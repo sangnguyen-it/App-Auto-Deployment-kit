@@ -1,0 +1,152 @@
+name: 'Flutter CI Setup'
+description: 'Setup Flutter environment with all dependencies for CI/CD'
+author: 'sangnguyen-it'
+
+inputs:
+  flutter_version:
+    description: 'Flutter version to install'
+    required: false
+    default: 'stable'
+  
+  cache_enabled:
+    description: 'Enable Flutter cache'
+    required: false
+    default: 'true'
+  
+  java_version:
+    description: 'Java version for Android builds'
+    required: false
+    default: '17'
+  
+  ruby_version:
+    description: 'Ruby version for Fastlane'
+    required: false
+    default: '3.1'
+  
+  setup_android:
+    description: 'Setup Android SDK and tools'
+    required: false
+    default: 'true'
+  
+  setup_ios:
+    description: 'Setup iOS development tools (macOS only)'
+    required: false
+    default: 'true'
+
+outputs:
+  flutter_version:
+    description: 'Installed Flutter version'
+    value: ${{ steps.flutter_info.outputs.version }}
+  
+  cache_hit:
+    description: 'Whether cache was hit'
+    value: ${{ steps.flutter_cache.outputs.cache-hit }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Java
+      if: inputs.setup_android == 'true'
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: ${{ inputs.java_version }}
+    
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ inputs.ruby_version }}
+        bundler-cache: true
+    
+    - name: Cache Flutter SDK
+      if: inputs.cache_enabled == 'true'
+      id: flutter_cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ runner.tool_cache }}/flutter
+          ~/.pub-cache
+        key: ${{ runner.os }}-flutter-${{ inputs.flutter_version }}-${{ hashFiles('**/pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-flutter-${{ inputs.flutter_version }}-
+          ${{ runner.os }}-flutter-
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ inputs.flutter_version }}
+        cache: ${{ inputs.cache_enabled }}
+        cache-key: flutter-${{ runner.os }}-${{ inputs.flutter_version }}
+        cache-path: ${{ runner.tool_cache }}/flutter
+        architecture: x64
+    
+    - name: Configure Flutter
+      shell: bash
+      run: |
+        flutter config --no-analytics
+        flutter precache --universal
+    
+    - name: Accept Android licenses
+      if: inputs.setup_android == 'true'
+      shell: bash
+      run: |
+        yes | flutter doctor --android-licenses || true
+    
+    - name: Setup iOS tools
+      if: inputs.setup_ios == 'true' && runner.os == 'macOS'
+      shell: bash
+      run: |
+        # Install CocoaPods if not available
+        if ! command -v pod &> /dev/null; then
+          echo "Installing CocoaPods..."
+          sudo gem install cocoapods
+        fi
+        
+        # Update CocoaPods repo
+        pod repo update --silent || true
+    
+    - name: Install Fastlane
+      shell: bash
+      run: |
+        if [ -f "Gemfile" ]; then
+          echo "Installing gems from Gemfile..."
+          bundle install
+        else
+          echo "Installing Fastlane directly..."
+          gem install fastlane -NV
+        fi
+    
+    - name: Flutter doctor
+      id: flutter_info
+      shell: bash
+      run: |
+        flutter doctor -v
+        FLUTTER_VERSION=$(flutter --version | head -n1 | cut -d' ' -f2)
+        echo "version=$FLUTTER_VERSION" >> $GITHUB_OUTPUT
+        echo "Flutter version: $FLUTTER_VERSION"
+    
+    - name: Get Flutter dependencies
+      shell: bash
+      run: |
+        echo "Getting Flutter dependencies..."
+        flutter pub get
+    
+    - name: Verify setup
+      shell: bash
+      run: |
+        echo "✅ Flutter setup completed successfully!"
+        echo "Flutter: $(flutter --version | head -n1)"
+        echo "Dart: $(dart --version | head -n1)"
+        echo "Java: $(java -version 2>&1 | head -n1)" || echo "Java: Not available"
+        echo "Ruby: $(ruby --version)" || echo "Ruby: Not available"
+        echo "Fastlane: $(fastlane --version)" || echo "Fastlane: Not available"
+        
+        if [ "$RUNNER_OS" = "macOS" ] && [ "${{ inputs.setup_ios }}" = "true" ]; then
+          echo "CocoaPods: $(pod --version)" || echo "CocoaPods: Not available"
+          echo "Xcode: $(xcodebuild -version | head -n1)" || echo "Xcode: Not available"
+        fi
+
+branding:
+  icon: 'smartphone'
+  color: 'blue'
+

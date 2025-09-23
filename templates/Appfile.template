@@ -1,0 +1,37 @@
+# Appfile Template for Flutter Projects
+# Copy this file to ios/fastlane/Appfile and android/fastlane/Appfile
+# Update the values according to your app configuration
+
+# For iOS (ios/fastlane/Appfile)
+# Uncomment and update these values for iOS:
+
+# app_identifier("com.example.yourapp") # Replace with your bundle identifier
+# apple_id("your-email@example.com") # Replace with your Apple ID
+# team_id("XXXXXXXXXX") # Replace with your Apple Developer Team ID
+
+# Optional: If you belong to multiple teams
+# itc_team_id("YYYYYYYYYY") # App Store Connect Team ID (if different from team_id)
+
+# For Android (android/fastlane/Appfile)
+# Uncomment and update these values for Android:
+
+# package_name("com.example.yourapp") # Replace with your Android package name
+
+# Optional: Google Play service account JSON file path
+# If not specified here, use environment variable FASTLANE_JSON_KEY_FILE
+# json_key_file("play_store_service_account.json")
+
+# Optional: Google Play service account JSON data
+# If not specified here, use environment variable FASTLANE_JSON_KEY_DATA
+# json_key_data("base64-encoded-json-content")
+
+# Example configuration for TrackAsia Live app:
+# 
+# iOS configuration:
+# app_identifier("com.trackasia.live")
+# apple_id("developer@trackasia.com")
+# team_id("ABC123DEF4")
+# 
+# Android configuration:
+# package_name("com.trackasia.live")
+

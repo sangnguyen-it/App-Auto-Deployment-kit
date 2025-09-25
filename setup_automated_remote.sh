@@ -17,7 +17,7 @@ set -e
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Version and repository information
-VERSION="1.0.0"
+VERSION="2.0.0"
 GITHUB_REPO="sangnguyen-it/App-Auto-Deployment-kit"
 GITHUB_BRANCH="main"
 GITHUB_RAW_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}"

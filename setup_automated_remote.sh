@@ -1459,6 +1459,60 @@ EOF
     print_success "Setup guides created"
 }
 
+# Download required scripts from GitHub without executing them
+download_required_scripts_no_execute() {
+    print_step "Downloading required scripts from GitHub (no execution)..."
+    
+    # Check connectivity first
+    if ! check_connectivity; then
+        print_warning "Cannot download scripts - no internet connectivity"
+        return 1
+    fi
+    
+    # List of required scripts to download
+    local scripts=(
+        "scripts/setup_automated.sh"
+        "scripts/flutter_project_analyzer.dart"
+        "scripts/version_checker.rb"
+        "scripts/version_manager.dart"
+        "scripts/integration_test.sh"
+        "scripts/quick_setup.sh"
+        "scripts/setup_interactive.sh"
+        "scripts/README.md"
+    )
+    
+    local download_success=true
+    
+    for script in "${scripts[@]}"; do
+        local script_name=$(basename "$script")
+        local script_dir=$(dirname "$script")
+        local target_path="$TARGET_DIR/$script"
+        local url="${GITHUB_RAW_URL}/${script}"
+        
+        print_info "Downloading $script_name..."
+        
+        # Create directory if it doesn't exist
+        mkdir -p "$TARGET_DIR/$script_dir"
+        
+        # Download the script
+        if curl -fsSL "$url" -o "$target_path" 2>/dev/null; then
+            chmod +x "$target_path"
+            print_success "✅ $script_name downloaded and made executable"
+        else
+            print_warning "❌ Failed to download $script_name"
+            download_success=false
+        fi
+    done
+    
+    if [ "$download_success" = true ]; then
+        print_success "All required scripts downloaded successfully (not executed)"
+        return 0
+    else
+        print_warning "Some scripts failed to download, but continuing..."
+        return 1
+    fi
+}
+
 # Download required scripts from GitHub
 download_required_scripts() {
     print_step "Downloading required scripts from GitHub..."
@@ -1604,15 +1658,18 @@ run_comprehensive_setup() {
         cd "$TARGET_DIR"
         if bash "$setup_script" "$TARGET_DIR"; then
             print_success "Comprehensive setup completed successfully!"
+            return 0
         else
             print_warning "Comprehensive setup encountered some issues, but basic setup is complete"
             print_info "You can run the setup script manually later: $setup_script"
+            return 1
         fi
     else
         print_info "Comprehensive setup script not found - basic setup only"
         echo -e "${CYAN}Next Steps:${NC}"
         echo -e "  • Check ${WHITE}docs/SETUP_GUIDE.md${NC} for manual setup"
         echo -e "  • Configure iOS/Android credentials manually"
+        return 1
     fi
 }
 
@@ -1647,8 +1704,23 @@ main() {
     # Create directory structure
     create_directory_structure
     
-    # Download required scripts from GitHub
-    download_required_scripts
+    # First, try to run local setup script if it exists
+    local local_setup_executed=false
+    if run_comprehensive_setup; then
+        local_setup_executed=true
+        print_success "Local setup script executed successfully!"
+    else
+        print_info "Local setup script not found or failed, will download from GitHub..."
+    fi
+    
+    # Download required scripts from GitHub (but skip execution if local was successful)
+    if [ "$local_setup_executed" = false ]; then
+        download_required_scripts
+    else
+        # Still download scripts for future use, but don't execute them
+        print_step "Downloading scripts for future use (skipping execution)..."
+        download_required_scripts_no_execute
+    fi
     
     # Generate all CI/CD files
     create_makefile
@@ -1678,18 +1750,12 @@ main() {
     echo -e "  3. ✅ GitHub Actions configured"
     echo -e "  4. ✅ Fastlane templates created"
     echo -e "  5. ✅ Documentation generated in ${WHITE}docs/${NC}"
-    echo -e "  6. ✅ Setup scripts downloaded and executed"
-    echo ""
-    
-    # Note: setup_automated.sh is already executed in download_required_scripts function
-    print_info "Comprehensive setup script has been automatically executed during download"
-    
-    # Fallback: If download failed, try to run existing setup scripts
-    if [ ! -f "$TARGET_DIR/scripts/setup_automated.sh" ]; then
-        print_separator
-        print_warning "Setup script not found after download, checking for existing scripts..."
-        run_comprehensive_setup
+    if [ "$local_setup_executed" = true ]; then
+        echo -e "  6. ✅ Local setup script executed"
+    else
+        echo -e "  6. ✅ Setup scripts downloaded and executed"
     fi
+    echo ""
     
     print_separator
     print_header "🎉 Complete Setup Finished!"

@@ -1931,18 +1931,7 @@ create_project_config() {
         fi
         echo ""
         
-        # Check if running in automated mode (skip credentials)
-        if [[ "$SKIP_CREDENTIALS" == "true" ]]; then
-            print_info "Running in automated mode - keeping existing project.config file"
-            print_success "✅ Using existing configuration for automated setup"
-            
-            # Set flag to prevent config updates in automated mode
-            export PROJECT_CONFIG_USER_APPROVED="false"
-            echo ""
-            return 0
-        fi
-        
-        # Ask user what to do (only in interactive mode)
+        # Ask user what to do
         echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
         echo "  ${GREEN} - Yes, create new (overwrite existing)"
         echo "  ${RED} - No, keep existing file"

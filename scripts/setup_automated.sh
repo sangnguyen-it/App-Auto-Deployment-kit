@@ -536,75 +536,108 @@ check_github_auth() {
         local max_attempts=3
         local attempt=1
         
+        print_info "🌐 Opening GitHub authentication in your web browser..."
+        print_info "📋 Please follow these steps:"
+        echo -e "  ${WHITE}1.${NC} Your browser will open automatically"
+        echo -e "  ${WHITE}2.${NC} Login to GitHub if not already logged in"
+        echo -e "  ${WHITE}3.${NC} Authorize the GitHub CLI application"
+        echo -e "  ${WHITE}4.${NC} Return to this terminal after authorization"
+        echo ""
+        
         while [ $attempt -le $max_attempts ]; do
-            print_step "Authentication attempt $attempt of $max_attempts..."
+            print_step "🔐 Starting GitHub authentication (attempt $attempt of $max_attempts)..."
             
-            if gh auth login --web; then
-                print_success "GitHub authentication completed successfully!"
+            # Clear any existing authentication that might be corrupted
+            if [ $attempt -gt 1 ]; then
+                print_info "🧹 Clearing previous authentication attempt..."
+                gh auth logout >/dev/null 2>&1 || true
+                sleep 1
+            fi
+            
+            # Attempt authentication
+            if gh auth login --web --git-protocol https; then
+                print_success "✅ GitHub authentication completed!"
+                
+                # Wait a moment for authentication to settle
+                sleep 2
                 
                 # Verify authentication worked
                 if gh auth status >/dev/null 2>&1; then
                     # Get authenticated user info
                     GITHUB_USER=$(gh api user --jq '.login' 2>/dev/null || echo "Unknown")
-                    print_success "Authenticated as: $GITHUB_USER"
-                    return 0
+                    print_success "🎉 Successfully authenticated as: $GITHUB_USER"
+                    
+                    # Double-check API access
+                    if gh api user >/dev/null 2>&1; then
+                        print_success "🔗 GitHub API access verified"
+                        return 0
+                    else
+                        print_warning "⚠️  Authentication succeeded but API access failed"
+                    fi
                 else
-                    print_error "Authentication verification failed"
+                    print_error "❌ Authentication verification failed"
                 fi
             else
-                print_error "GitHub authentication failed (attempt $attempt)"
-            fi
-            
-            if [ $attempt -lt $max_attempts ]; then
-                print_info "Retrying authentication..."
-                sleep 2
+                print_error "❌ GitHub authentication failed (attempt $attempt)"
+                
+                if [ $attempt -lt $max_attempts ]; then
+                    print_info "🔄 Will retry in 3 seconds..."
+                    sleep 3
+                fi
             fi
             
             ((attempt++))
         done
         
-        print_error "GitHub authentication failed after $max_attempts attempts"
-        print_info "Please ensure you have a stable internet connection and try again"
-        print_info "You can also try running 'gh auth login' manually first"
+        print_error "❌ GitHub authentication failed after $max_attempts attempts"
+        print_info "💡 Troubleshooting tips:"
+        echo -e "  ${WHITE}• ${NC}Ensure you have a stable internet connection"
+        echo -e "  ${WHITE}• ${NC}Check if GitHub.com is accessible"
+        echo -e "  ${WHITE}• ${NC}Try running 'gh auth login' manually first"
+        echo -e "  ${WHITE}• ${NC}Make sure you complete the browser authorization"
+        echo ""
         exit 1
     }
     
     # Check authentication status
     if ! gh auth status >/dev/null 2>&1; then
-        print_error "GitHub CLI is not authenticated"
-        print_info "GitHub authentication is REQUIRED to continue with the automated setup."
-        print_info "This script needs GitHub access to:"
-        echo -e "  ${WHITE}• Create and manage GitHub Actions workflows${NC}"
-        echo -e "  ${WHITE}• Access repository information${NC}"
-        echo -e "  ${WHITE}• Set up automated deployment pipelines${NC}"
+        print_error "❌ GitHub CLI is not authenticated"
+        print_info "🔑 GitHub authentication is REQUIRED to continue with the automated setup."
+        print_info "📝 This script needs GitHub access to:"
+        echo -e "  ${WHITE}• ${NC}Create and manage GitHub Actions workflows"
+        echo -e "  ${WHITE}• ${NC}Access repository information"
+        echo -e "  ${WHITE}• ${NC}Set up automated deployment pipelines"
         echo ""
         
-        print_step "Starting mandatory GitHub authentication..."
+        print_step "🚀 Starting automatic GitHub authentication..."
         perform_github_auth
     else
         # Already authenticated - get user info
         GITHUB_USER=$(gh api user --jq '.login' 2>/dev/null || echo "Unknown")
-        print_success "GitHub CLI is authenticated as: $GITHUB_USER"
+        print_success "✅ GitHub CLI is authenticated as: $GITHUB_USER"
         
         # Verify the authentication is still valid
         if ! gh api user >/dev/null 2>&1; then
-            print_error "GitHub authentication token is invalid or expired"
-            print_info "Re-authentication is REQUIRED to continue."
+            print_error "❌ GitHub authentication token is invalid or expired"
+            print_info "🔄 Re-authentication is REQUIRED to continue."
             echo ""
             
-            print_step "Starting mandatory GitHub re-authentication..."
+            print_step "🔐 Starting automatic GitHub re-authentication..."
             perform_github_auth
+        else
+            print_success "🔗 GitHub API access verified"
         fi
     fi
     
     # Final verification
     if ! gh auth status >/dev/null 2>&1 || ! gh api user >/dev/null 2>&1; then
-        print_error "GitHub authentication verification failed"
-        print_info "Cannot continue without valid GitHub authentication"
+        print_error "❌ GitHub authentication verification failed"
+        print_info "🛑 Cannot continue without valid GitHub authentication"
+        print_info "💡 Please run 'gh auth login' manually and try again"
         exit 1
     fi
     
-    print_success "GitHub authentication verified successfully"
+    print_success "🎉 GitHub authentication verified successfully"
     echo ""
 }
 

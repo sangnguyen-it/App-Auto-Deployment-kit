@@ -3374,6 +3374,12 @@ run_credential_setup() {
     print_header "🔒 Credential Validation & Setup"
     
     if ! validate_credentials; then
+        if [[ "$SKIP_CREDENTIALS" == "true" ]]; then
+            print_info "Skipping credential setup due to --skip-credentials flag"
+            print_warning "Some credentials are missing but setup will continue in automated mode"
+            return 0
+        fi
+        
         print_warning "Some credentials are missing. Starting interactive setup..."
         echo ""
         

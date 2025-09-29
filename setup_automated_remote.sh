@@ -111,7 +111,13 @@ print_separator() {
 
 # Detect if running from remote installation
 detect_remote_installation() {
-    if [[ "$PWD" == /tmp/* ]] || [[ "${BASH_SOURCE[0]}" == /tmp/* ]] || [[ "$0" == bash ]]; then
+    # Check multiple conditions for remote installation
+    if [[ "$PWD" == /tmp/* ]] || \
+       [[ "${BASH_SOURCE[0]}" == /tmp/* ]] || \
+       [[ "${BASH_SOURCE[0]}" == "/dev/fd/"* ]] || \
+       [[ "${BASH_SOURCE[0]}" == "/proc/self/fd/"* ]] || \
+       [[ "$0" == bash ]] || \
+       [[ "$0" == "bash" ]]; then
         REMOTE_INSTALLATION=true
         print_info "${GLOBE} Remote installation detected"
         return 0
@@ -502,13 +508,7 @@ EOF
 }
 
 # Detect if running via curl pipe
-detect_remote_installation() {
-    if [[ "${BASH_SOURCE[0]}" == "/dev/fd/"* ]] || [[ "${BASH_SOURCE[0]}" == "/proc/self/fd/"* ]]; then
-        REMOTE_INSTALLATION="true"
-    else
-        REMOTE_INSTALLATION="false"
-    fi
-}
+# Removed duplicate detect_remote_installation function
 
 # Detect target directory
 detect_target_directory() {
@@ -1712,7 +1712,19 @@ main() {
         print_info "Remote installation detected - downloading scripts from GitHub..."
         if download_required_scripts; then
             local_setup_executed=true
-            print_success "Scripts downloaded and executed successfully!"
+            print_success "✅ Local setup script executed"
+            
+            # If setup_automated.sh was executed successfully, we're done
+            print_separator
+            print_header "🎉 Complete Setup Finished!"
+            print_success "🎉 Complete CI/CD integration finished!"
+            echo ""
+            echo -e "${WHITE}Final Steps:${NC}"
+            echo -e "  1. ${CYAN}make system-check${NC} - Verify configuration"
+            echo -e "  2. ${CYAN}make auto-build-tester${NC} - Test deployment"
+            echo ""
+            print_success "✅ Ready for deployment! 🚀"
+            return 0
         else
             print_warning "Failed to download or execute scripts from GitHub"
         fi
@@ -1720,32 +1732,56 @@ main() {
         # For local installation, try to run existing local script first
         if run_comprehensive_setup; then
             local_setup_executed=true
-            print_success "Local setup script executed successfully!"
+            print_success "✅ Local setup script executed"
+            
+            # If local setup script was executed successfully, we're done
+            print_separator
+            print_header "🎉 Complete Setup Finished!"
+            print_success "🎉 Complete CI/CD integration finished!"
+            echo ""
+            echo -e "${WHITE}Final Steps:${NC}"
+            echo -e "  1. ${CYAN}make system-check${NC} - Verify configuration"
+            echo -e "  2. ${CYAN}make auto-build-tester${NC} - Test deployment"
+            echo ""
+            print_success "✅ Ready for deployment! 🚀"
+            return 0
         else
             print_info "Local setup script not found or failed, will download from GitHub..."
             # Fallback to downloading scripts
             if download_required_scripts; then
                 local_setup_executed=true
-                print_success "Scripts downloaded and executed successfully!"
+                print_success "✅ Local setup script executed"
+                
+                # If downloaded setup script was executed successfully, we're done
+                print_separator
+                print_header "🎉 Complete Setup Finished!"
+                print_success "🎉 Complete CI/CD integration finished!"
+                echo ""
+                echo -e "${WHITE}Final Steps:${NC}"
+                echo -e "  1. ${CYAN}make system-check${NC} - Verify configuration"
+                echo -e "  2. ${CYAN}make auto-build-tester${NC} - Test deployment"
+                echo ""
+                print_success "✅ Ready for deployment! 🚀"
+                return 0
             fi
         fi
     fi
     
-    # If no setup script was executed, download scripts for future use
+    # If no setup script was executed, download scripts for future use and create basic setup
     if [ "$local_setup_executed" = false ]; then
         print_step "Downloading scripts for future use..."
         download_required_scripts_no_execute
+        
+        # Generate basic CI/CD files as fallback
+        create_makefile
+        create_github_workflow  
+        create_android_fastlane
+        create_ios_fastlane
+        create_project_config
+        create_gemfile
+        update_gitignore
+        create_setup_guides
     fi
-    
-    # Generate all CI/CD files
-    create_makefile
-    create_github_workflow  
-    create_android_fastlane
-    create_ios_fastlane
-    create_project_config
-    create_gemfile
-    update_gitignore
-    create_setup_guides
     
     print_success "CI/CD integration completed successfully!"
     

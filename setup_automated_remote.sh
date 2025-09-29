@@ -1704,21 +1704,36 @@ main() {
     # Create directory structure
     create_directory_structure
     
-    # First, try to run local setup script if it exists
+    # Check if we're in remote installation mode
     local local_setup_executed=false
-    if run_comprehensive_setup; then
-        local_setup_executed=true
-        print_success "Local setup script executed successfully!"
+    
+    if [[ "$REMOTE_INSTALLATION" == "true" ]]; then
+        # For remote installation, download scripts first, then execute
+        print_info "Remote installation detected - downloading scripts from GitHub..."
+        if download_required_scripts; then
+            local_setup_executed=true
+            print_success "Scripts downloaded and executed successfully!"
+        else
+            print_warning "Failed to download or execute scripts from GitHub"
+        fi
     else
-        print_info "Local setup script not found or failed, will download from GitHub..."
+        # For local installation, try to run existing local script first
+        if run_comprehensive_setup; then
+            local_setup_executed=true
+            print_success "Local setup script executed successfully!"
+        else
+            print_info "Local setup script not found or failed, will download from GitHub..."
+            # Fallback to downloading scripts
+            if download_required_scripts; then
+                local_setup_executed=true
+                print_success "Scripts downloaded and executed successfully!"
+            fi
+        fi
     fi
     
-    # Download required scripts from GitHub (but skip execution if local was successful)
+    # If no setup script was executed, download scripts for future use
     if [ "$local_setup_executed" = false ]; then
-        download_required_scripts
-    else
-        # Still download scripts for future use, but don't execute them
-        print_step "Downloading scripts for future use (skipping execution)..."
+        print_step "Downloading scripts for future use..."
         download_required_scripts_no_execute
     fi
     

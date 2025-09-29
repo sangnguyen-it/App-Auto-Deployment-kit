@@ -3574,8 +3574,12 @@ main() {
             create_project_config
         fi
         
-        # Credential validation and interactive setup
-        run_credential_setup
+        # Credential validation (unless skipped)
+        if [[ "$SKIP_CREDENTIALS" != "true" ]]; then
+            run_credential_setup
+        else
+            print_info "Skipping credential validation as requested"
+        fi
         
         # Generate detailed setup guides
         generate_detailed_setup_guides

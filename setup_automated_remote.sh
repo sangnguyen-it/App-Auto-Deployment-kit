@@ -1701,6 +1701,21 @@ main() {
         exit 0
     fi
     
+    # Parse arguments to find directory path
+    local target_dir=""
+    for arg in "$@"; do
+        # Skip options that start with --
+        if [[ "$arg" != --* ]]; then
+            target_dir="$arg"
+            break
+        fi
+    done
+    
+    # If no directory specified and we're in remote mode, use current directory
+    if [[ -z "$target_dir" ]]; then
+        target_dir="$(pwd)"
+    fi
+    
     # Detect installation mode
     detect_remote_installation
     
@@ -1712,7 +1727,7 @@ main() {
     fi
     
     # Project analysis
-    detect_target_directory "$1"
+    detect_target_directory "$target_dir"
     analyze_flutter_project
     
     print_separator

@@ -1575,7 +1575,7 @@ download_required_scripts() {
             print_info "Executing downloaded setup_automated.sh..."
             
             cd "$TARGET_DIR"
-            if bash "$setup_script" "$TARGET_DIR"; then
+            if bash "$setup_script" "$@"; then
                 print_success "Downloaded setup script executed successfully!"
             else
                 print_warning "Downloaded setup script encountered some issues"
@@ -1626,9 +1626,9 @@ run_specific_setup_script() {
         print_info "Automatically running setup script..."
         echo ""
         
-        # Run the setup script with TARGET_DIR as argument
+        # Run the setup script with all arguments passed through
         cd "$TARGET_DIR"
-        if bash "$found_script" "$TARGET_DIR"; then
+        if bash "$found_script" "$@"; then
             print_success "Setup script completed successfully!"
             return 0
         else

@@ -792,7 +792,7 @@ create_comprehensive_makefile() {
 # Force bash shell usage (fix for echo -e compatibility)
 SHELL := /bin/bash
 
-.PHONY: help setup build deploy clean test doctor system-check
+.PHONY: help setup build deploy clean test doctor system-check system-tester trigger-github-actions
 .DEFAULT_GOAL := menu
 
 # Project Configuration
@@ -885,11 +885,29 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 	@printf "$(CYAN)🚀 Building for Testers$(NC)\n"
 	@printf "\n"
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking dependencies..."
-	@if ! command -v bundle >/dev/null 2>&1; then \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
-		gem install bundler; \
+	@if command -v ruby >/dev/null 2>&1 && command -v gem >/dev/null 2>&1; then \
+		if ! command -v bundle >/dev/null 2>&1; then \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
+			if gem install bundler 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Bundler installed successfully"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler install failed - continuing without gems"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: gem install bundler"; \
+			fi; \
+		fi; \
+		if [ -f "Gemfile" ] && command -v bundle >/dev/null 2>&1; then \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing Ruby gems..."; \
+			if bundle install 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Ruby gems installed"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundle install failed - continuing without gems"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: bundle install"; \
+			fi; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Ruby/Gems not found - skipping gem dependencies"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby if you need Fastlane functionality"; \
 	fi
-	@if [ ! -f "Gemfile.lock" ]; then bundle install; fi
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting system configuration check..."
 	@$(MAKE) system-check
 	@if [ $$? -ne 0 ]; then \
@@ -919,11 +937,39 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 		flutter build ios --release; \
 		if [ $$? -eq 0 ]; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
+			mkdir -p build/ios/archive build/ios/ipa; \
 			cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
 			if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
 				cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_NAME)"; \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_NAME)"; \
+				printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting IPA from Archive..."; \
+				if [ -f "ExportOptions.plist" ]; then \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist ExportOptions.plist; \
+				else \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+				fi; \
+				IPA_FILE=\$\$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+				if [ -n "\$\$IPA_FILE" ] && [ -f "\$\$IPA_FILE" ]; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "IPA exported successfully"; \
+					cp "\$\$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_NAME)"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
+					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to TestFlight..."; \
+					if command -v bundle >/dev/null 2>&1 && [ -f "Gemfile" ] && [ -f "fastlane/Fastfile" ]; then \
+						if bundle exec fastlane ios beta 2>/dev/null; then \
+							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight"; \
+						else \
+							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "TestFlight upload failed - check fastlane configuration"; \
+							printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && fastlane ios beta"; \
+						fi; \
+					else \
+						printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - manual TestFlight upload required"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "Upload manually: Use Xcode Organizer or Transporter app"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$(IPA_NAME)"; \
+					fi; \
+				else \
+					printf "$(RED)$(CROSS) %s$(NC)\n" "IPA export failed"; \
+				fi; \
 			fi; \
 		fi; \
 	else \
@@ -934,17 +980,38 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 	@printf "$(GREEN)🎉 Tester Build Pipeline Completed!$(NC)\n"
 	@printf "$(WHITE)📁 Builder Directory:$(NC) $(OUTPUT_DIR)/\n"
 	@printf "$(WHITE)📱 Android APK:$(NC) $(OUTPUT_DIR)/$(APK_NAME)\n"
+	@if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$(IPA_NAME)" ]; then \
+		printf "$(WHITE)🍎 iOS IPA:$(NC) $(OUTPUT_DIR)/$(IPA_NAME)\n"; \
+	fi
 
 auto-build-live: ## 🚀 Automated Live Production Pipeline
 	@printf "\n"
 	@printf "$(CYAN)🌟 Building for Production$(NC)\n"
 	@printf "\n"
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking dependencies..."
-	@if ! command -v bundle >/dev/null 2>&1; then \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
-		gem install bundler; \
+	@if command -v ruby >/dev/null 2>&1 && command -v gem >/dev/null 2>&1; then \
+		if ! command -v bundle >/dev/null 2>&1; then \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
+			if gem install bundler 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Bundler installed successfully"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler install failed - continuing without gems"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: gem install bundler"; \
+			fi; \
+		fi; \
+		if [ -f "Gemfile" ] && command -v bundle >/dev/null 2>&1; then \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing Ruby gems..."; \
+			if bundle install 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Ruby gems installed"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundle install failed - continuing without gems"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: bundle install"; \
+			fi; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Ruby/Gems not found - skipping gem dependencies"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby if you need Fastlane functionality"; \
 	fi
-	@if [ ! -f "Gemfile.lock" ]; then bundle install; fi
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting system configuration check..."
 	@$(MAKE) system-check
 	@if [ $$? -ne 0 ]; then \
@@ -974,11 +1041,39 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 		flutter build ios --release; \
 		if [ $$? -eq 0 ]; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
+			mkdir -p build/ios/archive build/ios/ipa; \
 			cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
 			if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
 				cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
+				printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting Production IPA from Archive..."; \
+				if [ -f "ExportOptions.plist" ]; then \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist ExportOptions.plist; \
+				else \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+				fi; \
+				IPA_FILE=\$\$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+				if [ -n "\$\$IPA_FILE" ] && [ -f "\$\$IPA_FILE" ]; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
+					cp "\$\$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
+					if command -v bundle >/dev/null 2>&1 && [ -f "Gemfile" ] && [ -f "fastlane/Fastfile" ]; then \
+						if bundle exec fastlane ios release 2>/dev/null; then \
+							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
+						else \
+							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
+							printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && fastlane ios release"; \
+						fi; \
+					else \
+						printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - manual App Store upload required"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "Upload manually: Use Xcode Organizer or Transporter app"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					fi; \
+				else \
+					printf "$(RED)$(CROSS) %s$(NC)\n" "Production IPA export failed"; \
+				fi; \
 			fi; \
 		fi; \
 	else \
@@ -989,6 +1084,56 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 	@printf "$(GREEN)🚀 Live Production Pipeline Completed!$(NC)\n"
 	@printf "$(WHITE)📁 Builder Directory:$(NC) $(OUTPUT_DIR)/\n"
 	@printf "$(WHITE)📦 Android AAB:$(NC) $(OUTPUT_DIR)/$(AAB_NAME)\n"
+	@if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$(IPA_PROD_NAME)" ]; then \
+		printf "$(WHITE)🍎 iOS Production IPA:$(NC) $(OUTPUT_DIR)/$(IPA_PROD_NAME)\n"; \
+	fi
+	
+	@printf "\n"
+	@printf "$(CYAN)🚀 Triggering GitHub Actions for Store Upload...$(NC)\n"
+	@$(MAKE) trigger-github-actions
+
+trigger-github-actions: ## 🚀 Trigger GitHub Actions CI/CD (Tag Push + API)
+	@printf "\n"
+	@printf "$(CYAN)🚀 Triggering GitHub Actions CI/CD$(NC)\n"
+	@printf "\n"
+	@VERSION=$$(grep "version:" pubspec.yaml | cut -d' ' -f2 | tr -d ' '); \
+	if [ -z "$$VERSION" ]; then \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract version from pubspec.yaml"; \
+		exit 1; \
+	fi; \
+	printf "$(CYAN)$(INFO) %s$(NC)\n" "Extracted version: $$VERSION"; \
+	TAG_NAME="v$$VERSION"; \
+	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
+	if git tag -a "$$TAG_NAME" -m "🚀 Production release $$VERSION" 2>/dev/null; then \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git tag already exists or failed to create"; \
+	fi; \
+	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Pushing git tag to remote..."; \
+	if git push origin "$$TAG_NAME" 2>/dev/null; then \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag pushed successfully"; \
+		printf "$(CYAN)$(GEAR) %s$(NC)\n" "GitHub Actions triggered by tag push"; \
+		printf "$(GREEN)$(ROCKET) %s$(NC)\n" "Monitor deployment: https://github.com/$$(git remote get-url origin | sed 's/.*github.com[:/]\([^.]*\).*/\1/')/actions"; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git push failed - trying GitHub API trigger..."; \
+		if command -v gh >/dev/null 2>&1; then \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Using GitHub CLI to trigger workflow..."; \
+			if gh workflow run deploy.yml --field environment=production --field platforms=all 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "GitHub Actions triggered via API"; \
+				printf "$(GREEN)$(ROCKET) %s$(NC)\n" "Monitor deployment: gh run list --workflow=deploy.yml"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "GitHub CLI trigger failed"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual trigger: Go to GitHub → Actions → Run workflow"; \
+			fi; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "GitHub CLI not found"; \
+			printf "$(CYAN)$(INFO) %s$(NC)\n" "Install: brew install gh"; \
+			printf "$(CYAN)$(INFO) %s$(NC)\n" "Or trigger manually on GitHub"; \
+		fi; \
+	fi
+	@printf "\n"
+	@printf "$(GREEN)🚀 GitHub Actions Pipeline Triggered!$(NC)\n"
+	@printf "$(CYAN)$(INFO) %s$(NC)\n" "Check GitHub Actions for automated deployment status"
 
 system-check: ## 🔍 Comprehensive System Configuration Check
 	@printf "$(CYAN)🔍 System Configuration Check$(NC)\n"
@@ -1004,18 +1149,52 @@ system-check: ## 🔍 Comprehensive System Configuration Check
 	@if [ -f "ios/fastlane/Fastfile" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Fastlane configured"; else printf "$(RED)$(CROSS) %s$(NC)\n" "iOS needs setup - See IOS_SETUP_GUIDE.md"; fi
 	@if [ -f ".github/workflows/deploy.yml" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "GitHub Actions configured"; else printf "$(RED)$(CROSS) %s$(NC)\n" "GitHub Actions needs setup"; fi
 
+system-tester: system-check ## 🧪 Alias for system-check (checks system for tester deployment)
+
 # Dependencies
-deps:
+deps: ## 📦 Install dependencies
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing dependencies..."
 	@flutter pub get
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing Ruby gems..."
-	@if command -v bundle >/dev/null 2>&1; then \
-		bundle install; \
+	@if command -v ruby >/dev/null 2>&1 && command -v gem >/dev/null 2>&1; then \
+		if ! command -v bundle >/dev/null 2>&1; then \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
+			if gem install bundler 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Bundler installed successfully"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler install failed - continuing without gems"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: gem install bundler"; \
+			fi; \
+		fi; \
+		if [ -f "Gemfile" ] && command -v bundle >/dev/null 2>&1; then \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing from Gemfile..."; \
+			if bundle install 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Ruby gems installed from Gemfile"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundle install failed - continuing without gems"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: bundle install"; \
+			fi; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "No Gemfile found or bundler unavailable - skipping gems"; \
+		fi; \
 	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
-		gem install bundler && bundle install; \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Ruby/Gems not available - skipping gem dependencies"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby to enable Fastlane functionality"; \
 	fi
-	@if [ -f "ios/Podfile" ]; then cd ios && pod install --silent; fi
+	@if [ -f "ios/Podfile" ]; then \
+		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing iOS dependencies..."; \
+		cd ios && pod install --silent || { \
+			printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Trying fix..."; \
+			if [ -f "Podfile.fixed" ]; then \
+				cp Podfile.fixed Podfile && \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Applied Podfile fix, retrying..."; \
+				pod install --silent || \
+				printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install still failing. Run: ./apply_podfile_fix.sh"; \
+			else \
+				printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Run: ./apply_podfile_fix.sh"; \
+			fi; \
+		}; \
+	fi
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Dependencies installed"
 
 setup: ## Setup and configure development environment
@@ -1097,21 +1276,23 @@ manual-operations: ## ⚙️ Manual Operations Menu
 	@printf "$(PURPLE)$(BOLD)Available Manual Operations:$(NC)\n"
 	@printf "\n"
 	@printf "$(CYAN)  1)$(NC) $(WHITE)🔨 Build Management$(NC)        $(GRAY)# Interactive builds$(NC)\n"
-	@printf "$(CYAN)  2)$(NC) $(WHITE)⚙️  Environment Setup$(NC)       $(GRAY)# Configure development environment$(NC)\n"
-	@printf "$(CYAN)  3)$(NC) $(WHITE)🧹 Clean & Reset$(NC)           $(GRAY)# Clean build artifacts$(NC)\n"
-	@printf "$(CYAN)  4)$(NC) $(WHITE)🔍 System Check$(NC)            $(GRAY)# Verify configuration$(NC)\n"
-	@printf "$(CYAN)  5)$(NC) $(WHITE)⬅️  Back to Main Menu$(NC)       $(GRAY)# Return to automated pipelines$(NC)\n"
+	@printf "$(CYAN)  2)$(NC) $(WHITE)🚀 Trigger GitHub Actions$(NC)  $(GRAY)# Git tag + CI/CD trigger$(NC)\n"
+	@printf "$(CYAN)  3)$(NC) $(WHITE)⚙️  Environment Setup$(NC)       $(GRAY)# Configure development environment$(NC)\n"
+	@printf "$(CYAN)  4)$(NC) $(WHITE)🧹 Clean & Reset$(NC)           $(GRAY)# Clean build artifacts$(NC)\n"
+	@printf "$(CYAN)  5)$(NC) $(WHITE)🔍 System Check$(NC)            $(GRAY)# Verify configuration$(NC)\n"
+	@printf "$(CYAN)  6)$(NC) $(WHITE)⬅️  Back to Main Menu$(NC)       $(GRAY)# Return to automated pipelines$(NC)\n"
 	@printf "\n"
 	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
-	@printf "$(WHITE)Enter your choice [1-5]:$(NC) "
+	@printf "$(WHITE)Enter your choice [1-6]:$(NC) "
 	@read -p "" CHOICE; \
 	case $$CHOICE in \
 		1) $(MAKE) build-management-menu ;; \
-		2) $(MAKE) setup ;; \
-		3) $(MAKE) clean ;; \
-		4) $(MAKE) system-check ;; \
-		5) $(MAKE) menu ;; \
-		*) printf "$(RED)Invalid choice. Please select 1-5.$(NC)\n" ;; \
+		2) $(MAKE) trigger-github-actions ;; \
+		3) $(MAKE) setup ;; \
+		4) $(MAKE) clean ;; \
+		5) $(MAKE) system-check ;; \
+		6) $(MAKE) menu ;; \
+		*) printf "$(RED)Invalid choice. Please select 1-6.$(NC)\n" ;; \
 	esac
 
 build-management-menu: ## 🔨 Build Management Menu
@@ -1195,13 +1376,14 @@ help: ## Show detailed help and all available commands
 	@printf "\n"
 	@printf "$(PURPLE)$(BOLD)⚙️ Manual Operations:$(NC)\n"
 	@printf "$(CYAN)  make manual-operations$(NC)  $(GRAY)# Manual tools menu$(NC)\n"
+	@printf "$(CYAN)  make trigger-github-actions$(NC) $(GRAY)# 🚀 Git tag + CI/CD trigger$(NC)\n"
 	@printf "$(CYAN)  make system-check$(NC)       $(GRAY)# 🔍 System verification$(NC)\n"
 	@printf "\n"
 	@printf "$(PURPLE)$(BOLD)Direct Commands:$(NC)\n"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -v "menu\|interactive\|auto-build" | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(CYAN)  %-20s$(NC) %s\n", $$1, $$2}'
 	@printf "\n"
 
-.PHONY: help system-check doctor clean deps test auto-build-tester auto-build-live setup menu manual-operations build-management-menu build-android-apk build-android-aab build-ios build
+.PHONY: help system-check system-tester doctor clean deps test auto-build-tester auto-build-live setup menu manual-operations build-management-menu build-android-apk build-android-aab build-ios build trigger-github-actions
 EOF
 }
 

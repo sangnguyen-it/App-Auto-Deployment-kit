@@ -653,65 +653,215 @@ EOF
     print_success "Makefile created and customized"
 }
 
-# Create GitHub workflow
+# Create GitHub workflow (Upload-Only)
 create_github_workflow() {
     print_step "Creating GitHub Actions workflow..."
     
     cat > "$TARGET_DIR/.github/workflows/deploy.yml" << EOF
-name: '$PROJECT_NAME - Auto Deploy'
+name: '$PROJECT_NAME - Upload to Stores'
 
 on:
-  push:
-    tags: 
-      - 'v*'
+  release:
+    types: [published]
+  
+  # Manual trigger with release tag
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Deployment environment'
+      release_tag:
+        description: 'Release tag to upload (e.g., v1.0.0+13)'
         required: true
-        default: 'beta'
+        default: 'latest'
+        type: string
+      platforms:
+        description: 'Platforms to deploy'
+        required: true
+        default: 'all'
         type: choice
         options:
-          - beta
-          - production
+          - ios
+          - android
+          - all
 
 jobs:
-  deploy-android:
-    name: 'Deploy Android'
+  # Upload to Google Play Store
+  upload-android:
+    name: '📦 Upload Android to Google Play'
     runs-on: ubuntu-latest
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.platforms == 'android' || github.event.inputs.platforms == 'all'))
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Setup Java 17
-      uses: actions/setup-java@v4
+    - name: Download Android AAB from release
+      run: |
+        if [[ "\${{ github.event_name }}" == "release" ]]; then
+          TAG_NAME="\${{ github.event.release.tag_name }}"
+        else
+          TAG_NAME="\${{ github.event.inputs.release_tag }}"
+          if [[ "\$TAG_NAME" == "latest" ]]; then
+            TAG_NAME=\$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+          fi
+        fi
+        
+        echo "📥 Downloading AAB from release: \$TAG_NAME"
+        gh release download "\$TAG_NAME" --pattern "*.aab" --dir ./downloads/
+        ls -la ./downloads/
+        
+        # Check if any AAB file exists
+        AAB_FILES=$(find ./downloads/ -name "*.aab" | head -1)
+        if [ -z "$AAB_FILES" ]; then
+          echo "❌ No AAB file found in release $TAG_NAME"
+          exit 1
+        fi
+        
+        echo "✅ AAB downloaded successfully"
+        echo "TAG_NAME=\$TAG_NAME" >> \$GITHUB_ENV
+      env:
+        GH_TOKEN: \${{ github.token }}
+    
+    - name: Setup Ruby for Fastlane
+      uses: ruby/setup-ruby@v1
       with:
-        distribution: 'corretto'
-        java-version: '17'
+        ruby-version: '3.1'
+        bundler-cache: true
+        working-directory: android
     
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
+    - name: Setup Android keystore
+      env:
+        ANDROID_KEYSTORE_BASE64: \${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        KEYSTORE_PASSWORD: \${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: \${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: \${{ secrets.KEY_PASSWORD }}
+      run: |
+        echo "🔐 Setting up Android keystore..."
+        mkdir -p android/app/
+        echo "\$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/app.keystore
+        
+        echo "storePassword=\$KEYSTORE_PASSWORD" > android/key.properties
+        echo "keyPassword=\$KEY_PASSWORD" >> android/key.properties
+        echo "keyAlias=\$KEY_ALIAS" >> android/key.properties
+        echo "storeFile=app/app.keystore" >> android/key.properties
+        
+        echo "✅ Android keystore configured"
+    
+    - name: Upload to Google Play Store
+      env:
+        SUPPLY_JSON_KEY_DATA: \${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+      run: |
+        echo "📤 Uploading AAB to Google Play Store..."
+        AAB_FILE=\$(find ./downloads -name "*.aab" | head -1)
+        echo "Found AAB: \$AAB_FILE"
+        
+        cd android
+        bundle exec fastlane supply --aab "../\$AAB_FILE" --track production --release_status completed
+        echo "✅ Successfully uploaded to Google Play Store"
+
+  # Upload to App Store
+  upload-ios:
+    name: '🍎 Upload iOS to App Store'
+    runs-on: macos-latest
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.platforms == 'ios' || github.event.inputs.platforms == 'all'))
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download iOS IPA from release
+      run: |
+        if [[ "\${{ github.event_name }}" == "release" ]]; then
+          TAG_NAME="\${{ github.event.release.tag_name }}"
+        else
+          TAG_NAME="\${{ github.event.inputs.release_tag }}"
+          if [[ "\$TAG_NAME" == "latest" ]]; then
+            TAG_NAME=\$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+          fi
+        fi
+        
+        echo "📥 Downloading IPA from release: \$TAG_NAME"
+        gh release download "\$TAG_NAME" --pattern "*.ipa" --dir ./downloads/
+        # Check if any IPA file exists
+        IPA_FILES=$(find ./downloads/ -name "*.ipa" | head -1)
+        if [ -z "$IPA_FILES" ]; then
+          echo "❌ No IPA file found in release $TAG_NAME"
+          exit 1
+        fi
+          exit 1
+        fi
+        
+        echo "✅ IPA downloaded successfully"
+        echo "TAG_NAME=\$TAG_NAME" >> \$GITHUB_ENV
+      env:
+        GH_TOKEN: \${{ github.token }}
+    
+    - name: Setup Ruby for Fastlane
+      uses: ruby/setup-ruby@v1
       with:
-        flutter-version: 'stable'
-        cache: true
+        ruby-version: '3.1'
+        bundler-cache: true
+        working-directory: ios
     
-    - name: Get Flutter dependencies
-      run: flutter pub get
+    - name: Setup iOS signing
+      env:
+        APP_STORE_CONNECT_API_KEY_ID: \${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        APP_STORE_CONNECT_ISSUER_ID: \${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        APP_STORE_CONNECT_API_KEY_BASE64: \${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+      run: |
+        echo "🔐 Setting up iOS signing..."
+        mkdir -p ios/fastlane/
+        echo "\$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > ios/fastlane/AuthKey_\$APP_STORE_CONNECT_API_KEY_ID.p8
+        chmod 600 ios/fastlane/AuthKey_\$APP_STORE_CONNECT_API_KEY_ID.p8
+        echo "✅ iOS signing configured"
     
-    - name: Build Android AAB
-      run: flutter build appbundle --release
+    - name: Upload to App Store
+      run: |
+        echo "📤 Uploading IPA to App Store..."
+        IPA_FILE=\$(find ./downloads -name "*.ipa" | head -1)
+        echo "Found IPA: \$IPA_FILE"
+        
+        cd ios
+        bundle exec fastlane pilot upload --ipa "../\$IPA_FILE" --skip_waiting_for_build_processing
+        echo "✅ Successfully uploaded to App Store"
+
+  # Summary job
+  summary:
+    name: '📊 Upload Summary'
+    runs-on: ubuntu-latest
+    needs: [upload-android, upload-ios]
+    if: always()
     
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: android-build-artifacts
-        path: |
-          build/app/outputs/bundle/release/app-release.aab
-        retention-days: 30
+    steps:
+    - name: Generate summary
+      run: |
+        echo "# 🚀 Store Upload Summary" >> \$GITHUB_STEP_SUMMARY
+        echo "" >> \$GITHUB_STEP_SUMMARY
+        echo "**Tag:** \${{ env.TAG_NAME || github.event.release.tag_name || github.event.inputs.release_tag }}" >> \$GITHUB_STEP_SUMMARY
+        echo "**Trigger:** \${{ github.event_name }}" >> \$GITHUB_STEP_SUMMARY
+        echo "" >> \$GITHUB_STEP_SUMMARY
+        
+        # Android status
+        if [[ "\${{ needs.upload-android.result }}" == "success" ]]; then
+          echo "✅ **Android:** Successfully uploaded to Google Play Store" >> \$GITHUB_STEP_SUMMARY
+        elif [[ "\${{ needs.upload-android.result }}" == "skipped" ]]; then
+          echo "⏭️ **Android:** Skipped" >> \$GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Android:** Upload failed" >> \$GITHUB_STEP_SUMMARY
+        fi
+        
+        # iOS status  
+        if [[ "\${{ needs.upload-ios.result }}" == "success" ]]; then
+          echo "✅ **iOS:** Successfully uploaded to App Store" >> \$GITHUB_STEP_SUMMARY
+        elif [[ "\${{ needs.upload-ios.result }}" == "skipped" ]]; then
+          echo "⏭️ **iOS:** Skipped" >> \$GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **iOS:** Upload failed" >> \$GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> \$GITHUB_STEP_SUMMARY
+        echo "🎉 **Upload process completed!**" >> \$GITHUB_STEP_SUMMARY
 EOF
     
-    print_success "GitHub Actions workflow created"
+    print_success "GitHub Actions workflow created (upload-only)"
 }
 
 # Create Android Fastlane configuration
@@ -724,38 +874,89 @@ create_android_fastlane() {
 package_name("$PACKAGE_NAME")
 EOF
     
+    # Create lowercase project name for filenames
+    local project_name_lower=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]')
+    
     # Create Fastfile
     cat > "$TARGET_DIR/android/fastlane/Fastfile" << EOF
 # Fastlane configuration for $PROJECT_NAME Android
 # Package: $PACKAGE_NAME
+# Generated on: \$(date)
 
 default_platform(:android)
+
+# Project Configuration - dynamically extracted
+PROJECT_NAME = "$PROJECT_NAME"
+PACKAGE_NAME = "$PACKAGE_NAME"
+AAB_PATH = "../builder/${project_name_lower}-production.aab"
 
 platform :android do
   desc "Submit a new Beta Build to Google Play Internal Testing"
   lane :beta do
-    gradle(task: "clean bundleRelease")
-    upload_to_play_store(
-      track: 'internal',
-      aab: '../build/app/outputs/bundle/release/app-release.aab',
-      skip_upload_apk: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true
-    )
+    UI.message("🚀 Building \#{PROJECT_NAME} for Internal Testing...")
+    
+    # Use artifacts from local build
+    if File.exist?(AAB_PATH)
+      UI.success("Using pre-built AAB: \#{AAB_PATH}")
+      upload_to_play_store(
+        track: 'internal',
+        aab: AAB_PATH,
+        package_name: PACKAGE_NAME,
+        skip_upload_apk: true,
+        skip_upload_metadata: true,
+        skip_upload_images: true,
+        skip_upload_screenshots: true
+      )
+    else
+      UI.error("AAB not found: \#{AAB_PATH}")
+      UI.message("Building AAB...")
+      gradle(task: "clean bundleRelease")
+      upload_to_play_store(
+        track: 'internal',
+        aab: '../build/app/outputs/bundle/release/app-release.aab',
+        package_name: PACKAGE_NAME,
+        skip_upload_apk: true,
+        skip_upload_metadata: true,
+        skip_upload_images: true,
+        skip_upload_screenshots: true
+      )
+    end
+    
+    UI.success("🎉 \#{PROJECT_NAME} uploaded to Internal Testing!")
   end
 
-  desc "Deploy a new version to Google Play"
+  desc "Deploy a new version to Google Play Production"
   lane :release do
-    gradle(task: "clean bundleRelease")
-    upload_to_play_store(
-      track: 'production',
-      aab: '../build/app/outputs/bundle/release/app-release.aab',
-      skip_upload_apk: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true
-    )
+    UI.message("🚀 Building \#{PROJECT_NAME} for Production...")
+    
+    # Use artifacts from local build  
+    if File.exist?(AAB_PATH)
+      UI.success("Using pre-built AAB: \#{AAB_PATH}")
+      upload_to_play_store(
+        track: 'production',
+        aab: AAB_PATH,
+        package_name: PACKAGE_NAME,
+        skip_upload_apk: true,
+        skip_upload_metadata: true,
+        skip_upload_images: true,
+        skip_upload_screenshots: true
+      )
+    else
+      UI.error("AAB not found: \#{AAB_PATH}")
+      UI.message("Building AAB...")
+      gradle(task: "clean bundleRelease")
+      upload_to_play_store(
+        track: 'production',
+        aab: '../build/app/outputs/bundle/release/app-release.aab',
+        package_name: PACKAGE_NAME,
+        skip_upload_apk: true,
+        skip_upload_metadata: true,
+        skip_upload_images: true,
+        skip_upload_screenshots: true
+      )
+    end
+    
+    UI.success("🎉 \#{PROJECT_NAME} uploaded to Google Play Store!")
   end
 end
 EOF
@@ -767,46 +968,132 @@ EOF
 create_ios_fastlane() {
     print_step "Creating iOS Fastlane configuration..."
     
+    # Create lowercase project name for filenames
+    local project_name_lower=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]')
+    
     # Create Appfile
     cat > "$TARGET_DIR/ios/fastlane/Appfile" << EOF
 # Appfile for $PROJECT_NAME iOS
-app_identifier("$BUNDLE_ID")
-apple_id("your-apple-id@email.com")
-team_id("YOUR_TEAM_ID")
+# Configuration for App Store Connect and Apple Developer
+
+app_identifier("$BUNDLE_ID") # Your bundle identifier
+apple_id("your-apple-id@email.com") # Replace with your Apple ID
+team_id("YOUR_TEAM_ID") # Replace with your Apple Developer Team ID
+
+# Optional: If you belong to multiple teams
+# itc_team_id("YOUR_TEAM_ID") # App Store Connect Team ID (if different from team_id)
 EOF
     
     # Create Fastfile
     cat > "$TARGET_DIR/ios/fastlane/Fastfile" << EOF
 # Fastlane configuration for $PROJECT_NAME iOS
 # Bundle ID: $BUNDLE_ID
+# Generated on: \$(date)
 
 default_platform(:ios)
 
+# Project Configuration - dynamically extracted
+PROJECT_NAME = "$PROJECT_NAME"
+BUNDLE_ID = "$BUNDLE_ID"
+IPA_PATH = "../builder/${project_name_lower}-production.ipa"
+TEAM_ID = "YOUR_TEAM_ID"
+KEY_ID = "YOUR_KEY_ID"
+ISSUER_ID = "YOUR_ISSUER_ID"
+
+# File paths (relative to fastlane directory)
+KEY_PATH = "./AuthKey_#{KEY_ID}.p8"
+CHANGELOG_PATH = "../builder/changelog.txt"
+IPA_OUTPUT_DIR = "../build/ios/ipa"
+
 platform :ios do
+  desc "Setup iOS environment"
+  lane :setup do
+    # Setup tasks would go here
+    UI.message("Setting up iOS environment for #{PROJECT_NAME}")
+  end
+
   desc "Submit a new Beta Build to TestFlight"
   lane :beta do
-    build_app(
-      scheme: "Runner",
-      export_method: "app-store"
-    )
+    UI.message("🚀 Building #{PROJECT_NAME} for TestFlight...")
     
-    upload_to_testflight(
-      skip_waiting_for_build_processing: true,
-      distribute_external: false
-    )
+    # Use artifacts from local build
+    if File.exist?(IPA_PATH)
+      UI.success("Using pre-built IPA: #{IPA_PATH}")
+      upload_to_testflight(
+        ipa: IPA_PATH,
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        groups: ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"],
+        notify_external_testers: true
+      )
+    else
+      UI.error("IPA not found: #{IPA_PATH}")
+      UI.message("Building IPA...")
+      build_app(
+        scheme: "Runner",
+        export_method: "app-store",
+        output_directory: IPA_OUTPUT_DIR
+      )
+      
+      upload_to_testflight(
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        groups: ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"],
+        notify_external_testers: true
+      )
+    end
+    
+    UI.success("🎉 #{PROJECT_NAME} uploaded to TestFlight!")
   end
 
   desc "Submit a new Release Build to App Store"
   lane :release do
-    build_app(
-      scheme: "Runner",
-      export_method: "app-store"
-    )
+    UI.message("🚀 Building #{PROJECT_NAME} for App Store...")
     
+    # Use artifacts from local build  
+    if File.exist?(IPA_PATH)
+      UI.success("Using pre-built IPA: #{IPA_PATH}")
+      upload_to_testflight(
+        ipa: IPA_PATH,
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        groups: ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"],
+        notify_external_testers: false
+      )
+    else
+      UI.error("IPA not found: #{IPA_PATH}")
+      UI.message("Building IPA...")
+      build_app(
+        scheme: "Runner",
+        export_method: "app-store",
+        output_directory: IPA_OUTPUT_DIR
+      )
+      
+      upload_to_testflight(
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        groups: ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"],
+        notify_external_testers: false
+      )
+    end
+    
+    UI.success("🎉 #{PROJECT_NAME} uploaded to App Store!")
+  end
+
+  desc "Upload archive to TestFlight"
+  lane :upload_only do
     upload_to_testflight(
       skip_waiting_for_build_processing: true,
-      distribute_external: false
+      distribute_external: false,
+      groups: ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"],
+      notify_external_testers: true
     )
+  end
+
+  desc "Clean iOS build artifacts"
+  lane :clean do
+    # Clean build artifacts
+    clear_derived_data
   end
 end
 EOF
@@ -856,11 +1143,157 @@ EOF
     print_success "Gemfile created"
 }
 
+# Update .gitignore with CI/CD related ignores
+update_gitignore() {
+    print_step "Updating .gitignore..."
+    
+    # Check if .gitignore exists
+    if [[ ! -f "$TARGET_DIR/.gitignore" ]]; then
+        print_warning ".gitignore not found, creating basic Flutter .gitignore"
+        cat > "$TARGET_DIR/.gitignore" << 'EOF'
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+
+# Web specific
+web/icons/Icon-*
+
+# Environment variables and secrets
+.env
+.env.*
+key.properties
+*.keystore
+*.jks
+EOF
+    fi
+    
+    # Check if CI/CD section already exists
+    if grep -q "CI/CD Integration" "$TARGET_DIR/.gitignore"; then
+        print_info "CI/CD section already exists in .gitignore, skipping update"
+        return
+    fi
+    
+    # Append CI/CD ignore rules
+    cat >> "$TARGET_DIR/.gitignore" << 'EOF'
+
+# ================================================================
+# CI/CD Integration - Auto-generated files and sensitive data
+# ================================================================
+
+# Build artifacts and output directories
+builder/
+build/
+dist/
+out/
+
+# iOS Build and Dependencies
+ios/Pods/
+ios/Podfile.lock
+ios/.symlinks/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/Flutter.podspec
+ios/Runner.xcworkspace/xcuserdata/
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+*.xcarchive/
+*.ipa
+*.app
+*.dSYM
+
+# iOS Export Options and Provisioning
+ios/ExportOptions*.plist
+ios/**/*.mobileprovision
+*.mobileprovision
+
+# Android Build Artifacts
+android/app/build/
+android/build/
+android/app/outputs/
+android/.gradle/
+*.aab
+*.apk
+
+# Credentials and Keys (NEVER commit these!)
+project.config
+project.config.*
+*.backup.*
+
+# iOS Signing Keys and Certificates
+ios/fastlane/AuthKey_*.p8
+ios/fastlane/*.p12
+ios/fastlane/*.cer
+ios/fastlane/*.certSigningRequest
+ios/private_keys/
+
+# Android Signing Keys
+android/fastlane/play_store_service_account.json
+android/app/play_store_service_account.json
+android/key.properties
+android/key.properties.*
+android/app/*.keystore
+android/app/*.jks
+android/upload-keystore.*
+
+# Fastlane Reports and Screenshots
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots/
+**/fastlane/test_output/
+**/fastlane/metadata/
+
+# Auto-generated Documentation
+*_GUIDE.md
+*_COMPLETE*.md
+*_FIX*.md
+*_ANALYSIS.md
+*_SUMMARY.md
+*_CHECKLIST.md
+*_INSTRUCTIONS.md
+*_DEPLOYMENT*.md
+*_SECRET*.md
+*_SETUP*.md
+
+# Backup workflow files
+.github/workflows/*.backup
+.github/workflows/*-backup.yml
+.github/workflows/*-old.yml
+
+# Temporary scripts and fixes
+apply_*.sh
+fix_*.sh
+test_*.sh
+quick_*.sh
+*_fix.sh
+*_test.sh
+*_backup.sh
+
+# Version Management and Deployment Configs
+deployment_monitor_config.json
+github_secrets_setup.txt
+play_store_secret.txt
+
+# Ruby and Bundler
+.bundle/
+vendor/bundle/
+.ruby-version
+EOF
+    
+    print_success ".gitignore updated with CI/CD ignore rules"
+}
+
 # Create setup guides
 create_setup_guides() {
     print_step "Creating setup guides..."
     
-    cat > "$TARGET_DIR/SETUP_GUIDE.md" << EOF
+    cat > "$TARGET_DIR/docs/SETUP_GUIDE.md" << EOF
 # 🎉 CI/CD Integration Complete!
 
 ## Project: $PROJECT_NAME
@@ -909,6 +1342,63 @@ EOF
     print_success "Setup guides created"
 }
 
+# Run comprehensive setup if available
+run_comprehensive_setup() {
+    print_step "Checking for comprehensive setup script..."
+    
+    # Look for setup_automated.sh in common locations
+    local setup_script=""
+    local possible_paths=(
+        "$TARGET_DIR/scripts/setup_automated.sh"
+        "$TARGET_DIR/setup_automated.sh"
+        "$(dirname "$TARGET_DIR")/scripts/setup_automated.sh"
+    )
+    
+    for path in "${possible_paths[@]}"; do
+        if [ -f "$path" ]; then
+            setup_script="$path"
+            break
+        fi
+    done
+    
+    if [ -n "$setup_script" ]; then
+        print_success "Found comprehensive setup script: $setup_script"
+        echo ""
+        echo -e "${CYAN}🚀 Starting Comprehensive Setup (Credential Collection)${NC}"
+        echo -e "${GRAY}This will guide you through iOS/Android credential setup...${NC}"
+        echo ""
+        
+        # Ask user if they want to continue with comprehensive setup
+        echo -e "${YELLOW}Do you want to continue with credential setup? (y/n):${NC}"
+        echo -e "${GRAY}This will collect iOS and Android credentials for store deployment${NC}"
+        read -p "Continue: " continue_choice
+        
+        if [[ "$continue_choice" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+            print_info "Running comprehensive setup script..."
+            echo ""
+            
+            # Run the comprehensive setup script
+            cd "$TARGET_DIR"
+            if bash "$setup_script" --credentials-only 2>/dev/null || bash "$setup_script"; then
+                print_success "Comprehensive setup completed successfully!"
+            else
+                print_warning "Comprehensive setup encountered some issues, but basic setup is complete"
+                print_info "You can run the setup script manually later: $setup_script"
+            fi
+        else
+            print_info "Skipping comprehensive setup"
+            echo -e "${CYAN}Manual Setup:${NC}"
+            echo -e "  • Run: ${WHITE}$setup_script${NC}"
+            echo -e "  • Or manually configure credentials in ${WHITE}docs/SETUP_GUIDE.md${NC}"
+        fi
+    else
+        print_info "Comprehensive setup script not found - basic setup only"
+        echo -e "${CYAN}Next Steps:${NC}"
+        echo -e "  • Check ${WHITE}docs/SETUP_GUIDE.md${NC} for manual setup"
+        echo -e "  • Configure iOS/Android credentials manually"
+    fi
+}
+
 # Main execution function
 main() {
     # Handle help
@@ -947,19 +1437,35 @@ main() {
     create_ios_fastlane
     create_project_config
     create_gemfile
+    update_gitignore
     create_setup_guides
     
     print_success "CI/CD integration completed successfully!"
     
     print_separator
-    print_header "🎉 Installation Complete!"
+    print_header "🎉 Basic Setup Complete!"
     
-    echo -e "${GREEN}🎉 Flutter CI/CD integration completed successfully!${NC}"
+    echo -e "${GREEN}🎉 Basic CI/CD structure created successfully!${NC}"
     echo ""
-    echo -e "${CYAN}Next Steps:${NC}"
+    echo -e "${CYAN}Basic Setup Completed:${NC}"
+    echo -e "  1. ✅ Directory structure created"
+    echo -e "  2. ✅ Makefile generated"
+    echo -e "  3. ✅ GitHub Actions configured"
+    echo -e "  4. ✅ Fastlane templates created"
+    echo -e "  5. ✅ Documentation generated in ${WHITE}docs/${NC}"
+    echo ""
+    
+    # Check if comprehensive setup script exists and run it
+    run_comprehensive_setup
+    
+    print_separator
+    print_header "🎉 Complete Setup Finished!"
+    
+    echo -e "${GREEN}🎉 Complete CI/CD integration finished!${NC}"
+    echo ""
+    echo -e "${CYAN}Final Steps:${NC}"
     echo -e "  1. ${WHITE}make system-check${NC} - Verify configuration"
-    echo -e "  2. Configure iOS/Android credentials"
-    echo -e "  3. ${WHITE}make auto-build-tester${NC} - Test deployment"
+    echo -e "  2. ${WHITE}make auto-build-tester${NC} - Test deployment"
     echo ""
     
     if [[ "$REMOTE_INSTALLATION" == "true" ]]; then

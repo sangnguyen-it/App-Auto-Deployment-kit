@@ -531,17 +531,13 @@ check_github_auth() {
     
     print_step "Checking GitHub authentication status..."
     
-    # Function to perform authentication with retry
+    # Function to perform authentication with user interaction
     perform_github_auth() {
         local max_attempts=3
         local attempt=1
         
-        print_info "🌐 Opening GitHub authentication in your web browser..."
-        print_info "📋 Please follow these steps:"
-        echo -e "  ${WHITE}1.${NC} Your browser will open automatically"
-        echo -e "  ${WHITE}2.${NC} Login to GitHub if not already logged in"
-        echo -e "  ${WHITE}3.${NC} Authorize the GitHub CLI application"
-        echo -e "  ${WHITE}4.${NC} Return to this terminal after authorization"
+        print_info "🌐 GitHub authentication is required to continue"
+        print_info "📋 This will open your web browser for authentication"
         echo ""
         
         while [ $attempt -le $max_attempts ]; do
@@ -554,14 +550,25 @@ check_github_auth() {
                 sleep 1
             fi
             
-            # Attempt authentication
+            print_info "📱 Please follow these steps:"
+            echo -e "  ${WHITE}1.${NC} Your browser will open automatically"
+            echo -e "  ${WHITE}2.${NC} Login to GitHub if not already logged in"
+            echo -e "  ${WHITE}3.${NC} Authorize the GitHub CLI application"
+            echo -e "  ${WHITE}4.${NC} Return to this terminal after authorization"
+            echo ""
+            
+            # Start authentication process
+            print_step "🚀 Launching GitHub authentication..."
+            
+            # Run gh auth login and capture its exit code
             if gh auth login --web --git-protocol https; then
-                print_success "✅ GitHub authentication completed!"
+                print_success "✅ GitHub authentication process completed!"
                 
                 # Wait a moment for authentication to settle
                 sleep 2
                 
                 # Verify authentication worked
+                print_step "🔍 Verifying authentication status..."
                 if gh auth status >/dev/null 2>&1; then
                     # Get authenticated user info
                     GITHUB_USER=$(gh api user --jq '.login' 2>/dev/null || echo "Unknown")
@@ -573,17 +580,32 @@ check_github_auth() {
                         return 0
                     else
                         print_warning "⚠️  Authentication succeeded but API access failed"
+                        print_info "🔄 Retrying API verification..."
+                        sleep 3
+                        if gh api user >/dev/null 2>&1; then
+                            print_success "🔗 GitHub API access verified on retry"
+                            return 0
+                        fi
                     fi
                 else
                     print_error "❌ Authentication verification failed"
+                    print_info "🔍 Checking authentication status details..."
+                    gh auth status 2>&1 || true
                 fi
             else
-                print_error "❌ GitHub authentication failed (attempt $attempt)"
-                
-                if [ $attempt -lt $max_attempts ]; then
-                    print_info "🔄 Will retry in 3 seconds..."
-                    sleep 3
-                fi
+                print_error "❌ GitHub authentication process failed (attempt $attempt)"
+                print_info "💡 This could happen if:"
+                echo -e "  ${WHITE}• ${NC}You cancelled the authentication in the browser"
+                echo -e "  ${WHITE}• ${NC}Network connection issues occurred"
+                echo -e "  ${WHITE}• ${NC}Browser didn't open properly"
+                echo ""
+            fi
+            
+            if [ $attempt -lt $max_attempts ]; then
+                echo ""
+                print_info "🔄 Would you like to try again? (Press Enter to retry, Ctrl+C to cancel)"
+                read -r
+                echo ""
             fi
             
             ((attempt++))
@@ -592,10 +614,12 @@ check_github_auth() {
         print_error "❌ GitHub authentication failed after $max_attempts attempts"
         print_info "💡 Troubleshooting tips:"
         echo -e "  ${WHITE}• ${NC}Ensure you have a stable internet connection"
-        echo -e "  ${WHITE}• ${NC}Check if GitHub.com is accessible"
-        echo -e "  ${WHITE}• ${NC}Try running 'gh auth login' manually first"
-        echo -e "  ${WHITE}• ${NC}Make sure you complete the browser authorization"
+        echo -e "  ${WHITE}• ${NC}Check if GitHub.com is accessible in your browser"
+        echo -e "  ${WHITE}• ${NC}Try running 'gh auth login --web' manually first"
+        echo -e "  ${WHITE}• ${NC}Make sure you complete the browser authorization process"
+        echo -e "  ${WHITE}• ${NC}Check if your browser is blocking popups"
         echo ""
+        print_error "🛑 Cannot continue without GitHub authentication"
         exit 1
     }
     

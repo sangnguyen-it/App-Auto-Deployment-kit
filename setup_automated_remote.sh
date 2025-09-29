@@ -217,10 +217,10 @@ main() {
         print_header "💻 Local Installation"
     fi
     
-    # Parse arguments to find target directory (skip --skip-credentials)
+    # Parse arguments to find target directory (skip flags)
     TARGET_PATH=""
     for arg in "$@"; do
-        if [[ "$arg" != "--skip-credentials" ]]; then
+        if [[ "$arg" != "--skip-credentials" && "$arg" != "--debug" && ! "$arg" =~ ^-- ]]; then
             TARGET_PATH="$arg"
             break
         fi

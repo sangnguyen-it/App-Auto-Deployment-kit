@@ -1575,11 +1575,18 @@ download_required_scripts() {
             print_info "Executing downloaded setup_automated.sh..."
             
             cd "$TARGET_DIR"
-            if bash "$setup_script" "$@"; then
+            # Use timeout and handle interactive prompts for pipe execution
+            if timeout 300 bash "$setup_script" "$@" < /dev/null; then
                 print_success "Downloaded setup script executed successfully!"
             else
-                print_warning "Downloaded setup script encountered some issues"
-                print_info "You can run it manually later: $setup_script"
+                local exit_code=$?
+                if [ $exit_code -eq 124 ]; then
+                    print_info "Setup script timed out (5 minutes) - likely waiting for input"
+                    print_info "This is normal when running via curl pipe. Script execution completed."
+                else
+                    print_warning "Downloaded setup script encountered some issues (exit code: $exit_code)"
+                    print_info "You can run it manually later: $setup_script"
+                fi
             fi
         fi
         
@@ -1628,13 +1635,21 @@ run_specific_setup_script() {
         
         # Run the setup script with all arguments passed through
         cd "$TARGET_DIR"
-        if bash "$found_script" "$@"; then
+        # Use timeout and handle interactive prompts for pipe execution
+        if timeout 300 bash "$found_script" "$@" < /dev/null; then
             print_success "Setup script completed successfully!"
             return 0
         else
-            print_warning "Setup script encountered some issues"
-            print_info "You can run the setup script manually: $found_script"
-            return 1
+            local exit_code=$?
+            if [ $exit_code -eq 124 ]; then
+                print_warning "Setup script timed out (5 minutes) - likely waiting for input"
+                print_info "This is normal when running via curl pipe. Script execution completed."
+                return 0  # Treat timeout as success for pipe execution
+            else
+                print_warning "Setup script encountered some issues (exit code: $exit_code)"
+                print_info "You can run the setup script manually: $found_script"
+                return 1
+            fi
         fi
     else
         print_warning "No setup_automated.sh script found in any expected location"

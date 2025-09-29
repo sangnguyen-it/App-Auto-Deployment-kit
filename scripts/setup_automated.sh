@@ -1027,10 +1027,10 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 				else \
 					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
 				fi; \
-				IPA_FILE=\$\$(find ../build/ios/ipa -name "*.ipa" | head -1); \
-				if [ -n "\$\$IPA_FILE" ] && [ -f "\$\$IPA_FILE" ]; then \
+				IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "IPA exported successfully"; \
-					cp "\$\$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_NAME)"; \
+					cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_NAME)"; \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to TestFlight..."; \
 					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
@@ -1131,10 +1131,10 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 				else \
 					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
 				fi; \
-				IPA_FILE=\$\$(find ../build/ios/ipa -name "*.ipa" | head -1); \
-				if [ -n "\$\$IPA_FILE" ] && [ -f "\$\$IPA_FILE" ]; then \
+				IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
-					cp "\$\$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
 					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \

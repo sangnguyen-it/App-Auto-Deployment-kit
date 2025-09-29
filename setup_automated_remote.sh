@@ -1459,6 +1459,55 @@ EOF
     print_success "Setup guides created"
 }
 
+# Download required scripts from GitHub
+download_required_scripts() {
+    print_step "Downloading required scripts from GitHub..."
+    
+    # Check connectivity first
+    if ! check_connectivity; then
+        print_warning "Cannot download scripts - no internet connectivity"
+        return 1
+    fi
+    
+    # List of required scripts to download
+    local scripts=(
+        "scripts/setup_automated.sh"
+        "scripts/flutter_project_analyzer.dart"
+        "scripts/version_checker.rb"
+    )
+    
+    local download_success=true
+    
+    for script in "${scripts[@]}"; do
+        local script_name=$(basename "$script")
+        local script_dir=$(dirname "$script")
+        local target_path="$TARGET_DIR/$script"
+        local url="${GITHUB_RAW_URL}/${script}"
+        
+        print_info "Downloading $script_name..."
+        
+        # Create directory if it doesn't exist
+        mkdir -p "$TARGET_DIR/$script_dir"
+        
+        # Download the script
+        if curl -fsSL "$url" -o "$target_path" 2>/dev/null; then
+            chmod +x "$target_path"
+            print_success "✅ $script_name downloaded and made executable"
+        else
+            print_warning "❌ Failed to download $script_name"
+            download_success=false
+        fi
+    done
+    
+    if [ "$download_success" = true ]; then
+        print_success "All required scripts downloaded successfully"
+        return 0
+    else
+        print_warning "Some scripts failed to download, but continuing..."
+        return 1
+    fi
+}
+
 # Run comprehensive setup if available
 run_comprehensive_setup() {
     print_step "Checking for comprehensive setup script..."
@@ -1546,6 +1595,9 @@ main() {
     
     # Create directory structure
     create_directory_structure
+    
+    # Download required scripts from GitHub
+    download_required_scripts
     
     # Generate all CI/CD files
     create_makefile

@@ -235,6 +235,14 @@ main() {
     
     # Parse arguments for skip-credentials
     SKIP_CREDENTIALS_ARG=""
+    
+    # Auto-detect if running via pipe (curl | bash) and enable skip-credentials
+    if [[ ! -t 0 ]] || [[ "${BASH_SOURCE[0]}" == "/dev/fd/"* ]] || [[ "${BASH_SOURCE[0]}" == "/proc/self/fd/"* ]]; then
+        print_info "Detected execution via pipe - enabling automated mode"
+        SKIP_CREDENTIALS_ARG="--skip-credentials"
+    fi
+    
+    # Also check explicit arguments
     for arg in "$@"; do
         if [[ "$arg" == "--skip-credentials" ]]; then
             SKIP_CREDENTIALS_ARG="--skip-credentials"

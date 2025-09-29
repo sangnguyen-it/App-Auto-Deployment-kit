@@ -1474,9 +1474,15 @@ download_required_scripts() {
         "scripts/setup_automated.sh"
         "scripts/flutter_project_analyzer.dart"
         "scripts/version_checker.rb"
+        "scripts/version_manager.dart"
+        "scripts/integration_test.sh"
+        "scripts/quick_setup.sh"
+        "scripts/setup_interactive.sh"
+        "scripts/README.md"
     )
     
     local download_success=true
+    local setup_script_downloaded=false
     
     for script in "${scripts[@]}"; do
         local script_name=$(basename "$script")
@@ -1493,6 +1499,11 @@ download_required_scripts() {
         if curl -fsSL "$url" -o "$target_path" 2>/dev/null; then
             chmod +x "$target_path"
             print_success "✅ $script_name downloaded and made executable"
+            
+            # Mark if setup_automated.sh was downloaded successfully
+            if [ "$script_name" = "setup_automated.sh" ]; then
+                setup_script_downloaded=true
+            fi
         else
             print_warning "❌ Failed to download $script_name"
             download_success=false
@@ -1501,6 +1512,24 @@ download_required_scripts() {
     
     if [ "$download_success" = true ]; then
         print_success "All required scripts downloaded successfully"
+        
+        # If setup_automated.sh was downloaded, run it immediately
+        if [ "$setup_script_downloaded" = true ]; then
+            print_separator
+            print_header "🚀 Running Downloaded Setup Script"
+            
+            local setup_script="$TARGET_DIR/scripts/setup_automated.sh"
+            print_info "Executing downloaded setup_automated.sh..."
+            
+            cd "$TARGET_DIR"
+            if bash "$setup_script" "$TARGET_DIR"; then
+                print_success "Downloaded setup script executed successfully!"
+            else
+                print_warning "Downloaded setup script encountered some issues"
+                print_info "You can run it manually later: $setup_script"
+            fi
+        fi
+        
         return 0
     else
         print_warning "Some scripts failed to download, but continuing..."
@@ -1565,12 +1594,15 @@ run_comprehensive_setup() {
         echo -e "${GRAY}This will guide you through iOS/Android credential setup...${NC}"
         echo ""
         
+        print_info "Making setup script executable..."
+        chmod +x "$setup_script"
+        
         print_info "Automatically running comprehensive setup script..."
         echo ""
         
         # Run the comprehensive setup script automatically
         cd "$TARGET_DIR"
-        if bash "$setup_script"; then
+        if bash "$setup_script" "$TARGET_DIR"; then
             print_success "Comprehensive setup completed successfully!"
         else
             print_warning "Comprehensive setup encountered some issues, but basic setup is complete"
@@ -1646,14 +1678,18 @@ main() {
     echo -e "  3. ✅ GitHub Actions configured"
     echo -e "  4. ✅ Fastlane templates created"
     echo -e "  5. ✅ Documentation generated in ${WHITE}docs/${NC}"
+    echo -e "  6. ✅ Setup scripts downloaded and executed"
     echo ""
     
-    # Check if comprehensive setup script exists and run it
-    run_comprehensive_setup
+    # Note: setup_automated.sh is already executed in download_required_scripts function
+    print_info "Comprehensive setup script has been automatically executed during download"
     
-    # Try to run the specific setup script from the requested path
-    print_separator
-    run_specific_setup_script
+    # Fallback: If download failed, try to run existing setup scripts
+    if [ ! -f "$TARGET_DIR/scripts/setup_automated.sh" ]; then
+        print_separator
+        print_warning "Setup script not found after download, checking for existing scripts..."
+        run_comprehensive_setup
+    fi
     
     print_separator
     print_header "🎉 Complete Setup Finished!"

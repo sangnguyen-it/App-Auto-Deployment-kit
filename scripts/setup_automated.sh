@@ -1950,12 +1950,18 @@ create_project_config() {
                 cp "$TARGET_DIR/project.config" "$backup_file"
                 print_info "✅ Backup saved: $(basename "$backup_file")"
                 
+                # Set flag to allow config updates
+                export PROJECT_CONFIG_USER_APPROVED="true"
+                
                 # Create new config
                 create_new_project_config
                 
             elif [[ "$user_choice" == "n" ]]; then
                 print_success "✅ Keeping existing project.config file"
                 print_info "Using current configuration without changes"
+                
+                # Set flag to prevent config updates
+                export PROJECT_CONFIG_USER_APPROVED="false"
                 echo ""
                 return 0
                 
@@ -1965,6 +1971,8 @@ create_project_config() {
         done
     else
         print_info "No existing project.config found - creating new one"
+        # Set flag to allow config updates for new files
+        export PROJECT_CONFIG_USER_APPROVED="true"
         create_new_project_config
     fi
 }
@@ -2583,6 +2591,12 @@ validate_credentials() {
 update_project_config() {
     print_step "Saving configuration to project.config..."
     
+    # Check if user approved config updates
+    if [[ "$PROJECT_CONFIG_USER_APPROVED" == "false" ]]; then
+        print_info "Skipping project.config update (user chose to keep existing file)"
+        return 0
+    fi
+    
     # Backup existing config
     if [ -f "$TARGET_DIR/project.config" ]; then
         cp "$TARGET_DIR/project.config" "$TARGET_DIR/project.config.backup" 2>/dev/null || true
@@ -2887,8 +2901,14 @@ create_android_keystore() {
 }
 
 # Update project config with collected credentials
-update_project_config() {
+update_project_config_with_credentials() {
     print_step "Updating project configuration..."
+    
+    # Check if user approved config updates
+    if [[ "$PROJECT_CONFIG_USER_APPROVED" == "false" ]]; then
+        print_info "Skipping project.config update (user chose to keep existing file)"
+        return 0
+    fi
     
     # Create updated project.config
     cat > "$TARGET_DIR/project.config" << EOF
@@ -3363,7 +3383,7 @@ run_credential_setup() {
             fi
             
             # Update project config with collected credentials
-            update_project_config
+            update_project_config_with_credentials
             
             # Re-validate after collection
             if validate_credentials; then
@@ -3573,7 +3593,14 @@ main() {
     create_makefile
     create_github_workflow
     create_gemfile
-    create_project_config
+    
+    # Only create project.config if it doesn't exist or user hasn't been asked yet
+    if [ ! -f "$TARGET_DIR/project.config" ] || [ -z "$PROJECT_CONFIG_USER_APPROVED" ]; then
+        create_project_config
+    else
+        print_info "Using existing project.config (user choice: keep existing)"
+    fi
+    
     copy_automation_scripts
     generate_env_config
     generate_credential_guide

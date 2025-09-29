@@ -1590,33 +1590,54 @@ download_required_scripts() {
     fi
 }
 
-# Run setup_automated.sh from specific path if available
+# Run setup_automated.sh from various possible locations
 run_specific_setup_script() {
-    local specific_script="/Volumes/DATA/ADVN-GIT/TRACK-CLIENT/TRACKASIA-LIVE/scripts/setup_automated.sh"
+    print_step "Searching for existing setup_automated.sh script..."
     
-    print_step "Checking for specific setup script at: $specific_script"
+    # Look for setup_automated.sh in various possible locations
+    local possible_paths=(
+        "$TARGET_DIR/scripts/setup_automated.sh"
+        "$TARGET_DIR/setup_automated.sh"
+        "$(dirname "$TARGET_DIR")/scripts/setup_automated.sh"
+        "/Volumes/DATA/ADVN-GIT/TRACK-CLIENT/TRACKASIA-LIVE/scripts/setup_automated.sh"
+        "/Volumes/SUNNY/AppAutoDeploy/scripts/setup_automated.sh"
+    )
     
-    if [ -f "$specific_script" ]; then
-        print_success "Found specific setup script: $specific_script"
+    local found_script=""
+    for script_path in "${possible_paths[@]}"; do
+        if [ -f "$script_path" ]; then
+            found_script="$script_path"
+            print_success "Found setup script at: $script_path"
+            break
+        else
+            print_info "Not found: $script_path"
+        fi
+    done
+    
+    if [ -n "$found_script" ]; then
         echo ""
-        echo -e "${CYAN}🚀 Running Specific Setup Script${NC}"
-        echo -e "${GRAY}Executing setup_automated.sh from the specified path...${NC}"
+        echo -e "${CYAN}🚀 Running Found Setup Script${NC}"
+        echo -e "${GRAY}Executing setup_automated.sh from: $found_script${NC}"
         echo ""
         
-        print_info "Automatically running specific setup script..."
+        print_info "Making script executable..."
+        chmod +x "$found_script"
+        
+        print_info "Automatically running setup script..."
         echo ""
         
-        # Run the specific setup script
-        if bash "$specific_script"; then
-            print_success "Specific setup script completed successfully!"
+        # Run the setup script with TARGET_DIR as argument
+        cd "$TARGET_DIR"
+        if bash "$found_script" "$TARGET_DIR"; then
+            print_success "Setup script completed successfully!"
             return 0
         else
-            print_warning "Specific setup script encountered some issues"
-            print_info "You can run the setup script manually: $specific_script"
+            print_warning "Setup script encountered some issues"
+            print_info "You can run the setup script manually: $found_script"
             return 1
         fi
     else
-        print_info "Specific setup script not found at: $specific_script"
+        print_warning "No setup_automated.sh script found in any expected location"
         return 1
     fi
 }
@@ -1707,13 +1728,13 @@ main() {
     local local_setup_executed=false
     
     if [[ "$REMOTE_INSTALLATION" == "true" ]]; then
-        # For remote installation, download scripts first, then execute
-        print_info "Remote installation detected - downloading scripts from GitHub..."
-        if download_required_scripts; then
+        # For remote installation, try to find existing local script first
+        print_info "Remote installation detected - checking for existing local scripts..."
+        if run_specific_setup_script; then
             local_setup_executed=true
             print_success "✅ Local setup script executed"
             
-            # If setup_automated.sh was executed successfully, we're done
+            # If local setup script was executed successfully, we're done
             print_separator
             print_header "🎉 Complete Setup Finished!"
             print_success "🎉 Complete CI/CD integration finished!"
@@ -1725,7 +1746,26 @@ main() {
             print_success "✅ Ready for deployment! 🚀"
             return 0
         else
-            print_warning "Failed to download or execute scripts from GitHub"
+            # Fallback: download scripts from GitHub
+            print_info "Local script not found, downloading scripts from GitHub..."
+            if download_required_scripts; then
+                local_setup_executed=true
+                print_success "✅ Local setup script executed"
+                
+                # If setup_automated.sh was executed successfully, we're done
+                print_separator
+                print_header "🎉 Complete Setup Finished!"
+                print_success "🎉 Complete CI/CD integration finished!"
+                echo ""
+                echo -e "${WHITE}Final Steps:${NC}"
+                echo -e "  1. ${CYAN}make system-check${NC} - Verify configuration"
+                echo -e "  2. ${CYAN}make auto-build-tester${NC} - Test deployment"
+                echo ""
+                print_success "✅ Ready for deployment! 🚀"
+                return 0
+            else
+                print_warning "Failed to download or execute scripts from GitHub"
+            fi
         fi
     else
         # For local installation, try to run existing local script first

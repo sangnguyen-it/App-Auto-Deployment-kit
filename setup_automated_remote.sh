@@ -120,11 +120,10 @@ detect_remote_installation() {
        [[ "$0" == "bash" ]]; then
         REMOTE_INSTALLATION=true
         print_info "${GLOBE} Remote installation detected"
-        return 0
     else
         REMOTE_INSTALLATION=false
-        return 1
     fi
+    return 0
 }
 
 # Check internet connectivity and GitHub access

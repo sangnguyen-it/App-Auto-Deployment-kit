@@ -2,6 +2,7 @@
 # Flutter CI/CD Auto-Integration Kit - Remote Installation Script
 # This script can be downloaded and run from GitHub, or executed locally
 # Usage: curl -fsSL https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/setup_automated_remote.sh | bash -s -- --skip-credentials
+# Updated: 2024-12-19 - Fixed local script prioritization
 
 set -e
 

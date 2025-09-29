@@ -258,6 +258,84 @@ print_separator() {
     echo -e "${GRAY}─────────────────────────────────────────────────────────────────${NC}"
 }
 
+# Check and fix Bundler version issues
+check_and_fix_bundler_version() {
+    print_step "Checking Bundler version compatibility..."
+    
+    # Check if Bundler is installed
+    if ! command -v bundle >/dev/null 2>&1; then
+        print_warning "Bundler not found. Installing..."
+        if gem install bundler >/dev/null 2>&1; then
+            print_success "Bundler installed successfully"
+        else
+            print_error "Failed to install Bundler"
+            return 1
+        fi
+    fi
+    
+    # Get current Bundler version
+    CURRENT_BUNDLER_VERSION=$(bundle --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+    if [ -z "$CURRENT_BUNDLER_VERSION" ]; then
+        print_warning "Could not determine current Bundler version"
+        return 0
+    fi
+    
+    print_info "Current Bundler version: $CURRENT_BUNDLER_VERSION"
+    
+    # Check Gemfile.lock files for required Bundler version
+    REQUIRED_VERSION=""
+    GEMFILE_LOCK_PATHS=("$TARGET_DIR/Gemfile.lock" "$TARGET_DIR/android/Gemfile.lock" "$TARGET_DIR/ios/Gemfile.lock")
+    
+    for GEMFILE_LOCK in "${GEMFILE_LOCK_PATHS[@]}"; do
+        if [ -f "$GEMFILE_LOCK" ]; then
+            BUNDLED_WITH=$(grep -A1 "BUNDLED WITH" "$GEMFILE_LOCK" 2>/dev/null | tail -1 | tr -d ' ')
+            if [ -n "$BUNDLED_WITH" ]; then
+                REQUIRED_VERSION="$BUNDLED_WITH"
+                print_info "Found required Bundler version in $(basename "$(dirname "$GEMFILE_LOCK")"): $REQUIRED_VERSION"
+                break
+            fi
+        fi
+    done
+    
+    # If we found a required version and it's different from current, update
+    if [ -n "$REQUIRED_VERSION" ] && [ "$CURRENT_BUNDLER_VERSION" != "$REQUIRED_VERSION" ]; then
+        print_warning "Bundler version mismatch detected!"
+        print_info "Current: $CURRENT_BUNDLER_VERSION, Required: $REQUIRED_VERSION"
+        print_step "Updating Bundler to version $REQUIRED_VERSION..."
+        
+        if gem install bundler -v "$REQUIRED_VERSION" >/dev/null 2>&1; then
+            print_success "Bundler updated to version $REQUIRED_VERSION"
+            
+            # Verify the update
+            NEW_VERSION=$(bundle --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+            if [ "$NEW_VERSION" = "$REQUIRED_VERSION" ]; then
+                print_success "Bundler version verified: $NEW_VERSION"
+            else
+                print_warning "Bundler version verification failed. Expected: $REQUIRED_VERSION, Got: $NEW_VERSION"
+            fi
+        else
+            print_error "Failed to update Bundler to version $REQUIRED_VERSION"
+            return 1
+        fi
+    else
+        print_success "Bundler version is compatible"
+    fi
+    
+    # Install gems in directories that have Gemfile
+    for DIR in "$TARGET_DIR" "$TARGET_DIR/android" "$TARGET_DIR/ios"; do
+        if [ -f "$DIR/Gemfile" ]; then
+            print_step "Installing gems in $(basename "$DIR")..."
+            if (cd "$DIR" && bundle install >/dev/null 2>&1); then
+                print_success "Gems installed in $(basename "$DIR")"
+            else
+                print_warning "Failed to install gems in $(basename "$DIR")"
+            fi
+        fi
+    done
+    
+    print_success "Bundler version check completed"
+}
+
 # Fix SOURCE_DIR if we're running from copied scripts in target project
 if [[ "$SOURCE_DIR" == "$TARGET_DIR" ]]; then
     print_step "🔍 Detecting source directory..."
@@ -955,8 +1033,8 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 					cp "\$\$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_NAME)"; \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to TestFlight..."; \
-					if command -v bundle >/dev/null 2>&1 && [ -f "Gemfile" ] && [ -f "fastlane/Fastfile" ]; then \
-						if bundle exec fastlane ios beta 2>/dev/null; then \
+					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
+						if fastlane ios beta 2>/dev/null; then \
 							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight"; \
 						else \
 							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "TestFlight upload failed - check fastlane configuration"; \
@@ -1059,8 +1137,8 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 					cp "\$\$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
-					if command -v bundle >/dev/null 2>&1 && [ -f "Gemfile" ] && [ -f "fastlane/Fastfile" ]; then \
-						if bundle exec fastlane ios release 2>/dev/null; then \
+					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
+						if fastlane ios release 2>/dev/null; then \
 							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
 						else \
 							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
@@ -3455,6 +3533,11 @@ main() {
     # Always validate target directory and extract project info
     validate_target_directory
     extract_project_info
+    
+    # Check and fix Bundler version issues
+    print_separator
+    print_header "🔧 Bundler Version Check"
+    check_and_fix_bundler_version
     
     if [[ "$SETUP_ONLY" == "true" ]]; then
         # Setup-only mode: Just run credential validation and setup

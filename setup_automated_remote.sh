@@ -301,6 +301,94 @@ analyze_flutter_project() {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 🔧 BUNDLER VERSION MANAGEMENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Check and fix Bundler version issues
+check_and_fix_bundler_version() {
+    print_step "Checking Bundler version compatibility..."
+    
+    # Check if bundler is installed
+    if ! command -v bundle &> /dev/null; then
+        print_warning "Bundler not found, installing..."
+        if command -v gem &> /dev/null; then
+            gem install bundler
+            print_success "Bundler installed successfully"
+        else
+            print_error "Ruby/gem not found. Please install Ruby first."
+            return 1
+        fi
+    fi
+    
+    # Get current bundler version
+    local current_version=$(bundle --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+    print_info "Current Bundler version: $current_version"
+    
+    # Check for Gemfile.lock in project directories
+    local gemfile_lock_paths=(
+        "$TARGET_DIR/Gemfile.lock"
+        "$TARGET_DIR/android/Gemfile.lock"
+        "$TARGET_DIR/ios/Gemfile.lock"
+    )
+    
+    local required_version=""
+    for lock_file in "${gemfile_lock_paths[@]}"; do
+        if [[ -f "$lock_file" ]]; then
+            local lock_version=$(grep "BUNDLED WITH" -A1 "$lock_file" | tail -1 | tr -d ' ' 2>/dev/null || echo "")
+            if [[ -n "$lock_version" ]]; then
+                required_version="$lock_version"
+                print_info "Found required Bundler version in $(basename $(dirname $lock_file)): $required_version"
+                break
+            fi
+        fi
+    done
+    
+    # If we found a required version and it's different from current, update
+    if [[ -n "$required_version" && "$current_version" != "$required_version" ]]; then
+        print_warning "Bundler version mismatch detected!"
+        print_info "Current: $current_version, Required: $required_version"
+        print_step "Updating Bundler to version $required_version..."
+        
+        if gem install bundler -v "$required_version"; then
+            print_success "Bundler updated to version $required_version"
+            
+            # Verify the update
+            local new_version=$(bundle --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+            if [[ "$new_version" == "$required_version" ]]; then
+                print_success "Bundler version verified: $new_version"
+            else
+                print_warning "Bundler version verification failed, but continuing..."
+            fi
+        else
+            print_error "Failed to update Bundler version"
+            return 1
+        fi
+    else
+        print_success "Bundler version is compatible"
+    fi
+    
+    # Install dependencies in each directory with Gemfile
+    local gemfile_dirs=(
+        "$TARGET_DIR"
+        "$TARGET_DIR/android"
+        "$TARGET_DIR/ios"
+    )
+    
+    for dir in "${gemfile_dirs[@]}"; do
+        if [[ -f "$dir/Gemfile" ]]; then
+            print_step "Installing gems in $(basename $dir)..."
+            if (cd "$dir" && bundle install); then
+                print_success "Gems installed successfully in $(basename $dir)"
+            else
+                print_warning "Failed to install gems in $(basename $dir), continuing..."
+            fi
+        fi
+    done
+    
+    return 0
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
 # 📋 MAIN EXECUTION FLOW
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -607,8 +695,8 @@ auto-build-tester: ## Build and deploy to testers
 	fi
 	@if [ ! -f "Gemfile.lock" ]; then bundle install; fi
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting tester build..."
-	@if [ -d "android" ]; then cd android && bundle exec fastlane beta; fi
-	@if [ -d "ios" ]; then cd ios && bundle exec fastlane beta; fi
+	@if [ -d "android" ]; then cd android && fastlane beta; fi
+	@if [ -d "ios" ]; then cd ios && fastlane beta; fi
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Tester build completed"
 
 # Auto build for production
@@ -622,8 +710,8 @@ auto-build-live: ## Build and deploy to production
 	fi
 	@if [ ! -f "Gemfile.lock" ]; then bundle install; fi
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting production build..."
-	@if [ -d "android" ]; then cd android && bundle exec fastlane release; fi
-	@if [ -d "ios" ]; then cd ios && bundle exec fastlane release; fi
+	@if [ -d "android" ]; then cd android && fastlane release; fi
+	@if [ -d "ios" ]; then cd ios && fastlane release; fi
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production build completed"
 
 clean: ## Clean build artifacts
@@ -1441,6 +1529,11 @@ main() {
     create_setup_guides
     
     print_success "CI/CD integration completed successfully!"
+    
+    # Check and fix Bundler version issues
+    print_separator
+    print_header "🔧 Bundler Version Check"
+    check_and_fix_bundler_version
     
     print_separator
     print_header "🎉 Basic Setup Complete!"

@@ -262,7 +262,7 @@ main() {
         
         # Execute the local script with arguments
         print_step "Executing local setup_automated.sh..."
-        if "$LOCAL_SETUP_SCRIPT" $SKIP_CREDENTIALS_ARG "$TARGET_DIR"; then
+        if "$LOCAL_SETUP_SCRIPT" --setup-only $SKIP_CREDENTIALS_ARG "$TARGET_DIR"; then
             print_success "Local setup completed successfully!"
             
             print_separator
@@ -302,7 +302,7 @@ main() {
         
         # Execute the downloaded script with arguments
         print_step "Executing downloaded setup_automated.sh..."
-        if "$TARGET_DIR/scripts/setup_automated.sh.downloaded" $SKIP_CREDENTIALS_ARG "$TARGET_DIR"; then
+        if "$TARGET_DIR/scripts/setup_automated.sh.downloaded" --setup-only $SKIP_CREDENTIALS_ARG "$TARGET_DIR"; then
             print_success "Downloaded setup completed successfully!"
             
             # Optionally move the downloaded script to replace the local one

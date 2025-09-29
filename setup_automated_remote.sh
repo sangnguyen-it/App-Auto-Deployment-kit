@@ -1575,19 +1575,11 @@ download_required_scripts() {
             print_info "Executing downloaded setup_automated.sh..."
             
             cd "$TARGET_DIR"
-            # Handle interactive prompts for pipe execution by redirecting stdin
-            if bash "$setup_script" "$@" < /dev/null 2>/dev/null; then
+            if bash "$setup_script" "$TARGET_DIR"; then
                 print_success "Downloaded setup script executed successfully!"
             else
-                local exit_code=$?
-                # Check if script exists and is executable - if so, likely just interactive prompt issue
-                if [ -f "$setup_script" ] && [ -x "$setup_script" ]; then
-                    print_info "Setup script executed but may have encountered interactive prompts"
-                    print_info "This is normal when running via curl pipe. Core setup completed."
-                else
-                    print_warning "Downloaded setup script encountered some issues (exit code: $exit_code)"
-                    print_info "You can run it manually later: $setup_script"
-                fi
+                print_warning "Downloaded setup script encountered some issues"
+                print_info "You can run it manually later: $setup_script"
             fi
         fi
         
@@ -1634,24 +1626,15 @@ run_specific_setup_script() {
         print_info "Automatically running setup script..."
         echo ""
         
-        # Run the setup script with all arguments passed through
+        # Run the setup script with TARGET_DIR as argument
         cd "$TARGET_DIR"
-        # Handle interactive prompts for pipe execution by redirecting stdin
-        if bash "$found_script" "$@" < /dev/null 2>/dev/null; then
+        if bash "$found_script" "$TARGET_DIR"; then
             print_success "Setup script completed successfully!"
             return 0
         else
-            local exit_code=$?
-            # Check if script exists and is executable - if so, likely just interactive prompt issue
-            if [ -f "$found_script" ] && [ -x "$found_script" ]; then
-                print_info "Setup script executed but may have encountered interactive prompts"
-                print_info "This is normal when running via curl pipe. Core setup completed."
-                return 0  # Treat as success for pipe execution
-            else
-                print_warning "Setup script encountered some issues (exit code: $exit_code)"
-                print_info "You can run the setup script manually: $found_script"
-                return 1
-            fi
+            print_warning "Setup script encountered some issues"
+            print_info "You can run the setup script manually: $found_script"
+            return 1
         fi
     else
         print_warning "No setup_automated.sh script found in any expected location"
@@ -1718,21 +1701,6 @@ main() {
         exit 0
     fi
     
-    # Parse arguments to find directory path
-    local target_dir=""
-    for arg in "$@"; do
-        # Skip options that start with --
-        if [[ "$arg" != --* ]]; then
-            target_dir="$arg"
-            break
-        fi
-    done
-    
-    # If no directory specified and we're in remote mode, use current directory
-    if [[ -z "$target_dir" ]]; then
-        target_dir="$(pwd)"
-    fi
-    
     # Detect installation mode
     detect_remote_installation
     
@@ -1744,7 +1712,7 @@ main() {
     fi
     
     # Project analysis
-    detect_target_directory "$target_dir"
+    detect_target_directory "$1"
     analyze_flutter_project
     
     print_separator

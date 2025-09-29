@@ -265,16 +265,15 @@ main() {
         if "$LOCAL_SETUP_SCRIPT" --setup-only $SKIP_CREDENTIALS_ARG "$TARGET_DIR"; then
             print_success "Local setup completed successfully!"
             
+            # Now run the full script for user interaction
             print_separator
-            print_header "🎉 Complete Setup Finished!"
-            print_success "🎉 Complete CI/CD integration finished!"
+            print_header "🔄 Running Full Setup"
+            print_info "Now running the full setup script for credential configuration..."
             echo ""
-            echo -e "${WHITE}Final Steps:${NC}"
-            echo -e "  1. ${CYAN}make system-check${NC} - Verify configuration"
-            echo -e "  2. ${CYAN}make auto-build-tester${NC} - Test deployment"
-            echo ""
-            print_success "✅ Ready for deployment! 🚀"
-            return 0
+            
+            # Execute the full script without --setup-only
+            "$LOCAL_SETUP_SCRIPT" "$TARGET_DIR"
+            return $?
         else
             print_warning "Local setup script failed, will try downloading from GitHub..."
         fi
@@ -309,16 +308,15 @@ main() {
             mv "$TARGET_DIR/scripts/setup_automated.sh.downloaded" "$TARGET_DIR/scripts/setup_automated.sh"
             print_info "Updated local setup script with latest version"
             
+            # Now run the full script for user interaction
             print_separator
-            print_header "🎉 Complete Setup Finished!"
-            print_success "🎉 Complete CI/CD integration finished!"
+            print_header "🔄 Running Full Setup"
+            print_info "Now running the full setup script for credential configuration..."
             echo ""
-            echo -e "${WHITE}Final Steps:${NC}"
-            echo -e "  1. ${CYAN}make system-check${NC} - Verify configuration"
-            echo -e "  2. ${CYAN}make auto-build-tester${NC} - Test deployment"
-            echo ""
-            print_success "✅ Ready for deployment! 🚀"
-            return 0
+            
+            # Execute the full script without --setup-only
+            "$TARGET_DIR/scripts/setup_automated.sh" "$TARGET_DIR"
+            return $?
         else
             print_error "Downloaded setup script execution failed"
             exit 1

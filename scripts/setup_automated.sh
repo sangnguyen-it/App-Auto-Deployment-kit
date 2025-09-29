@@ -536,6 +536,14 @@ check_github_auth() {
         local max_attempts=3
         local attempt=1
         
+        # Check and handle GITHUB_TOKEN environment variable
+        if [ -n "$GITHUB_TOKEN" ]; then
+            print_warning "⚠️  GITHUB_TOKEN environment variable detected"
+            print_info "🧹 Clearing GITHUB_TOKEN to allow interactive authentication..."
+            unset GITHUB_TOKEN
+            export GITHUB_TOKEN=""
+        fi
+        
         print_info "🌐 GitHub authentication is required to continue"
         print_info "📋 This will open your web browser for authentication"
         echo ""
@@ -546,9 +554,13 @@ check_github_auth() {
             # Clear any existing authentication that might be corrupted
             if [ $attempt -gt 1 ]; then
                 print_info "🧹 Clearing previous authentication attempt..."
-                gh auth logout >/dev/null 2>&1 || true
+                env -u GITHUB_TOKEN gh auth logout >/dev/null 2>&1 || true
                 sleep 1
             fi
+            
+            # Ensure GITHUB_TOKEN is still cleared
+            unset GITHUB_TOKEN
+            export GITHUB_TOKEN=""
             
             print_info "📱 Please follow these steps:"
             echo -e "  ${WHITE}1.${NC} Your browser will open automatically"
@@ -560,8 +572,8 @@ check_github_auth() {
             # Start authentication process
             print_step "🚀 Launching GitHub authentication..."
             
-            # Run gh auth login and capture its exit code
-            if gh auth login --web --git-protocol https; then
+            # Run gh auth login in a clean environment without GITHUB_TOKEN
+            if env -u GITHUB_TOKEN gh auth login --web --git-protocol https; then
                 print_success "✅ GitHub authentication process completed!"
                 
                 # Wait a moment for authentication to settle
@@ -569,20 +581,20 @@ check_github_auth() {
                 
                 # Verify authentication worked
                 print_step "🔍 Verifying authentication status..."
-                if gh auth status >/dev/null 2>&1; then
+                if env -u GITHUB_TOKEN gh auth status >/dev/null 2>&1; then
                     # Get authenticated user info
-                    GITHUB_USER=$(gh api user --jq '.login' 2>/dev/null || echo "Unknown")
+                    GITHUB_USER=$(env -u GITHUB_TOKEN gh api user --jq '.login' 2>/dev/null || echo "Unknown")
                     print_success "🎉 Successfully authenticated as: $GITHUB_USER"
                     
                     # Double-check API access
-                    if gh api user >/dev/null 2>&1; then
+                    if env -u GITHUB_TOKEN gh api user >/dev/null 2>&1; then
                         print_success "🔗 GitHub API access verified"
                         return 0
                     else
                         print_warning "⚠️  Authentication succeeded but API access failed"
                         print_info "🔄 Retrying API verification..."
                         sleep 3
-                        if gh api user >/dev/null 2>&1; then
+                        if env -u GITHUB_TOKEN gh api user >/dev/null 2>&1; then
                             print_success "🔗 GitHub API access verified on retry"
                             return 0
                         fi
@@ -590,7 +602,7 @@ check_github_auth() {
                 else
                     print_error "❌ Authentication verification failed"
                     print_info "🔍 Checking authentication status details..."
-                    gh auth status 2>&1 || true
+                    env -u GITHUB_TOKEN gh auth status 2>&1 || true
                 fi
             else
                 print_error "❌ GitHub authentication process failed (attempt $attempt)"
@@ -624,7 +636,7 @@ check_github_auth() {
     }
     
     # Check authentication status
-    if ! gh auth status >/dev/null 2>&1; then
+    if ! env -u GITHUB_TOKEN gh auth status >/dev/null 2>&1; then
         print_error "❌ GitHub CLI is not authenticated"
         print_info "🔑 GitHub authentication is REQUIRED to continue with the automated setup."
         print_info "📝 This script needs GitHub access to:"
@@ -637,11 +649,11 @@ check_github_auth() {
         perform_github_auth
     else
         # Already authenticated - get user info
-        GITHUB_USER=$(gh api user --jq '.login' 2>/dev/null || echo "Unknown")
+        GITHUB_USER=$(env -u GITHUB_TOKEN gh api user --jq '.login' 2>/dev/null || echo "Unknown")
         print_success "✅ GitHub CLI is authenticated as: $GITHUB_USER"
         
         # Verify the authentication is still valid
-        if ! gh api user >/dev/null 2>&1; then
+        if ! env -u GITHUB_TOKEN gh api user >/dev/null 2>&1; then
             print_error "❌ GitHub authentication token is invalid or expired"
             print_info "🔄 Re-authentication is REQUIRED to continue."
             echo ""
@@ -654,7 +666,7 @@ check_github_auth() {
     fi
     
     # Final verification
-    if ! gh auth status >/dev/null 2>&1 || ! gh api user >/dev/null 2>&1; then
+    if ! env -u GITHUB_TOKEN gh auth status >/dev/null 2>&1 || ! env -u GITHUB_TOKEN gh api user >/dev/null 2>&1; then
         print_error "❌ GitHub authentication verification failed"
         print_info "🛑 Cannot continue without valid GitHub authentication"
         print_info "💡 Please run 'gh auth login' manually and try again"

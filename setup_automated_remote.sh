@@ -1508,6 +1508,37 @@ download_required_scripts() {
     fi
 }
 
+# Run setup_automated.sh from specific path if available
+run_specific_setup_script() {
+    local specific_script="/Volumes/DATA/ADVN-GIT/TRACK-CLIENT/TRACKASIA-LIVE/scripts/setup_automated.sh"
+    
+    print_step "Checking for specific setup script at: $specific_script"
+    
+    if [ -f "$specific_script" ]; then
+        print_success "Found specific setup script: $specific_script"
+        echo ""
+        echo -e "${CYAN}🚀 Running Specific Setup Script${NC}"
+        echo -e "${GRAY}Executing setup_automated.sh from the specified path...${NC}"
+        echo ""
+        
+        print_info "Automatically running specific setup script..."
+        echo ""
+        
+        # Run the specific setup script
+        if bash "$specific_script"; then
+            print_success "Specific setup script completed successfully!"
+            return 0
+        else
+            print_warning "Specific setup script encountered some issues"
+            print_info "You can run the setup script manually: $specific_script"
+            return 1
+        fi
+    else
+        print_info "Specific setup script not found at: $specific_script"
+        return 1
+    fi
+}
+
 # Run comprehensive setup if available
 run_comprehensive_setup() {
     print_step "Checking for comprehensive setup script..."
@@ -1534,28 +1565,16 @@ run_comprehensive_setup() {
         echo -e "${GRAY}This will guide you through iOS/Android credential setup...${NC}"
         echo ""
         
-        # Ask user if they want to continue with comprehensive setup
-        echo -e "${YELLOW}Do you want to continue with credential setup? (y/n):${NC}"
-        echo -e "${GRAY}This will collect iOS and Android credentials for store deployment${NC}"
-        read -p "Continue: " continue_choice
+        print_info "Automatically running comprehensive setup script..."
+        echo ""
         
-        if [[ "$continue_choice" =~ ^[Yy]([Ee][Ss])?$ ]]; then
-            print_info "Running comprehensive setup script..."
-            echo ""
-            
-            # Run the comprehensive setup script
-            cd "$TARGET_DIR"
-            if bash "$setup_script" --credentials-only 2>/dev/null || bash "$setup_script"; then
-                print_success "Comprehensive setup completed successfully!"
-            else
-                print_warning "Comprehensive setup encountered some issues, but basic setup is complete"
-                print_info "You can run the setup script manually later: $setup_script"
-            fi
+        # Run the comprehensive setup script automatically
+        cd "$TARGET_DIR"
+        if bash "$setup_script"; then
+            print_success "Comprehensive setup completed successfully!"
         else
-            print_info "Skipping comprehensive setup"
-            echo -e "${CYAN}Manual Setup:${NC}"
-            echo -e "  • Run: ${WHITE}$setup_script${NC}"
-            echo -e "  • Or manually configure credentials in ${WHITE}docs/SETUP_GUIDE.md${NC}"
+            print_warning "Comprehensive setup encountered some issues, but basic setup is complete"
+            print_info "You can run the setup script manually later: $setup_script"
         fi
     else
         print_info "Comprehensive setup script not found - basic setup only"
@@ -1631,6 +1650,10 @@ main() {
     
     # Check if comprehensive setup script exists and run it
     run_comprehensive_setup
+    
+    # Try to run the specific setup script from the requested path
+    print_separator
+    run_specific_setup_script
     
     print_separator
     print_header "🎉 Complete Setup Finished!"

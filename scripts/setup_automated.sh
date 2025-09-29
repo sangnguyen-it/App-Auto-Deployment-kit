@@ -2798,6 +2798,83 @@ TESTFLIGHT_GROUPS="$TESTFLIGHT_GROUPS"
 EOF
     
     print_success "Configuration saved to project.config"
+    
+    # Sync with iOS Fastlane Appfile
+    sync_appfile
+}
+
+# Sync project.config with iOS Fastlane Appfile
+sync_appfile() {
+    local appfile_path="$TARGET_DIR/ios/fastlane/Appfile"
+    
+    # Check if iOS Fastlane directory exists
+    if [ ! -d "$TARGET_DIR/ios/fastlane" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: iOS Fastlane directory not found at $TARGET_DIR/ios/fastlane" >&2
+        fi
+        return 0
+    fi
+    
+    # Check if Appfile exists
+    if [ ! -f "$appfile_path" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: Appfile not found at $appfile_path" >&2
+        fi
+        return 0
+    fi
+    
+    print_step "🔄 Syncing project.config with iOS Fastlane Appfile..."
+    
+    # Load current project config
+    if [ -f "$TARGET_DIR/project.config" ]; then
+        source "$TARGET_DIR/project.config" 2>/dev/null || true
+    else
+        print_warning "⚠️  project.config not found, skipping Appfile sync"
+        return 0
+    fi
+    
+    # Backup existing Appfile
+    if [ -f "$appfile_path" ]; then
+        cp "$appfile_path" "$appfile_path.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+    fi
+    
+    # Update Appfile with values from project.config
+    local temp_appfile=$(mktemp)
+    
+    # Read existing Appfile and update values
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^app_identifier ]]; then
+            if [[ -n "$BUNDLE_ID" && "$BUNDLE_ID" != "YOUR_BUNDLE_ID" ]]; then
+                echo "app_identifier(\"$BUNDLE_ID\")"
+            else
+                echo "$line"
+            fi
+        elif [[ "$line" =~ ^apple_id ]]; then
+            if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" ]]; then
+                echo "apple_id(\"$APPLE_ID\")"
+            else
+                echo "$line"
+            fi
+        elif [[ "$line" =~ ^team_id ]]; then
+            if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
+                echo "team_id(\"$TEAM_ID\")"
+            else
+                echo "$line"
+            fi
+        else
+            echo "$line"
+        fi
+    done < "$appfile_path" > "$temp_appfile"
+    
+    # Replace original Appfile with updated version
+    mv "$temp_appfile" "$appfile_path"
+    
+    print_success "✅ iOS Fastlane Appfile updated with project.config values"
+    
+    if [[ "${DEBUG:-}" == "true" ]]; then
+        echo "🐛 DEBUG: Updated Appfile content:" >&2
+        cat "$appfile_path" >&2
+    fi
 }
 
 # Interactive credential collection
@@ -3107,6 +3184,9 @@ IOS_READY=$IOS_READY
 EOF
     
     print_success "Project configuration updated"
+    
+    # Sync with iOS Fastlane Appfile
+    sync_appfile
 }
 
 # Generate detailed setup guides

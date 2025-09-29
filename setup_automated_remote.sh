@@ -265,6 +265,12 @@ main() {
         if "$LOCAL_SETUP_SCRIPT" --setup-only $SKIP_CREDENTIALS_ARG "$TARGET_DIR"; then
             print_success "Local setup completed successfully!"
             
+            # Show ready for deployment message
+            print_separator
+            print_success "🎉 Ready for deployment!"
+            print_info "Your Flutter project is now ready for automated deployment!"
+            echo ""
+            
             # Now run the full script for user interaction
             print_separator
             print_header "🔄 Running Full Setup"
@@ -307,6 +313,12 @@ main() {
             # Optionally move the downloaded script to replace the local one
             mv "$TARGET_DIR/scripts/setup_automated.sh.downloaded" "$TARGET_DIR/scripts/setup_automated.sh"
             print_info "Updated local setup script with latest version"
+            
+            # Show ready for deployment message
+            print_separator
+            print_success "🎉 Ready for deployment!"
+            print_info "Your Flutter project is now ready for automated deployment!"
+            echo ""
             
             # Now run the full script for user interaction
             print_separator

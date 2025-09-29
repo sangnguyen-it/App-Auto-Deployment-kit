@@ -513,6 +513,101 @@ extract_project_info() {
     echo ""
 }
 
+# Check GitHub CLI authentication status
+check_github_auth() {
+    print_header "Checking GitHub Authentication"
+    
+    # Check if GitHub CLI is installed
+    if ! command -v gh >/dev/null 2>&1; then
+        print_error "GitHub CLI (gh) is not installed"
+        print_info "Please install GitHub CLI first:"
+        echo -e "  ${WHITE}• macOS:${NC} brew install gh"
+        echo -e "  ${WHITE}• Linux:${NC} https://github.com/cli/cli/blob/trunk/docs/install_linux.md"
+        echo -e "  ${WHITE}• Windows:${NC} https://github.com/cli/cli/releases"
+        echo ""
+        print_error "GitHub CLI is required to continue. Please install it and run the script again."
+        exit 1
+    fi
+    
+    print_step "Checking GitHub authentication status..."
+    
+    # Function to perform authentication with retry
+    perform_github_auth() {
+        local max_attempts=3
+        local attempt=1
+        
+        while [ $attempt -le $max_attempts ]; do
+            print_step "Authentication attempt $attempt of $max_attempts..."
+            
+            if gh auth login --web; then
+                print_success "GitHub authentication completed successfully!"
+                
+                # Verify authentication worked
+                if gh auth status >/dev/null 2>&1; then
+                    # Get authenticated user info
+                    GITHUB_USER=$(gh api user --jq '.login' 2>/dev/null || echo "Unknown")
+                    print_success "Authenticated as: $GITHUB_USER"
+                    return 0
+                else
+                    print_error "Authentication verification failed"
+                fi
+            else
+                print_error "GitHub authentication failed (attempt $attempt)"
+            fi
+            
+            if [ $attempt -lt $max_attempts ]; then
+                print_info "Retrying authentication..."
+                sleep 2
+            fi
+            
+            ((attempt++))
+        done
+        
+        print_error "GitHub authentication failed after $max_attempts attempts"
+        print_info "Please ensure you have a stable internet connection and try again"
+        print_info "You can also try running 'gh auth login' manually first"
+        exit 1
+    }
+    
+    # Check authentication status
+    if ! gh auth status >/dev/null 2>&1; then
+        print_error "GitHub CLI is not authenticated"
+        print_info "GitHub authentication is REQUIRED to continue with the automated setup."
+        print_info "This script needs GitHub access to:"
+        echo -e "  ${WHITE}• Create and manage GitHub Actions workflows${NC}"
+        echo -e "  ${WHITE}• Access repository information${NC}"
+        echo -e "  ${WHITE}• Set up automated deployment pipelines${NC}"
+        echo ""
+        
+        print_step "Starting mandatory GitHub authentication..."
+        perform_github_auth
+    else
+        # Already authenticated - get user info
+        GITHUB_USER=$(gh api user --jq '.login' 2>/dev/null || echo "Unknown")
+        print_success "GitHub CLI is authenticated as: $GITHUB_USER"
+        
+        # Verify the authentication is still valid
+        if ! gh api user >/dev/null 2>&1; then
+            print_error "GitHub authentication token is invalid or expired"
+            print_info "Re-authentication is REQUIRED to continue."
+            echo ""
+            
+            print_step "Starting mandatory GitHub re-authentication..."
+            perform_github_auth
+        fi
+    fi
+    
+    # Final verification
+    if ! gh auth status >/dev/null 2>&1 || ! gh api user >/dev/null 2>&1; then
+        print_error "GitHub authentication verification failed"
+        print_info "Cannot continue without valid GitHub authentication"
+        exit 1
+    fi
+    
+    print_success "GitHub authentication verified successfully"
+    echo ""
+}
+
 # Create directory structure
 create_directory_structure() {
     print_header "Creating Directory Structure"
@@ -3553,6 +3648,9 @@ main() {
     # Always validate target directory and extract project info
     validate_target_directory
     extract_project_info
+    
+    # Check GitHub CLI authentication status
+    check_github_auth
     
     # Check and fix Bundler version issues
     print_separator

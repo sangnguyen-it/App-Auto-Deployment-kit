@@ -265,27 +265,15 @@ main() {
         if "$LOCAL_SETUP_SCRIPT" --setup-only $SKIP_CREDENTIALS_ARG "$TARGET_DIR"; then
             print_success "Local setup completed successfully!"
             
-            # Verify script is properly installed and executable
-            if [[ -f "$LOCAL_SETUP_SCRIPT" && -x "$LOCAL_SETUP_SCRIPT" ]]; then
-                # Show ready for deployment message
-                print_separator
-                print_success "🎉 Ready for deployment!"
-                print_info "Your Flutter project is now ready for automated deployment!"
-                print_info "All scripts have been downloaded and verified successfully."
-                echo ""
-                
-                # Show next steps instead of auto-running
-                print_separator
-                print_header "📋 Next Steps"
-                print_info "You can now run the full integration:"
-                echo "   ./scripts/setup_automated.sh"
-                echo ""
-                print_info "This will configure your credentials and complete the setup."
-                return 0
-            else
-                print_error "Script verification failed"
-                return 1
-            fi
+            # Now run the full script for user interaction
+            print_separator
+            print_header "🔄 Running Full Setup"
+            print_info "Now running the full setup script for credential configuration..."
+            echo ""
+            
+            # Execute the full script without --setup-only
+            "$LOCAL_SETUP_SCRIPT" "$TARGET_DIR"
+            return $?
         else
             print_warning "Local setup script failed, will try downloading from GitHub..."
         fi
@@ -316,31 +304,19 @@ main() {
         if "$TARGET_DIR/scripts/setup_automated.sh.downloaded" --setup-only $SKIP_CREDENTIALS_ARG "$TARGET_DIR"; then
             print_success "Downloaded setup completed successfully!"
             
-            # Move the downloaded script to replace the local one
+            # Optionally move the downloaded script to replace the local one
             mv "$TARGET_DIR/scripts/setup_automated.sh.downloaded" "$TARGET_DIR/scripts/setup_automated.sh"
             print_info "Updated local setup script with latest version"
             
-            # Verify script is properly installed and executable
-            if [[ -f "$TARGET_DIR/scripts/setup_automated.sh" && -x "$TARGET_DIR/scripts/setup_automated.sh" ]]; then
-                # Show ready for deployment message
-                print_separator
-                print_success "🎉 Ready for deployment!"
-                print_info "Your Flutter project is now ready for automated deployment!"
-                print_info "All scripts have been downloaded and verified successfully."
-                echo ""
-                
-                # Show next steps instead of auto-running
-                print_separator
-                print_header "📋 Next Steps"
-                print_info "You can now run the full integration:"
-                echo "   ./scripts/setup_automated.sh"
-                echo ""
-                print_info "This will configure your credentials and complete the setup."
-                return 0
-            else
-                print_error "Script verification failed"
-                return 1
-            fi
+            # Now run the full script for user interaction
+            print_separator
+            print_header "🔄 Running Full Setup"
+            print_info "Now running the full setup script for credential configuration..."
+            echo ""
+            
+            # Execute the full script without --setup-only
+            "$TARGET_DIR/scripts/setup_automated.sh" "$TARGET_DIR"
+            return $?
         else
             print_error "Downloaded setup script execution failed"
             exit 1

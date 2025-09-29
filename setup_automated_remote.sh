@@ -1215,10 +1215,38 @@ EOF
 }
 
 # Create Gemfile
+# Create Platform-Specific Gemfiles
 create_gemfile() {
-    print_step "Creating Gemfile..."
+    print_step "Creating Platform-Specific Ruby Gemfiles"
     
-    cat > "$TARGET_DIR/Gemfile" << EOF
+    # Create Android Gemfile
+    print_step "Creating android/Gemfile..."
+    mkdir -p "$TARGET_DIR/android"
+    cat > "$TARGET_DIR/android/Gemfile" << GEMEOF
+# Gemfile for $PROJECT_NAME Android deployment
+
+source "https://rubygems.org"
+
+gem "fastlane", "~> 2.210"
+gem "bundler", ">= 2.6"
+GEMEOF
+    
+    # Create iOS Gemfile
+    print_step "Creating ios/Gemfile..."
+    mkdir -p "$TARGET_DIR/ios"
+    cat > "$TARGET_DIR/ios/Gemfile" << GEMEOF
+# Gemfile for $PROJECT_NAME iOS deployment
+
+source "https://rubygems.org"
+
+gem "fastlane", "~> 2.210"
+gem "cocoapods", "~> 1.11"
+gem "bundler", ">= 2.6"
+GEMEOF
+    
+    # Create Root Gemfile for development
+    print_step "Creating root Gemfile..."
+    cat > "$TARGET_DIR/Gemfile" << GEMEOF
 # Gemfile for $PROJECT_NAME Flutter project
 
 source "https://rubygems.org"
@@ -1226,9 +1254,10 @@ source "https://rubygems.org"
 gem "fastlane", "~> 2.210"
 gem "cocoapods", "~> 1.11"
 gem "bundler", ">= 2.6"
-EOF
+GEMEOF
     
-    print_success "Gemfile created"
+    print_success "Platform-specific Gemfiles created"
+    print_info "Created: android/Gemfile, ios/Gemfile, Gemfile"
 }
 
 # Update .gitignore with CI/CD related ignores

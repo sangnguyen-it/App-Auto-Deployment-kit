@@ -2133,55 +2133,45 @@ create_project_config() {
         fi
         echo ""
         
-        # Check if running from remote (curl) - auto-keep existing config
-        # When running via curl | bash, $0 is typically "bash" and script is piped
-        echo "🐛 DEBUG: \$0 = '$0'" >&2
-        echo "🐛 DEBUG: SCRIPT_PATH = '$SCRIPT_PATH'" >&2
-        echo "🐛 DEBUG: -f SCRIPT_PATH = $([ -f "$SCRIPT_PATH" ] && echo "true" || echo "false")" >&2
-        if [[ "$0" == "bash" || "$0" == "sh" || ! -f "$SCRIPT_PATH" || "$SCRIPT_PATH" == *"/bash" ]]; then
-            print_info "Running from remote - automatically keeping existing project.config"
-            print_success "✅ Keeping existing project.config file"
-            print_info "Using current configuration without changes"
-            
-            # Set flag to prevent config updates
-            export PROJECT_CONFIG_USER_APPROVED="false"
-            echo ""
-            return 0
-        else
-            # Ask user what to do (local execution)
-            echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
-            echo "  ${GREEN} - Yes, create new (overwrite existing)"
-            echo "  ${RED} - No, keep existing file"
-            echo ""
-            
-            local user_choice=""
-            while [[ "$user_choice" != "y" && "$user_choice" != "n" ]]; do
+        # Ask user what to do with existing config
+        echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
+        echo "  ${GREEN} - Yes, create new (overwrite existing)"
+        echo "  ${RED} - No, keep existing file"
+        echo ""
+        
+        local user_choice=""
+        while [[ "$user_choice" != "y" && "$user_choice" != "n" ]]; do
+            # Use /dev/tty to read from actual terminal when running via curl | bash
+            if [[ -t 0 ]]; then
                 read -p "Your choice (y/n): " user_choice
-                user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+            else
+                printf "Your choice (y/n): "
+                read user_choice < /dev/tty
+            fi
+            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+            
+            if [[ "$user_choice" == "y" ]]; then
+                print_info "Creating new project.config file..."
                 
-                if [[ "$user_choice" == "y" ]]; then
-                    print_info "Creating new project.config file..."
-                    
-                    # Set flag to allow config updates
-                    export PROJECT_CONFIG_USER_APPROVED="true"
-                    
-                    # Create new config
-                    create_new_project_config
-                    
-                elif [[ "$user_choice" == "n" ]]; then
-                    print_success "✅ Keeping existing project.config file"
-                    print_info "Using current configuration without changes"
-                    
-                    # Set flag to prevent config updates
-                    export PROJECT_CONFIG_USER_APPROVED="false"
-                    echo ""
-                    return 0
-                    
-                else
-                    print_error "Please enter 'y' for yes or 'n' for no"
-                fi
-            done
-        fi
+                # Set flag to allow config updates
+                export PROJECT_CONFIG_USER_APPROVED="true"
+                
+                # Create new config
+                create_new_project_config
+                
+            elif [[ "$user_choice" == "n" ]]; then
+                print_success "✅ Keeping existing project.config file"
+                print_info "Using current configuration without changes"
+                
+                # Set flag to prevent config updates
+                export PROJECT_CONFIG_USER_APPROVED="false"
+                echo ""
+                return 0
+                
+            else
+                print_error "Please enter 'y' for yes or 'n' for no"
+            fi
+        done
     else
         print_info "No existing project.config found - creating new one"
         # Set flag to allow config updates for new files
@@ -2236,31 +2226,18 @@ copy_automation_scripts() {
         cp "$SOURCE_DIR/scripts/setup_automated.sh" "$TARGET_DIR/scripts/"
         print_success "Copied setup_automated.sh from: $SOURCE_DIR/scripts/"
     else
-        # Check if running from remote (curl) by examining script execution context
-        # When running via curl | bash, $0 is typically "bash" and script is piped
-        if [[ "$0" == "bash" || "$0" == "sh" || ! -f "$SCRIPT_PATH" || "$SCRIPT_PATH" == *"/bash" ]]; then
-            print_step "Downloading setup_automated.sh from remote repository..."
-            # Download setup_automated.sh from GitHub
-            if command -v curl >/dev/null 2>&1; then
-                if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/setup_automated.sh" -o "$TARGET_DIR/scripts/setup_automated.sh"; then
-                    print_success "Downloaded setup_automated.sh from remote repository"
-                else
-                    print_error "Failed to download setup_automated.sh from remote repository"
-                    return 1
-                fi
+        print_step "Downloading setup_automated.sh from remote repository..."
+        # Download setup_automated.sh from GitHub
+        if command -v curl >/dev/null 2>&1; then
+            if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/setup_automated.sh" -o "$TARGET_DIR/scripts/setup_automated.sh"; then
+                print_success "Downloaded setup_automated.sh from remote repository"
             else
-                print_error "curl not available - cannot download setup_automated.sh"
+                print_error "Failed to download setup_automated.sh from remote repository"
                 return 1
             fi
         else
-            print_step "Creating setup_automated.sh in target project..."
-            # Copy the current script as setup_automated.sh
-            if [[ -f "$SCRIPT_PATH" ]]; then
-                cp "$SCRIPT_PATH" "$TARGET_DIR/scripts/setup_automated.sh"
-                print_success "Created setup_automated.sh in scripts directory"
-            else
-                print_warning "Could not copy setup_automated.sh - source script not found"
-            fi
+            print_error "curl not available - cannot download setup_automated.sh"
+            return 1
         fi
     fi
     

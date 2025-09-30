@@ -2858,6 +2858,9 @@ EOF
     
     # Sync with iOS Fastlane Appfile
     sync_appfile
+    
+    # Sync with iOS Fastlane Fastfile
+    sync_fastfile
 }
 
 # Sync project.config with iOS Fastlane Appfile
@@ -2928,6 +2931,69 @@ sync_appfile() {
     if [[ "${DEBUG:-}" == "true" ]]; then
         echo "🐛 DEBUG: Updated Appfile content:" >&2
         cat "$appfile_path" >&2
+    fi
+}
+
+# Sync project.config with iOS Fastlane Fastfile
+sync_fastfile() {
+    local fastfile_path="$TARGET_DIR/ios/fastlane/Fastfile"
+    
+    # Check if iOS Fastlane directory exists
+    if [ ! -d "$TARGET_DIR/ios/fastlane" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: iOS Fastlane directory not found at $TARGET_DIR/ios/fastlane" >&2
+        fi
+        return 0
+    fi
+    
+    # Check if Fastfile exists
+    if [ ! -f "$fastfile_path" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: Fastfile not found at $fastfile_path" >&2
+        fi
+        return 0
+    fi
+    
+    print_step "🔄 Syncing project.config with iOS Fastlane Fastfile..."
+    
+    # Load current project config
+    if [ -f "$TARGET_DIR/project.config" ]; then
+        source "$TARGET_DIR/project.config" 2>/dev/null || true
+    else
+        print_warning "⚠️  project.config not found, skipping Fastfile sync"
+        return 0
+    fi
+    
+    # Update Fastfile with values from project.config (only if not placeholders)
+    if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
+        sed -i '' "s/TEAM_ID = \"YOUR_TEAM_ID\"/TEAM_ID = \"$TEAM_ID\"/g" "$fastfile_path"
+        sed -i '' "s/TEAM_ID = \"[^\"]*\"/TEAM_ID = \"$TEAM_ID\"/g" "$fastfile_path"
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: Updated TEAM_ID to $TEAM_ID" >&2
+        fi
+    fi
+    
+    if [[ -n "$KEY_ID" && "$KEY_ID" != "YOUR_KEY_ID" ]]; then
+        sed -i '' "s/KEY_ID = \"YOUR_KEY_ID\"/KEY_ID = \"$KEY_ID\"/g" "$fastfile_path"
+        sed -i '' "s/KEY_ID = \"[^\"]*\"/KEY_ID = \"$KEY_ID\"/g" "$fastfile_path"
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: Updated KEY_ID to $KEY_ID" >&2
+        fi
+    fi
+    
+    if [[ -n "$ISSUER_ID" && "$ISSUER_ID" != "YOUR_ISSUER_ID" ]]; then
+        sed -i '' "s/ISSUER_ID = \"YOUR_ISSUER_ID\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$fastfile_path"
+        sed -i '' "s/ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$fastfile_path"
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: Updated ISSUER_ID to $ISSUER_ID" >&2
+        fi
+    fi
+    
+    print_success "✅ iOS Fastlane Fastfile updated with project.config values"
+    
+    if [[ "${DEBUG:-}" == "true" ]]; then
+        echo "🐛 DEBUG: Updated Fastfile content:" >&2
+        grep -E "(TEAM_ID|KEY_ID|ISSUER_ID)" "$fastfile_path" >&2
     fi
 }
 
@@ -3263,6 +3329,9 @@ EOF
     
     # Sync with iOS Fastlane Appfile
     sync_appfile
+    
+    # Sync with iOS Fastlane Fastfile
+    sync_fastfile
 }
 
 # Generate detailed setup guides

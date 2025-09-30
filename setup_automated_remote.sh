@@ -2138,7 +2138,7 @@ create_gemfile() {
 source "https://rubygems.org"
 
 # Fastlane for CI/CD automation
-gem "fastlane", "~> 2.210"
+gem "fastlane", "~> 2.228"
 
 # iOS specific plugins
 gem "cocoapods", "~> 1.11"
@@ -2160,7 +2160,7 @@ end
 
 # Optional: Version lock for CI stability
 # Uncomment and pin specific versions for production CI
-# gem "fastlane", "2.210.1"
+# gem "fastlane", "2.228.0"
 # gem "cocoapods", "1.11.3"
 
 EOF

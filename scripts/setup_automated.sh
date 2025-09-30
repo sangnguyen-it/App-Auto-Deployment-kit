@@ -2120,7 +2120,19 @@ create_project_config() {
         fi
         echo ""
         
-        # Ask user what to do
+        # Check if running in remote execution or non-TTY environment
+        if [ "$REMOTE_EXECUTION" = "true" ] || ! [[ -t 0 ]]; then
+            print_info "🤖 Remote execution detected - using existing project.config"
+            print_success "✅ Keeping existing project.config file"
+            print_info "Using current configuration without changes"
+            
+            # Set flag to prevent config updates
+            export PROJECT_CONFIG_USER_APPROVED="false"
+            echo ""
+            return 0
+        fi
+        
+        # Ask user what to do (only in interactive mode)
         echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
         echo "  ${GREEN} - Yes, create new (overwrite existing)"
         echo "  ${RED} - No, keep existing file"

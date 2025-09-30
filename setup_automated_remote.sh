@@ -2035,7 +2035,7 @@ EOF2
       run: |
         echo "# 🚀 Deployment Summary" >> \$GITHUB_STEP_SUMMARY
         echo "" >> \$GITHUB_STEP_SUMMARY
-        echo "**Project:** $PROJECT_NAME" >> \$GITHUB_STEP_SUMMARY
+        echo "**Project:** \$PROJECT_NAME" >> \$GITHUB_STEP_SUMMARY
         echo "**Version:** \${{ needs.validate.outputs.version }}" >> \$GITHUB_STEP_SUMMARY
         echo "**Environment:** \${{ needs.validate.outputs.environment }}" >> \$GITHUB_STEP_SUMMARY
         echo "**Platforms:** \${{ needs.validate.outputs.platforms }}" >> \$GITHUB_STEP_SUMMARY
@@ -2147,11 +2147,6 @@ create_project_config() {
             if [[ "$user_choice" == "y" ]]; then
                 print_info "Creating new project.config file..."
                 
-                # Backup existing file
-                local backup_file="$TARGET_DIR/project.config.backup.$(date +%Y%m%d_%H%M%S)"
-                cp "$TARGET_DIR/project.config" "$backup_file"
-                print_info "✅ Backup saved: $(basename "$backup_file")"
-                
                 # Set flag to allow config updates
                 export PROJECT_CONFIG_USER_APPROVED="true"
                 
@@ -2216,8 +2211,40 @@ EOF
 copy_automation_scripts() {
     print_header "Copying Automation Scripts"
     
-    # Scripts are already present in target directory
-    print_success "Automation scripts already available"
+    # Create scripts directory if it doesn't exist
+    mkdir -p "$TARGET_DIR/scripts"
+    
+    # Copy or create setup_automated.sh if source is available
+    if [[ -n "$SOURCE_DIR" && -f "$SOURCE_DIR/scripts/setup_automated.sh" && "$SOURCE_DIR" != "$TARGET_DIR" ]]; then
+        print_step "Copying setup_automated.sh from source..."
+        cp "$SOURCE_DIR/scripts/setup_automated.sh" "$TARGET_DIR/scripts/"
+        print_success "Copied setup_automated.sh from: $SOURCE_DIR/scripts/"
+    else
+        print_step "Creating setup_automated.sh in target project..."
+        # Copy the current script as setup_automated.sh
+        if [[ -f "$SCRIPT_PATH" ]]; then
+            cp "$SCRIPT_PATH" "$TARGET_DIR/scripts/setup_automated.sh"
+            print_success "Created setup_automated.sh in scripts directory"
+        else
+            print_warning "Could not copy setup_automated.sh - source script not found"
+        fi
+    fi
+    
+    # Copy other essential scripts if available
+    if [[ -n "$SOURCE_DIR" && -d "$SOURCE_DIR/scripts" && "$SOURCE_DIR" != "$TARGET_DIR" ]]; then
+        print_step "Copying additional automation scripts..."
+        for script_file in "$SOURCE_DIR/scripts"/*.sh "$SOURCE_DIR/scripts"/*.dart; do
+            if [[ -f "$script_file" ]]; then
+                script_name=$(basename "$script_file")
+                if [[ "$script_name" != "setup_automated.sh" ]]; then
+                    cp "$script_file" "$TARGET_DIR/scripts/" 2>/dev/null || true
+                fi
+            fi
+        done
+        print_success "Additional scripts copied"
+    fi
+    
+    print_success "Automation scripts are now available"
     
     # Create basic documentation
     if [ ! -f "$TARGET_DIR/docs/README.md" ]; then
@@ -2799,11 +2826,6 @@ update_project_config() {
         return 0
     fi
     
-    # Backup existing config
-    if [ -f "$TARGET_DIR/project.config" ]; then
-        cp "$TARGET_DIR/project.config" "$TARGET_DIR/project.config.backup" 2>/dev/null || true
-    fi
-    
     # Get current timestamp
     local timestamp=$(date)
     
@@ -2871,10 +2893,7 @@ sync_appfile() {
         return 0
     fi
     
-    # Backup existing Appfile
-    if [ -f "$appfile_path" ]; then
-        cp "$appfile_path" "$appfile_path.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
-    fi
+
     
     # Update Appfile with values from project.config
     local temp_appfile=$(mktemp)
@@ -3742,90 +3761,8 @@ main() {
     # Ensure we have proper error handling for non-interactive execution
     trap 'echo "Error occurred at line $LINENO. Exit code: $?" >&2' ERR
     
-    # Show usage if help requested
-    if [[ "$1" == "--help" || "$1" == "-h" ]]; then
-        echo "Automated Flutter CI/CD Integration Script"
-        echo ""
-        echo "Usage: $0 [OPTIONS] [TARGET_PROJECT_PATH]"
-        echo ""
-        echo "Options:"
-        echo "  --setup-only           Only run credential validation and setup"
-        echo "  --skip-credentials     Skip credential validation (for CI/CD)"
-        echo "  --skip-environment     Skip Ruby/CocoaPods environment setup"
-        echo "  -h, --help            Show this help message"
-        echo ""
-        echo "This script automatically integrates complete CI/CD automation into any Flutter project:"
-        echo "• Analyzes existing project structure and extracts configuration"
-        echo "• Creates customized Android/iOS Fastlane configurations"  
-        echo "• Generates Makefile with project-specific commands"
-        echo "• Sets up GitHub Actions workflow for automated deployment"
-        echo "• Validates and collects iOS/Android credentials interactively"
-        echo "• Creates detailed setup guides for manual configuration"
-        echo "• Copies automation scripts and documentation"
-        echo ""
-        echo "Examples:"
-        echo "  $0                          # Full integration into current directory"
-        echo "  $0 ../MyFlutterApp          # Full integration into specific project"
-        echo "  $0 --setup-only .           # Only credential setup for current project"
-        echo "  $0 --skip-credentials .     # Integration without credential prompts"
-        echo "  $0 --skip-environment .     # Integration without Ruby/CocoaPods setup"
-        echo ""
-        echo "Path Detection:"
-        echo "  # Script intelligently detects Flutter project location"
-        echo "  $0 .                        # From project root"
-        echo "  ./setup_automated.sh        # From scripts/ directory (auto-detects parent)"
-        echo "  DEBUG=true $0 .             # Enable verbose debugging output"
-        echo ""
-        echo "Common Issues:"
-        echo "  • If 'Not a Flutter project' error: ensure pubspec.yaml exists"
-        echo "  • Script auto-detects if run from scripts/ subdirectory"
-        echo "  • Use DEBUG=true for detailed path detection information"
-        echo "  • Run from Flutter project root directory for best results"
-        echo ""
-        exit 0
-    fi
-    
-    # Parse command line options
-    SETUP_ONLY=false
-    SKIP_CREDENTIALS=false
-    TARGET_PATH=""
-    
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --setup-only)
-                SETUP_ONLY=true
-                shift
-                ;;
-            --skip-credentials)
-                SKIP_CREDENTIALS=true
-                shift
-                ;;
-            --skip-environment)
-                SKIP_ENVIRONMENT=true
-                shift
-                ;;
-            -*)
-                echo "Unknown option: $1"
-                exit 1
-                ;;
-            *)
-                if [[ -z "$TARGET_PATH" ]]; then
-                    TARGET_PATH="$1"
-                else
-                    echo "Multiple target paths specified"
-        exit 1
-    fi
-                shift
-                ;;
-        esac
-    done
-    
     # Set target directory using robust detection
-    if [[ -n "$TARGET_PATH" ]]; then
-        TARGET_DIR=$(detect_target_directory "$TARGET_PATH")
-    else
-        TARGET_DIR=$(detect_target_directory "$(pwd)")
-    fi
+    TARGET_DIR=$(detect_target_directory "${1:-$(pwd)}")
     
     # Debug information (only in verbose mode)
     if [[ "${DEBUG:-}" == "true" ]]; then
@@ -3835,7 +3772,7 @@ main() {
     fi
     
     # Check if source directory exists (relaxed for dynamic detection)
-    if [[ "$SETUP_ONLY" != "true" ]] && [[ -z "$SOURCE_DIR" || ! -d "$SOURCE_DIR" ]]; then
+    if [[ -z "$SOURCE_DIR" || ! -d "$SOURCE_DIR" ]]; then
         print_warning "Source directory not found: $SOURCE_DIR"
         print_info "Script will use inline templates for file generation"
         SOURCE_DIR=""  # Clear invalid source dir
@@ -3853,38 +3790,7 @@ main() {
     print_header "🔧 Bundler Version Check"
     check_and_fix_bundler_version
     
-    if [[ "$SETUP_ONLY" == "true" ]]; then
-        # Setup-only mode: Just run credential validation and setup
-        print_header "🔒 Credential Setup Mode"
-        print_info "Running in setup-only mode - validating and collecting credentials only"
-        echo ""
-        
-        # Ensure directories exist for credential files
-        mkdir -p "$TARGET_DIR/ios/fastlane"
-        mkdir -p "$TARGET_DIR/android/fastlane"
-        
-        # Create basic project.config if it doesn't exist
-        if [ ! -f "$TARGET_DIR/project.config" ]; then
-            create_project_config
-        fi
-        
-        # Credential validation (unless skipped)
-        if [[ "$SKIP_CREDENTIALS" != "true" ]]; then
-            run_credential_setup
-        else
-            print_info "Skipping credential validation as requested"
-        fi
-        
-        # Generate detailed setup guides
-        generate_detailed_setup_guides
-        
-        print_success "Credential setup completed!"
-        echo -e "${CYAN}You can now run the full integration:${NC}"
-        echo -e "  ${WHITE}./scripts/setup_automated.sh .${NC}"
-        
-    else
-        # Full integration mode
-        # Execute integration steps
+    # Full integration mode - Execute all integration steps
     create_directory_structure
     create_android_fastlane
     create_ios_fastlane  
@@ -3903,26 +3809,15 @@ main() {
     generate_env_config
     generate_credential_guide
     create_setup_guide
-        
-        # Credential validation (unless skipped)
-        if [[ "$SKIP_CREDENTIALS" != "true" ]]; then
-            run_credential_setup
-        else
-            print_info "Skipping credential validation as requested"
-            # Generate detailed setup guides anyway
-            generate_detailed_setup_guides
-        fi
-        
-        # Basic environment setup
-        if [[ "$SKIP_ENVIRONMENT" != "true" ]]; then
+    
+    # Run credential setup
+    run_credential_setup
+    
+    # Basic environment setup
     setup_basic_environment
-        else
-            print_info "⏭️  Skipping environment setup (Ruby/CocoaPods)"
-        fi
-        
-        # Show completion
+    
+    # Show completion
     show_completion
-    fi
     
     # Final validation summary (always show)
     show_final_summary

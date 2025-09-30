@@ -1096,14 +1096,19 @@ FLUTTER_VERSION := stable
 PACKAGE_NAME := PACKAGE_PLACEHOLDER
 PACKAGE := $(PROJECT_NAME)
 
+# Version Configuration (extracted from pubspec.yaml)
+VERSION_FULL := $(shell grep "^version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
+VERSION_NAME := $(shell echo $(VERSION_FULL) | cut -d'+' -f1)
+VERSION_CODE := $(shell echo $(VERSION_FULL) | cut -d'+' -f2)
+
 # Output Configuration
 OUTPUT_DIR := builder
-APK_NAME := $(PACKAGE)-release.apk
-AAB_NAME := $(PACKAGE)-production.aab
-IPA_NAME := $(PACKAGE)-release.ipa
-IPA_PROD_NAME := $(PACKAGE)-production.ipa
-ARCHIVE_NAME := $(PACKAGE)-release.xcarchive
-ARCHIVE_PROD_NAME := $(PACKAGE)-production.xcarchive
+APK_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-release.apk
+AAB_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-production.aab
+IPA_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-release.ipa
+IPA_PROD_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-production.ipa
+ARCHIVE_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-release.xcarchive
+ARCHIVE_PROD_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-production.xcarchive
 
 # Enhanced Colors and Styles
 RED := \033[0;31m
@@ -2336,6 +2341,8 @@ KEY_ID = "YOUR_KEY_ID"
 ISSUER_ID = "YOUR_ISSUER_ID"
 
 # Place your App Store Connect API key
+# Download from: App Store Connect → Users and Access → Keys
+# Copy the downloaded .p8 file to ios/fastlane directory:
 cp /path/to/AuthKey_YOUR_KEY_ID.p8 ios/fastlane/
 \`\`\`
 
@@ -2583,9 +2590,15 @@ This guide helps you configure all necessary credentials for automated deploymen
 
 ### 4. Place API Key File
 \`\`\`bash
-# Copy your API key to the correct location
+# Copy your downloaded .p8 file to ios/fastlane directory
+# Replace YOUR_KEY_ID with your actual Key ID from App Store Connect
 cp /path/to/AuthKey_YOUR_KEY_ID.p8 ios/fastlane/
+
+# Example: If your Key ID is 9QD74BZG36
+# cp ~/Downloads/AuthKey_9QD74BZG36.p8 ios/fastlane/
 \`\`\`
+
+**Important**: The API key file must be placed in the \`ios/fastlane/\` directory with the exact name \`AuthKey_YOUR_KEY_ID.p8\`.
 
 ## 🤖 Android Google Play Console Setup
 
@@ -3018,6 +3031,8 @@ collect_ios_credentials() {
         print_warning "Private key file not found: AuthKey_${KEY_ID}.p8"
         echo -e "${YELLOW}Please place your private key file in: ios/fastlane/${NC}"
         echo -e "${GRAY}Download from: App Store Connect → Users and Access → Keys${NC}"
+        echo -e "${GRAY}Copy the downloaded .p8 file to ios/fastlane directory:${NC}"
+        echo -e "${GRAY}  cp ~/Downloads/AuthKey_${KEY_ID}.p8 ios/fastlane/${NC}"
         echo ""
         
         # Only ask if file doesn't exist
@@ -3460,13 +3475,18 @@ This guide walks you through setting up iOS deployment for your Flutter project.
 
 ### 2.2 Place API Key
 \`\`\`bash
-# Copy your key to the correct location
-# Replace YOUR_KEY_ID with your actual Key ID
+# Copy your downloaded .p8 file to ios/fastlane directory
+# Replace YOUR_KEY_ID with your actual Key ID from App Store Connect
 cp /path/to/AuthKey_YOUR_KEY_ID.p8 ios/fastlane/
+
+# Example: If your Key ID is 9QD74BZG36
+# cp ~/Downloads/AuthKey_9QD74BZG36.p8 ios/fastlane/
 
 # Verify file exists
 ls -la ios/fastlane/AuthKey_*.p8
 \`\`\`
+
+**Important**: The API key file must be placed in the \`ios/fastlane/\` directory with the exact name \`AuthKey_YOUR_KEY_ID.p8\` where YOUR_KEY_ID matches the Key ID from App Store Connect.
 
 ## Step 3: Configure Project Files
 

@@ -3008,8 +3008,12 @@ collect_ios_credentials() {
     while [[ "$TEAM_ID" == "YOUR_TEAM_ID" || -z "$TEAM_ID" ]]; do
         echo -e "${CYAN}Enter your Apple Developer Team ID:${NC}"
         echo -e "${GRAY}(Find this in App Store Connect → Membership → Team ID)${NC}"
-        read -p "Team ID: " input_team_id
-        if [[ -n "$input_team_id" && "$input_team_id" != "YOUR_TEAM_ID" ]]; then
+        local input_team_id
+        read_required_or_skip "Team ID: " input_team_id
+        if [[ "$input_team_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Team ID setup for remote execution"
+            break
+        elif [[ -n "$input_team_id" && "$input_team_id" != "YOUR_TEAM_ID" ]]; then
             TEAM_ID="$input_team_id"
             # Save immediately after successful input
             update_project_config
@@ -3023,8 +3027,12 @@ collect_ios_credentials() {
     while [[ "$KEY_ID" == "YOUR_KEY_ID" || -z "$KEY_ID" ]]; do
         echo -e "${CYAN}Enter your App Store Connect API Key ID:${NC}"
         echo -e "${GRAY}(Find this in App Store Connect → Users and Access → Keys)${NC}"
-        read -p "Key ID: " input_key_id
-        if [[ -n "$input_key_id" && "$input_key_id" != "YOUR_KEY_ID" ]]; then
+        local input_key_id
+        read_required_or_skip "Key ID: " input_key_id
+        if [[ "$input_key_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Key ID setup for remote execution"
+            break
+        elif [[ -n "$input_key_id" && "$input_key_id" != "YOUR_KEY_ID" ]]; then
             KEY_ID="$input_key_id"
             # Save immediately after successful input
             update_project_config
@@ -3038,8 +3046,12 @@ collect_ios_credentials() {
     while [[ "$ISSUER_ID" == "YOUR_ISSUER_ID" || -z "$ISSUER_ID" ]]; do
         echo -e "${CYAN}Enter your App Store Connect Issuer ID:${NC}"
         echo -e "${GRAY}(Find this in App Store Connect → Users and Access → Keys)${NC}"
-        read -p "Issuer ID: " input_issuer_id
-        if [[ -n "$input_issuer_id" && "$input_issuer_id" != "YOUR_ISSUER_ID" ]]; then
+        local input_issuer_id
+        read_required_or_skip "Issuer ID: " input_issuer_id
+        if [[ "$input_issuer_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Issuer ID setup for remote execution"
+            break
+        elif [[ -n "$input_issuer_id" && "$input_issuer_id" != "YOUR_ISSUER_ID" ]]; then
             ISSUER_ID="$input_issuer_id"
             # Save immediately after successful input
             update_project_config
@@ -3052,8 +3064,12 @@ collect_ios_credentials() {
     # Collect Apple ID
     while [[ "$APPLE_ID" == "your-apple-id@email.com" || -z "$APPLE_ID" ]]; do
         echo -e "${CYAN}Enter your Apple ID (email):${NC}"
-        read -p "Apple ID: " input_apple_id
-        if [[ "$input_apple_id" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        local input_apple_id
+        read_required_or_skip "Apple ID: " input_apple_id
+        if [[ "$input_apple_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Apple ID setup for remote execution"
+            break
+        elif [[ "$input_apple_id" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
             APPLE_ID="$input_apple_id"
             # Save immediately after successful input
             update_project_config

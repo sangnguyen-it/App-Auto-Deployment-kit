@@ -184,7 +184,7 @@ test_auto_integration() {
             "ios/fastlane/Fastfile"
             "Gemfile"
             "project.config"
-            "CICD_INTEGRATION_COMPLETE.md"
+            "docs/CICD_INTEGRATION_COMPLETE.md"
         )
         
         echo ""
@@ -212,7 +212,7 @@ test_config_generator() {
     # Check additional files that should be generated
     local files=(
         ".env.example"
-        "CREDENTIAL_SETUP.md"
+        "docs/CREDENTIAL_SETUP.md"
         "android/key.properties.template"
         "ios/ExportOptions.plist"
     )
@@ -269,13 +269,13 @@ show_test_results() {
     
     echo ""
     print_info "Key files:"
-    ls -la Makefile project.config CICD_INTEGRATION_COMPLETE.md 2>/dev/null || true
+    ls -la Makefile project.config docs/CICD_INTEGRATION_COMPLETE.md 2>/dev/null || true
     
     echo ""
     print_info "To explore the test project:"
     echo -e "  ${CYAN}cd $TEST_DIR/$TEST_PROJECT${NC}"
     echo -e "  ${CYAN}make help${NC}"
-    echo -e "  ${CYAN}cat CICD_INTEGRATION_COMPLETE.md${NC}"
+    echo -e "  ${CYAN}cat docs/CICD_INTEGRATION_COMPLETE.md${NC}"
     
     echo ""
     print_info "To clean up:"

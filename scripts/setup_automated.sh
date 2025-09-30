@@ -1439,8 +1439,8 @@ system-check: ## 🔍 Comprehensive System Configuration Check
 	@if [ -d "android" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "Android directory found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "Android directory missing"; fi
 	@if [ -d "ios" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS directory found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "iOS directory missing"; fi
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking CI/CD configuration..."
-	@if [ -f "android/fastlane/Fastfile" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "Android Fastlane configured"; else printf "$(RED)$(CROSS) %s$(NC)\n" "Android needs setup - See ANDROID_SETUP_GUIDE.md"; fi
-	@if [ -f "ios/fastlane/Fastfile" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Fastlane configured"; else printf "$(RED)$(CROSS) %s$(NC)\n" "iOS needs setup - See IOS_SETUP_GUIDE.md"; fi
+	@if [ -f "android/fastlane/Fastfile" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "Android Fastlane configured"; else printf "$(RED)$(CROSS) %s$(NC)\n" "Android needs setup - See docs/ANDROID_SETUP_GUIDE.md"; fi
+	@if [ -f "ios/fastlane/Fastfile" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Fastlane configured"; else printf "$(RED)$(CROSS) %s$(NC)\n" "iOS needs setup - See docs/IOS_SETUP_GUIDE.md"; fi
 	@if [ -f ".github/workflows/deploy.yml" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "GitHub Actions configured"; else printf "$(RED)$(CROSS) %s$(NC)\n" "GitHub Actions needs setup"; fi
 
 system-tester: system-check ## 🧪 Alias for system-check (checks system for tester deployment)
@@ -2267,7 +2267,7 @@ make auto-build-live
 2. Test the deployment with \`make system-check\`
 3. Run your first deployment with \`make auto-build-tester\`
 
-For detailed setup instructions, see \`CICD_INTEGRATION_COMPLETE.md\`.
+For detailed setup instructions, see \`docs/CICD_INTEGRATION_COMPLETE.md\`.
 EOF
         print_success "Documentation created"
     else
@@ -2281,7 +2281,8 @@ EOF
 create_setup_guide() {
     print_header "Creating Setup Guide"
     
-    cat > "$TARGET_DIR/CICD_INTEGRATION_COMPLETE.md" << EOF
+    mkdir -p "$TARGET_DIR/docs"
+    cat > "$TARGET_DIR/docs/CICD_INTEGRATION_COMPLETE.md" << EOF
 # 🎉 CI/CD Integration Complete!
 
 ## 📋 Project Setup Summary
@@ -2433,7 +2434,7 @@ make help                # Show all commands
 *Source: Automated Setup Script*
 EOF
     
-    print_success "Setup guide created: CICD_INTEGRATION_COMPLETE.md"
+    print_success "Setup guide created: docs/CICD_INTEGRATION_COMPLETE.md"
     echo ""
 }
 
@@ -2551,7 +2552,8 @@ EOF
 generate_credential_guide() {
     print_info "Generating credential setup guide..."
     
-    local guide_path="$TARGET_DIR/CREDENTIAL_SETUP.md"
+    mkdir -p "$TARGET_DIR/docs"
+    local guide_path="$TARGET_DIR/docs/CREDENTIAL_SETUP.md"
     
     cat > "$guide_path" << EOF
 # 🔑 Credential Setup Guide for $PROJECT_NAME
@@ -2669,7 +2671,7 @@ show_completion() {
     echo -e "  ${CHECK} project.config"
     echo -e "  ${CHECK} scripts/ (automation tools)"
     echo -e "  ${CHECK} docs/ (documentation)"
-    echo -e "  ${CHECK} CICD_INTEGRATION_COMPLETE.md (setup guide)"
+    echo -e "  ${CHECK} docs/CICD_INTEGRATION_COMPLETE.md (setup guide)"
     echo ""
     
     echo -e "${YELLOW}⚠️ Required Next Steps:${NC}"
@@ -2679,7 +2681,7 @@ show_completion() {
     echo ""
     
     print_success "CI/CD integration completed successfully!"
-    echo -e "${WHITE}📖 See CICD_INTEGRATION_COMPLETE.md for detailed setup instructions.${NC}"
+    echo -e "${WHITE}📖 See docs/CICD_INTEGRATION_COMPLETE.md for detailed setup instructions.${NC}"
     echo ""
 }
 
@@ -3253,7 +3255,8 @@ generate_detailed_setup_guides() {
     print_header "📚 Generating Detailed Setup Guides"
     
     # Android setup guide
-    cat > "$TARGET_DIR/ANDROID_SETUP_GUIDE.md" << EOF
+    mkdir -p "$TARGET_DIR/docs"
+    cat > "$TARGET_DIR/docs/ANDROID_SETUP_GUIDE.md" << EOF
 # 🤖 Complete Android Setup Guide for $PROJECT_NAME
 
 ## Overview
@@ -3419,7 +3422,8 @@ android/fastlane/play_store_service_account.json
 EOF
 
     # iOS setup guide
-    cat > "$TARGET_DIR/IOS_SETUP_GUIDE.md" << EOF
+    mkdir -p "$TARGET_DIR/docs"
+    cat > "$TARGET_DIR/docs/IOS_SETUP_GUIDE.md" << EOF
 # 🍎 Complete iOS Setup Guide for $PROJECT_NAME
 
 ## Overview
@@ -3655,8 +3659,8 @@ After successful TestFlight deployment:
 EOF
 
     print_success "Detailed setup guides created:"
-    echo -e "  ${CHECK} ANDROID_SETUP_GUIDE.md - Complete Android setup"
-    echo -e "  ${CHECK} IOS_SETUP_GUIDE.md - Complete iOS setup"
+    echo -e "  ${CHECK} docs/ANDROID_SETUP_GUIDE.md - Complete Android setup"
+    echo -e "  ${CHECK} docs/IOS_SETUP_GUIDE.md - Complete iOS setup"
     echo ""
 }
 
@@ -3718,21 +3722,21 @@ show_final_summary() {
     if [[ "$ANDROID_READY" == "true" ]]; then
         echo -e "  ${CHECK} ${GREEN}Android ready for deployment${NC}"
     else
-        echo -e "  ${CROSS} ${RED}Android needs setup${NC} - See ANDROID_SETUP_GUIDE.md"
+        echo -e "  ${CROSS} ${RED}Android needs setup${NC} - See docs/ANDROID_SETUP_GUIDE.md"
     fi
     
     if [[ "$IOS_READY" == "true" ]]; then
         echo -e "  ${CHECK} ${GREEN}iOS ready for deployment${NC}"
     else
-        echo -e "  ${CROSS} ${RED}iOS needs setup${NC} - See IOS_SETUP_GUIDE.md"
+        echo -e "  ${CROSS} ${RED}iOS needs setup${NC} - See docs/IOS_SETUP_GUIDE.md"
     fi
     
     echo ""
     echo -e "${BLUE}📚 Generated Guides:${NC}"
-    echo -e "  ${CHECK} ANDROID_SETUP_GUIDE.md - Complete Android setup instructions"
-    echo -e "  ${CHECK} IOS_SETUP_GUIDE.md - Complete iOS setup instructions"
-    echo -e "  ${CHECK} CICD_INTEGRATION_COMPLETE.md - Full integration guide"
-    echo -e "  ${CHECK} CREDENTIAL_SETUP.md - Credential configuration guide"
+    echo -e "  ${CHECK} docs/ANDROID_SETUP_GUIDE.md - Complete Android setup instructions"
+    echo -e "  ${CHECK} docs/IOS_SETUP_GUIDE.md - Complete iOS setup instructions"
+    echo -e "  ${CHECK} docs/CICD_INTEGRATION_COMPLETE.md - Full integration guide"
+    echo -e "  ${CHECK} docs/CREDENTIAL_SETUP.md - Credential configuration guide"
     
     echo ""
     if [[ "$CREDENTIALS_COMPLETE" == "true" ]]; then
@@ -3745,8 +3749,8 @@ show_final_summary() {
     else
         print_warning "⚠️ Complete setup required before deployment"
         echo -e "${CYAN}Next steps:${NC}"
-        echo -e "  • ${WHITE}Review ANDROID_SETUP_GUIDE.md${NC} for Android setup"
-        echo -e "  • ${WHITE}Review IOS_SETUP_GUIDE.md${NC} for iOS setup"
+        echo -e "  • ${WHITE}Review docs/ANDROID_SETUP_GUIDE.md${NC} for Android setup"
+    echo -e "  • ${WHITE}Review docs/IOS_SETUP_GUIDE.md${NC} for iOS setup"
         echo -e "  • ${WHITE}Run this script again${NC} after placing credentials"
         echo -e "  • ${WHITE}./scripts/setup_automated.sh --setup-only .${NC} for credential setup only"
     fi

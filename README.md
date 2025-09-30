@@ -35,7 +35,8 @@ your-flutter-project/
 ├── Makefile                           # Interactive automation commands
 ├── Gemfile                            # Ruby dependencies for Fastlane
 ├── project.config                     # Project configuration settings
-├── CICD_INTEGRATION_COMPLETE.md       # Complete setup guide
+├── docs/
+│   ├── CICD_INTEGRATION_COMPLETE.md   # Complete setup guide
 ├── .github/workflows/deploy.yml       # GitHub Actions CI/CD pipeline
 ├── android/fastlane/
 │   ├── Appfile                        # Android Fastlane configuration
@@ -131,7 +132,7 @@ The script generates detailed guides for setting up:
 - **TestFlight** configuration
 - **Automatic code signing** or manual provisioning
 
-All steps are documented in the generated `CICD_INTEGRATION_COMPLETE.md` file.
+All steps are documented in the generated `docs/CICD_INTEGRATION_COMPLETE.md` file.
 
 ## ⚙️ System Requirements
 

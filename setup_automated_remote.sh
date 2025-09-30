@@ -3833,8 +3833,11 @@ main() {
     # Ensure we have proper error handling for non-interactive execution
     trap 'echo "Error occurred at line $LINENO. Exit code: $?" >&2' ERR
     
-    # Set target directory using robust detection
+    # Set target directory using robust detection (allow non-zero exit for directory detection)
+    set +e  # Temporarily disable exit on error
     TARGET_DIR=$(detect_target_directory "${1:-$(pwd)}")
+    detect_exit_code=$?
+    set -e  # Re-enable exit on error
     
     # Debug information (only in verbose mode)
     if [[ "${DEBUG:-}" == "true" ]]; then

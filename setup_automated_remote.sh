@@ -2206,7 +2206,6 @@ create_project_config() {
             else
                 print_error "Please enter 'y' for yes or 'n' for no"
             fi
-        done
     else
         print_info "No existing project.config found - creating new one"
         # Set flag to allow config updates for new files

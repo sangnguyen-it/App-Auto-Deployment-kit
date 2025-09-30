@@ -2181,23 +2181,9 @@ create_project_config() {
         echo "  ${RED} - No, keep existing file"
         echo ""
         
-        local user_choice=""
-         while [[ "$user_choice" != "y" && "$user_choice" != "n" ]]; do
-             # Use /dev/tty to read from actual terminal when running via curl | bash
-             if [[ -t 0 ]]; then
-                 read -p "Your choice (y/n): " user_choice
-             else
-                 printf "Your choice (y/n): "
-                 if read user_choice < /dev/tty 2>/dev/null; then
-                     # Successfully read from /dev/tty
-                     :
-                 else
-                     # Cannot read from terminal, default to 'n' (keep existing)
-                     echo "n (auto-selected: keeping existing file)"
-                     user_choice="n"
-                 fi
-             fi
-            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+        local user_choice
+        read_with_fallback "Your choice (y/n): " "n" user_choice
+        user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
             
             if [[ "$user_choice" == "y" ]]; then
                 print_info "Creating new project.config file..."

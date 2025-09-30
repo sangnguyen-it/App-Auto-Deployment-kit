@@ -374,6 +374,71 @@ check_and_fix_bundler_version() {
     print_success "Bundler version check completed"
 }
 
+# Auto-sync project.config with iOS fastlane files if config exists
+auto_sync_project_config() {
+    # Check if project.config exists
+    if [ ! -f "$TARGET_DIR/project.config" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: No project.config found, skipping auto-sync" >&2
+        fi
+        return 0
+    fi
+    
+    print_header "🔄 Auto-syncing project.config with iOS Fastlane files"
+    
+    # Load project.config values
+    print_step "Loading project.config..."
+    if source "$TARGET_DIR/project.config" 2>/dev/null; then
+        print_success "project.config loaded successfully"
+        
+        # Show current config values for key iOS fields
+        echo ""
+        print_info "Current iOS configuration:"
+        echo "   Team ID: ${TEAM_ID:-'not set'}"
+        echo "   Key ID: ${KEY_ID:-'not set'}"
+        echo "   Issuer ID: ${ISSUER_ID:-'not set'}"
+        echo "   Apple ID: ${APPLE_ID:-'not set'}"
+        echo ""
+        
+        # Check if we have valid iOS credentials to sync
+        local has_valid_credentials=false
+        
+        if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" && "$TEAM_ID" != "TEAM_ID" ]]; then
+            has_valid_credentials=true
+        fi
+        
+        if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" && "$APPLE_ID" != "APPLE_ID" ]]; then
+            has_valid_credentials=true
+        fi
+        
+        if [[ -n "$KEY_ID" && "$KEY_ID" != "YOUR_KEY_ID" && "$KEY_ID" != "KEY_ID" ]]; then
+            has_valid_credentials=true
+        fi
+        
+        if [[ -n "$ISSUER_ID" && "$ISSUER_ID" != "YOUR_ISSUER_ID" && "$ISSUER_ID" != "ISSUER_ID" ]]; then
+            has_valid_credentials=true
+        fi
+        
+        if [ "$has_valid_credentials" = true ]; then
+            print_step "Syncing iOS fastlane files with project.config values..."
+            
+            # Sync all iOS fastlane files
+            sync_appfile
+            sync_fastfile  
+            sync_export_options
+            
+            print_success "✅ iOS fastlane files synchronized with project.config"
+        else
+            print_info "ℹ️  No valid iOS credentials found in project.config, skipping sync"
+            print_info "    Update project.config with your TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID to enable auto-sync"
+        fi
+    else
+        print_warning "⚠️  Failed to load project.config, skipping auto-sync"
+    fi
+    
+    echo ""
+}
+
 # Fix SOURCE_DIR if we're running from copied scripts in target project
 if [[ "$SOURCE_DIR" == "$TARGET_DIR" ]]; then
     print_step "🔍 Detecting source directory..."
@@ -1691,8 +1756,8 @@ help: ## Show detailed help and all available commands
 	@printf "\n"
 	@printf "$(PURPLE)$(BOLD)🚀 Automated Pipelines:$(NC)\n"
 	@printf "$(CYAN)  make$(NC)                    $(GRAY)# Start main menu$(NC)\n"
-	@printf "$(CYAN)  make auto-build-tester$(NC)  $(GRAY)# 🧪 Tester: APK + TestFlight$(NC)\n"
-	@printf "$(CYAN)  make auto-build-live$(NC)    $(GRAY)# 🚀 Production: AAB + App Store$(NC)\n"
+	@printf "$(CYAN)  make tester$(NC)  $(GRAY)# 🧪 Tester: APK + TestFlight$(NC)\n"
+	@printf "$(CYAN)  make live$(NC)    $(GRAY)# 🚀 Production: AAB + App Store$(NC)\n"
 	@printf "\n"
 	@printf "$(PURPLE)$(BOLD)⚙️ Manual Operations:$(NC)\n"
 	@printf "$(CYAN)  make manual-operations$(NC)  $(GRAY)# Manual tools menu$(NC)\n"
@@ -2273,10 +2338,10 @@ make system-check
 make version-current
 
 # Test deployment
-make auto-build-tester
+make tester
 
 # Production deployment
-make auto-build-live
+make live
 \`\`\`
 
 ### Configuration Files
@@ -2291,7 +2356,7 @@ make auto-build-live
 
 1. Update credentials in project configuration files
 2. Test the deployment with \`make system-check\`
-3. Run your first deployment with \`make auto-build-tester\`
+3. Run your first deployment with \`make tester\`
 
 For detailed setup instructions, see \`docs/CICD_INTEGRATION_COMPLETE.md\`.
 EOF
@@ -2410,10 +2475,10 @@ make system-check
 make version-current
 
 # Test build (creates APK + tries TestFlight)
-make auto-build-tester
+make tester
 
 # Production build (creates AAB + tries App Store)  
-make auto-build-live
+make live
 \`\`\`
 
 ## 🚀 Available Commands
@@ -2423,8 +2488,8 @@ make auto-build-live
 make
 
 # Quick commands
-make auto-build-tester    # Test deployment 
-make auto-build-live      # Production deployment
+make tester    # Test deployment 
+make live      # Production deployment
 make system-check         # Verify configuration
 make version-interactive  # Manage app versions
 make clean               # Clean build artifacts
@@ -2435,8 +2500,8 @@ make help                # Show all commands
 
 1. **Development**: Work on your Flutter app
 2. **Version**: \`make version-interactive\` to update version
-3. **Test**: \`make auto-build-tester\` for internal testing
-4. **Production**: \`make auto-build-live\` for store release
+3. **Test**: \`make tester\` for internal testing
+4. **Production**: \`make live\` for store release
 5. **CI/CD**: Push tags to trigger GitHub Actions
 
 ## 📞 Support
@@ -2671,8 +2736,8 @@ PLAY_STORE_JSON_BASE64 = [Base64 encoded service account JSON]
 ## ✅ Testing Your Setup
 
 1. **System Check**: \`make system-check\`
-2. **Test Build**: \`make auto-build-tester\`
-3. **Production Build**: \`make auto-build-live\`
+2. **Test Build**: \`make tester\`
+3. **Production Build**: \`make live\`
 
 ---
 *Generated on: $(date)*
@@ -2882,6 +2947,9 @@ EOF
     
     # Sync with iOS Fastlane Fastfile
     sync_fastfile
+    
+    # Sync with iOS ExportOptions.plist
+    sync_export_options
 }
 
 # Sync project.config with iOS Fastlane Appfile
@@ -3049,6 +3117,50 @@ sync_fastfile() {
     if [[ "${DEBUG:-}" == "true" ]]; then
         echo "🐛 DEBUG: Updated Fastfile content:" >&2
         grep -E "(TEAM_ID|KEY_ID|ISSUER_ID|KEY_PATH|signingCertificate)" "$fastfile_path" >&2
+    fi
+}
+
+# Sync project.config with iOS ExportOptions.plist
+sync_export_options() {
+    local export_options_path="$TARGET_DIR/ios/ExportOptions.plist"
+    
+    # Check if ExportOptions.plist exists
+    if [ ! -f "$export_options_path" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: ExportOptions.plist not found at $export_options_path" >&2
+        fi
+        return 0
+    fi
+    
+    print_step "🔄 Syncing project.config with iOS ExportOptions.plist..."
+    
+    # Load project.config values
+    if [ -f "$TARGET_DIR/project.config" ]; then
+        source "$TARGET_DIR/project.config" 2>/dev/null || true
+    else
+        print_warning "⚠️  project.config not found, skipping ExportOptions.plist sync"
+        return 0
+    fi
+    
+    # Only update if TEAM_ID is not empty and not a placeholder
+    if [ -n "$TEAM_ID" ] && [ "$TEAM_ID" != "YOUR_TEAM_ID" ] && [ "$TEAM_ID" != "TEAM_ID" ]; then
+        # Create backup
+        cp "$export_options_path" "$export_options_path.bak"
+        
+        # Update teamID in ExportOptions.plist
+        sed -i.tmp "s/<string>YOUR_TEAM_ID<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"
+        sed -i.tmp "s/<string>TEAM_ID<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"
+        
+        # Clean up temporary file
+        rm -f "$export_options_path.tmp"
+        
+        print_success "✅ iOS ExportOptions.plist updated with project.config values"
+        
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: Updated ExportOptions.plist teamID to: $TEAM_ID" >&2
+        fi
+    else
+        print_info "ℹ️  Skipping ExportOptions.plist update (TEAM_ID not set or is placeholder)"
     fi
 }
 
@@ -3387,6 +3499,9 @@ EOF
     
     # Sync with iOS Fastlane Fastfile
     sync_fastfile
+    
+    # Sync with iOS ExportOptions.plist
+    sync_export_options
 }
 
 # Generate detailed setup guides
@@ -3504,8 +3619,8 @@ Once setup is complete, you can use:
 
 \`\`\`bash
 # Local deployment
-make auto-build-tester      # Internal testing
-make auto-build-live        # Production
+make tester      # Internal testing
+make live        # Production
 
 # GitHub Actions (automatic on git tag)
 git tag v1.0.1
@@ -3726,8 +3841,8 @@ Once setup is complete:
 
 \`\`\`bash
 # Local deployment
-make auto-build-tester      # TestFlight internal
-make auto-build-live        # App Store review
+make tester      # TestFlight internal
+make live        # App Store review
 
 # GitHub Actions (automatic on git tag)
 git tag v1.0.1
@@ -3888,8 +4003,8 @@ show_final_summary() {
         echo -e "${CYAN}Quick commands:${NC}"
         echo -e "  • ${WHITE}make help${NC} - All commands"
         echo -e "  • ${WHITE}make system-check${NC} - Verify configuration"
-        echo -e "  • ${WHITE}make auto-build-tester${NC} - Test deployment"
-        echo -e "  • ${WHITE}make auto-build-live${NC} - Production deployment"
+        echo -e "  • ${WHITE}make tester${NC} - Test deployment"
+        echo -e "  • ${WHITE}make live${NC} - Production deployment"
     else
         print_warning "⚠️ Complete setup required before deployment"
         echo -e "${CYAN}Next steps:${NC}"
@@ -3923,6 +4038,9 @@ main() {
     # Always validate target directory and extract project info
     validate_target_directory
     extract_project_info
+    
+    # Auto-sync project.config with iOS fastlane files if config exists
+    auto_sync_project_config
     
     # Check GitHub CLI authentication status
     check_github_auth

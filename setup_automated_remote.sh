@@ -2185,27 +2185,24 @@ create_project_config() {
         read_with_fallback "Your choice (y/n): " "n" user_choice
         user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
             
-            if [[ "$user_choice" == "y" ]]; then
-                print_info "Creating new project.config file..."
-                
-                # Set flag to allow config updates
-                export PROJECT_CONFIG_USER_APPROVED="true"
-                
-                # Create new config
-                create_new_project_config
-                
-            elif [[ "$user_choice" == "n" ]]; then
-                print_success "✅ Keeping existing project.config file"
-                print_info "Using current configuration without changes"
-                
-                # Set flag to prevent config updates
-                export PROJECT_CONFIG_USER_APPROVED="false"
-                echo ""
-                return 0
-                
-            else
-                print_error "Please enter 'y' for yes or 'n' for no"
-            fi
+        if [[ "$user_choice" == "y" ]]; then
+            print_info "Creating new project.config file..."
+            
+            # Set flag to allow config updates
+            export PROJECT_CONFIG_USER_APPROVED="true"
+            
+            # Create new config
+            create_new_project_config
+            
+        else
+            print_success "✅ Keeping existing project.config file"
+            print_info "Using current configuration without changes"
+            
+            # Set flag to prevent config updates
+            export PROJECT_CONFIG_USER_APPROVED="false"
+            echo ""
+            return 0
+        fi
     else
         print_info "No existing project.config found - creating new one"
         # Set flag to allow config updates for new files

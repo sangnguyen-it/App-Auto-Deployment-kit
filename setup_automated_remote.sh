@@ -225,6 +225,11 @@ PACKAGE_NAME=""
 GIT_REPO=""
 CURRENT_VERSION=""
 
+# Script version and metadata
+SCRIPT_VERSION="2.1.0"
+SCRIPT_BUILD_DATE="2024-01-20"
+SCRIPT_AUTHOR="Flutter CI/CD Auto-Deploy"
+
 # Interactive mode flag
 INTERACTIVE_MODE=false
 
@@ -233,6 +238,90 @@ VALIDATION_REQUIRED=true
 CREDENTIALS_COMPLETE=false
 ANDROID_READY=false
 IOS_READY=false
+
+# Logging variables
+LOG_FILE=""
+
+# Initialize logging
+init_logging() {
+    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    LOG_FILE="/tmp/flutter_cicd_setup_${timestamp}.log"
+    
+    # Start logging
+    exec 3>&1 4>&2
+    exec 1> >(tee -a "$LOG_FILE")
+    exec 2> >(tee -a "$LOG_FILE" >&2)
+    
+    log_info "Script started at $(date)"
+    log_info "Script version: $SCRIPT_VERSION"
+    log_info "Log file: $LOG_FILE"
+}
+
+# Enhanced logging functions with timestamps and levels
+log_with_timestamp() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+}
+
+log_info() {
+    log_with_timestamp "INFO" "$1"
+}
+
+log_warning() {
+    log_with_timestamp "WARN" "$1"
+}
+
+log_error() {
+    log_with_timestamp "ERROR" "$1"
+}
+
+log_success() {
+    log_with_timestamp "SUCCESS" "$1"
+}
+
+# Progress indicator for long operations
+show_progress() {
+    local duration=$1
+    local message="$2"
+    local progress=0
+    local bar_length=30
+    
+    echo -ne "${CYAN}${GEAR} $message ${NC}"
+    
+    while [ $progress -le $duration ]; do
+        local filled=$((progress * bar_length / duration))
+        local empty=$((bar_length - filled))
+        
+        printf "\r${CYAN}${GEAR} $message ${NC}["
+        printf "%*s" $filled | tr ' ' '█'
+        printf "%*s" $empty | tr ' ' '░'
+        printf "] %d%%" $((progress * 100 / duration))
+        
+        sleep 0.1
+        progress=$((progress + 1))
+    done
+    echo ""
+}
+
+
+
+# Version check function
+check_script_version() {
+    print_step "Checking script version..."
+    print_info "Current script version: $SCRIPT_VERSION"
+    print_info "Build date: $SCRIPT_BUILD_DATE"
+    
+    # Check for updates (if running from remote)
+    if [[ "$REMOTE_EXECUTION" == "true" ]]; then
+        print_info "Running latest version from remote repository"
+    else
+        print_info "Running local version"
+    fi
+    
+    log_info "Script version check completed: $SCRIPT_VERSION"
+}
 
 # Print functions (defined early to be available everywhere)
 print_header() {
@@ -247,22 +336,27 @@ print_header() {
 
 print_step() {
     echo -e "${CYAN}${GEAR} $1${NC}"
+    log_info "STEP: $1"
 }
 
 print_success() {
     echo -e "${GREEN}${CHECK} $1${NC}"
+    log_success "$1"
 }
 
 print_error() {
     echo -e "${RED}${CROSS} $1${NC}"
+    log_error "$1"
 }
 
 print_warning() {
     echo -e "${YELLOW}${WARNING} $1${NC}"
+    log_warning "$1"
 }
 
 print_info() {
     echo -e "${BLUE}${INFO} $1${NC}"
+    log_info "$1"
 }
 
 print_separator() {
@@ -847,7 +941,7 @@ EOF
 create_ios_fastlane() {
     print_header "Creating iOS Fastlane Configuration"
     
-    # Create Appfile template
+    # Create iOS Appfile
     cat > "$TARGET_DIR/ios/fastlane/Appfile" << EOF
 # Appfile for $PROJECT_NAME iOS
 # Configuration for App Store Connect and Apple Developer
@@ -3809,6 +3903,12 @@ main() {
                 ;;
         esac
     done
+    
+    # Initialize logging
+    init_logging
+    
+    # Check script version
+    check_script_version
     
     # Set target directory using robust detection
     if [[ -n "$TARGET_PATH" ]]; then

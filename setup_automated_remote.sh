@@ -2220,13 +2220,30 @@ copy_automation_scripts() {
         cp "$SOURCE_DIR/scripts/setup_automated.sh" "$TARGET_DIR/scripts/"
         print_success "Copied setup_automated.sh from: $SOURCE_DIR/scripts/"
     else
-        print_step "Creating setup_automated.sh in target project..."
-        # Copy the current script as setup_automated.sh
-        if [[ -f "$SCRIPT_PATH" ]]; then
-            cp "$SCRIPT_PATH" "$TARGET_DIR/scripts/setup_automated.sh"
-            print_success "Created setup_automated.sh in scripts directory"
+        # Check if running from remote (curl) by examining script path
+        if [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
+            print_step "Downloading setup_automated.sh from remote repository..."
+            # Download setup_automated.sh from GitHub
+            if command -v curl >/dev/null 2>&1; then
+                if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/setup_automated.sh" -o "$TARGET_DIR/scripts/setup_automated.sh"; then
+                    print_success "Downloaded setup_automated.sh from remote repository"
+                else
+                    print_error "Failed to download setup_automated.sh from remote repository"
+                    return 1
+                fi
+            else
+                print_error "curl not available - cannot download setup_automated.sh"
+                return 1
+            fi
         else
-            print_warning "Could not copy setup_automated.sh - source script not found"
+            print_step "Creating setup_automated.sh in target project..."
+            # Copy the current script as setup_automated.sh
+            if [[ -f "$SCRIPT_PATH" ]]; then
+                cp "$SCRIPT_PATH" "$TARGET_DIR/scripts/setup_automated.sh"
+                print_success "Created setup_automated.sh in scripts directory"
+            else
+                print_warning "Could not copy setup_automated.sh - source script not found"
+            fi
         fi
     fi
     
@@ -2242,6 +2259,18 @@ copy_automation_scripts() {
             fi
         done
         print_success "Additional scripts copied"
+    elif [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
+        print_step "Downloading additional automation scripts from remote..."
+        # Download essential scripts from GitHub
+        local essential_scripts=("common_functions.sh" "integration_test.sh" "quick_setup.sh" "setup_interactive.sh")
+        for script_name in "${essential_scripts[@]}"; do
+            if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/$script_name" -o "$TARGET_DIR/scripts/$script_name" 2>/dev/null; then
+                print_info "Downloaded $script_name"
+            else
+                print_warning "Could not download $script_name (optional)"
+            fi
+        done
+        print_success "Essential scripts downloaded"
     fi
     
     print_success "Automation scripts are now available"

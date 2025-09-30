@@ -2215,13 +2215,40 @@ EOF
 copy_automation_scripts() {
     print_header "Copying Automation Scripts"
     
-    # Copy scripts directory if it doesn't exist or if we're in remote execution
-    if [ ! -d "$TARGET_DIR/scripts" ] || [ "$REMOTE_EXECUTION" = "true" ]; then
+    # Debug information
+    if [[ "${DEBUG:-}" == "true" ]]; then
+        echo "🐛 DEBUG: SOURCE_DIR = '$SOURCE_DIR'" >&2
+        echo "🐛 DEBUG: TARGET_DIR = '$TARGET_DIR'" >&2
+        echo "🐛 DEBUG: REMOTE_EXECUTION = '$REMOTE_EXECUTION'" >&2
+        echo "🐛 DEBUG: Checking if $SOURCE_DIR/scripts exists..." >&2
+        ls -la "$SOURCE_DIR/scripts" 2>&1 >&2 || echo "🐛 DEBUG: $SOURCE_DIR/scripts does not exist" >&2
+    fi
+    
+    # Copy scripts directory if it doesn't exist, is empty, or if we're in remote execution
+    local scripts_empty=false
+    if [ -d "$TARGET_DIR/scripts" ]; then
+        # Check if directory is empty (only contains . and ..)
+        local file_count=$(find "$TARGET_DIR/scripts" -mindepth 1 -maxdepth 1 | wc -l)
+        if [ "$file_count" -eq 0 ]; then
+            scripts_empty=true
+        fi
+    fi
+    
+    if [ ! -d "$TARGET_DIR/scripts" ] || [ "$scripts_empty" = "true" ] || [ "$REMOTE_EXECUTION" = "true" ]; then
         if [ -d "$SOURCE_DIR/scripts" ]; then
+            echo "📁 Copying scripts from $SOURCE_DIR/scripts to $TARGET_DIR/"
+            # Remove empty target directory if it exists
+            if [ -d "$TARGET_DIR/scripts" ] && [ "$scripts_empty" = "true" ]; then
+                rm -rf "$TARGET_DIR/scripts"
+            fi
             cp -r "$SOURCE_DIR/scripts" "$TARGET_DIR/"
             print_success "Scripts directory copied successfully"
         else
             print_warning "Source scripts directory not found at $SOURCE_DIR/scripts"
+            if [[ "${DEBUG:-}" == "true" ]]; then
+                echo "🐛 DEBUG: Available directories in SOURCE_DIR:" >&2
+                ls -la "$SOURCE_DIR" 2>&1 >&2 || echo "🐛 DEBUG: Cannot list $SOURCE_DIR" >&2
+            fi
         fi
     else
         print_success "Automation scripts already available"

@@ -2120,9 +2120,13 @@ create_project_config() {
         fi
         echo ""
         
-        # Check if running in remote execution or non-TTY environment
-        if [ "$REMOTE_EXECUTION" = "true" ] || ! [[ -t 0 ]]; then
-            print_info "🤖 Remote execution detected - using existing project.config"
+        # Check if running in remote execution, non-TTY environment, or skip-credentials mode
+        if [ "$REMOTE_EXECUTION" = "true" ] || ! [[ -t 0 ]] || [ "$SKIP_CREDENTIALS" = "true" ]; then
+            if [ "$SKIP_CREDENTIALS" = "true" ]; then
+                print_info "🤖 Automated mode (--skip-credentials) - using existing project.config"
+            else
+                print_info "🤖 Remote execution detected - using existing project.config"
+            fi
             print_success "✅ Keeping existing project.config file"
             print_info "Using current configuration without changes"
             

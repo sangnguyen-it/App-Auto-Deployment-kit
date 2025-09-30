@@ -831,17 +831,31 @@ EOF
 create_ios_fastlane() {
     print_header "Creating iOS Fastlane Configuration"
     
-    # Create Appfile template
+    # Load existing config if available to use real values
+    local config_apple_id="your-apple-id@email.com"
+    local config_team_id="YOUR_TEAM_ID"
+    
+    if [ -f "$TARGET_DIR/project.config" ]; then
+        source "$TARGET_DIR/project.config" 2>/dev/null || true
+        if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" ]]; then
+            config_apple_id="$APPLE_ID"
+        fi
+        if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
+            config_team_id="$TEAM_ID"
+        fi
+    fi
+    
+    # Create Appfile with real values when available
     cat > "$TARGET_DIR/ios/fastlane/Appfile" << EOF
 # Appfile for $PROJECT_NAME iOS
 # Configuration for App Store Connect and Apple Developer
 
 app_identifier("$BUNDLE_ID") # Your bundle identifier
-apple_id("your-apple-id@email.com") # Replace with your Apple ID
-team_id("YOUR_TEAM_ID") # Replace with your Apple Developer Team ID
+apple_id("$config_apple_id") # Apple ID for App Store Connect
+team_id("$config_team_id") # Apple Developer Team ID
 
 # Optional: If you belong to multiple teams
-# itc_team_id("YOUR_TEAM_ID") # App Store Connect Team ID (if different from team_id)
+# itc_team_id("$config_team_id") # App Store Connect Team ID (if different from team_id)
 
 EOF
     print_success "iOS Appfile template created"
@@ -2843,19 +2857,19 @@ sync_appfile() {
     
     # Read existing Appfile and update values
     while IFS= read -r line; do
-        if [[ "$line" =~ ^app_identifier ]]; then
+        if [[ "$line" =~ ^[[:space:]]*app_identifier ]]; then
             if [[ -n "$BUNDLE_ID" && "$BUNDLE_ID" != "YOUR_BUNDLE_ID" ]]; then
                 echo "app_identifier(\"$BUNDLE_ID\")"
             else
                 echo "$line"
             fi
-        elif [[ "$line" =~ ^apple_id ]]; then
+        elif [[ "$line" =~ ^[[:space:]]*apple_id ]]; then
             if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" ]]; then
                 echo "apple_id(\"$APPLE_ID\")"
             else
                 echo "$line"
             fi
-        elif [[ "$line" =~ ^team_id ]]; then
+        elif [[ "$line" =~ ^[[:space:]]*team_id ]]; then
             if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
                 echo "team_id(\"$TEAM_ID\")"
             else

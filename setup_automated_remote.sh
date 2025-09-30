@@ -957,7 +957,7 @@ ISSUER_ID = "YOUR_ISSUER_ID"
 TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"]
 
 # File paths (relative to fastlane directory)
-KEY_PATH = "./AuthKey_#{KEY_ID}.p8"
+KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"
 CHANGELOG_PATH = "../builder/changelog.txt"
 IPA_OUTPUT_DIR = "../build/ios/ipa"
 # Project-specific paths
@@ -978,10 +978,18 @@ platform :ios do
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
+      xcargs: "-allowProvisioningUpdates",
       export_options: {
-        method: "app-store",
+        method: "app-store-connect",
         signingStyle: "automatic",
-        teamID: TEAM_ID
+        teamID: TEAM_ID,
+        signingCertificate: "Apple Distribution",
+        compileBitcode: false,
+        uploadBitcode: false,
+        uploadSymbols: true,
+        provisioningProfiles: {
+          "\${BUNDLE_ID}" => "AUTO_DETECTED"
+        }
       }
     )
     
@@ -1004,10 +1012,18 @@ platform :ios do
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
+      xcargs: "-allowProvisioningUpdates",
       export_options: {
-        method: "app-store",
+        method: "app-store-connect",
         signingStyle: "automatic",
-        teamID: TEAM_ID
+        teamID: TEAM_ID,
+        signingCertificate: "Apple Distribution",
+        compileBitcode: false,
+        uploadBitcode: false,
+        uploadSymbols: true,
+        provisioningProfiles: {
+          "\${BUNDLE_ID}" => "AUTO_DETECTED"
+        }
       }
     )
     
@@ -1071,7 +1087,7 @@ platform :ios do
       end
     end
     
-    return changelog_content
+    changelog_content
   end
 end
 EOF
@@ -3047,17 +3063,51 @@ sync_fastfile() {
         sed -i.bak "s/ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
     fi
     
+    # Fix KEY_PATH to use correct relative path from ios/ directory
+    sed -i.bak 's|KEY_PATH = "./AuthKey_#{KEY_ID}.p8"|KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"|g' "$temp_fastfile"
+    
+    # Update export_options to include proper signing certificate and bitcode settings
+    # Fix build_and_upload_auto lane
+    sed -i.bak '/build_and_upload_auto/,/^  end$/{
+        /export_options: {/,/}$/{
+            s/export_options: {.*/export_options: {/
+            /method: "app-store",/a\
+        signingStyle: "automatic",\
+        teamID: TEAM_ID,\
+        signingCertificate: "Apple Distribution",\
+        compileBitcode: false,\
+        uploadBitcode: false,\
+        uploadSymbols: true
+            /teamID: TEAM_ID$/d
+        }
+    }' "$temp_fastfile"
+    
+    # Fix build_and_upload_production lane
+    sed -i.bak '/build_and_upload_production/,/^  end$/{
+        /export_options: {/,/}$/{
+            s/export_options: {.*/export_options: {/
+            /method: "app-store",/a\
+        signingStyle: "automatic",\
+        teamID: TEAM_ID,\
+        signingCertificate: "Apple Distribution",\
+        compileBitcode: false,\
+        uploadBitcode: false,\
+        uploadSymbols: true
+            /teamID: TEAM_ID$/d
+        }
+    }' "$temp_fastfile"
+    
     # Clean up backup files
     rm -f "$temp_fastfile.bak"
     
     # Replace original Fastfile with updated version
     mv "$temp_fastfile" "$fastfile_path"
     
-    print_success "✅ iOS Fastlane Fastfile updated with project.config values"
+    print_success "✅ iOS Fastlane Fastfile updated with project.config values and iOS build fixes"
     
     if [[ "${DEBUG:-}" == "true" ]]; then
         echo "🐛 DEBUG: Updated Fastfile content (relevant lines):" >&2
-        grep -E "TEAM_ID|KEY_ID|ISSUER_ID" "$fastfile_path" >&2
+        grep -E "TEAM_ID|KEY_ID|ISSUER_ID|KEY_PATH|signingCertificate" "$fastfile_path" >&2
     fi
 }
 

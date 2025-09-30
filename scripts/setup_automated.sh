@@ -930,7 +930,7 @@ ISSUER_ID = "YOUR_ISSUER_ID"
 TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"]
 
 # File paths (relative to fastlane directory)
-KEY_PATH = "./AuthKey_#{KEY_ID}.p8"
+KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"
 CHANGELOG_PATH = "../builder/changelog.txt"
 IPA_OUTPUT_DIR = "../build/ios/ipa"
 # Project-specific paths
@@ -943,75 +943,96 @@ platform :ios do
     UI.message("Setting up iOS environment for #{PROJECT_NAME}")
   end
 
-  desc "Build archive and upload to TestFlight with automatic signing"
-  lane :build_and_upload_auto do
+  desc "Build iOS archive"
+  lane :build_archive do
     setup_signing
     
     build_app(
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
-      export_options: {
-        method: "app-store",
-        signingStyle: "automatic",
-        teamID: TEAM_ID
-      }
-    )
-    
-    changelog_content = read_changelog
-    
-    upload_to_testflight(
-      changelog: changelog_content,
-      skip_waiting_for_build_processing: true,
-      distribute_external: false,
-      groups: TESTER_GROUPS,
-      notify_external_testers: true
-    )
-  end
-  
-  desc "Build archive and upload to App Store for production release"
-  lane :build_and_upload_production do
-    setup_signing
-    
-    build_app(
-      scheme: "Runner",
-      export_method: "app-store",
-      output_directory: IPA_OUTPUT_DIR,
-      export_options: {
-        method: "app-store",
-        signingStyle: "automatic",
-        teamID: TEAM_ID
-      }
-    )
-    
-    changelog_content = read_changelog("production")
-    
-    upload_to_testflight(
-      changelog: changelog_content,
-      skip_waiting_for_build_processing: true,
-      distribute_external: false,
-      groups: TESTER_GROUPS,
-      notify_external_testers: false
+      xcargs: "-allowProvisioningUpdates"
     )
   end
   
   desc "Submit a new Beta Build to TestFlight"
   lane :beta do
-    build_and_upload_auto
+    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
+      upload_to_testflight(
+        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+        changelog: read_changelog,
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        groups: TESTER_GROUPS,
+        notify_external_testers: true
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive
+      upload_to_testflight(
+        changelog: read_changelog,
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        groups: TESTER_GROUPS,
+        notify_external_testers: true
+      )
+    end
   end
 
   desc "Submit a new Production Build to App Store"
   lane :release do
-    build_and_upload_production
+    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
+      upload_to_app_store(
+        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+        force: true,
+        reject_if_possible: true,
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive
+      upload_to_app_store(
+        force: true,
+        reject_if_possible: true,
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    end
   end
 
-  desc "Upload archive to TestFlight"
-  lane :upload_only do
+  desc "Upload existing IPA to TestFlight"
+  lane :upload_testflight do
+    setup_signing
+    
     upload_to_testflight(
+      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+      changelog: read_changelog,
       skip_waiting_for_build_processing: true,
       distribute_external: false,
       groups: TESTER_GROUPS,
       notify_external_testers: true
+    )
+  end
+
+  desc "Upload existing IPA to App Store"
+  lane :upload_appstore do
+    setup_signing
+    
+    upload_to_app_store(
+      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+      force: true,
+      reject_if_possible: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: false,
+      automatic_release: false
     )
   end
 
@@ -1044,7 +1065,7 @@ platform :ios do
       end
     end
     
-    return changelog_content
+    changelog_content
   end
 end
 EOF
@@ -2989,11 +3010,45 @@ sync_fastfile() {
         fi
     fi
     
-    print_success "✅ iOS Fastlane Fastfile updated with project.config values"
+    # Fix KEY_PATH to use correct relative path from ios/ directory
+    sed -i '' 's|KEY_PATH = "./AuthKey_#{KEY_ID}.p8"|KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"|g' "$fastfile_path"
+    
+    # Update export_options to include proper signing certificate and bitcode settings
+    # Fix build_and_upload_auto lane
+    sed -i '' '/build_and_upload_auto/,/^  end$/{
+        /export_options: {/,/}$/{
+            s/export_options: {.*/export_options: {/
+            /method: "app-store",/a\
+        signingStyle: "automatic",\
+        teamID: TEAM_ID,\
+        signingCertificate: "Apple Distribution",\
+        compileBitcode: false,\
+        uploadBitcode: false,\
+        uploadSymbols: true
+            /teamID: TEAM_ID$/d
+        }
+    }' "$fastfile_path"
+    
+    # Fix build_and_upload_production lane
+    sed -i '' '/build_and_upload_production/,/^  end$/{
+        /export_options: {/,/}$/{
+            s/export_options: {.*/export_options: {/
+            /method: "app-store",/a\
+        signingStyle: "automatic",\
+        teamID: TEAM_ID,\
+        signingCertificate: "Apple Distribution",\
+        compileBitcode: false,\
+        uploadBitcode: false,\
+        uploadSymbols: true
+            /teamID: TEAM_ID$/d
+        }
+    }' "$fastfile_path"
+    
+    print_success "✅ iOS Fastlane Fastfile updated with project.config values and iOS build fixes"
     
     if [[ "${DEBUG:-}" == "true" ]]; then
         echo "🐛 DEBUG: Updated Fastfile content:" >&2
-        grep -E "(TEAM_ID|KEY_ID|ISSUER_ID)" "$fastfile_path" >&2
+        grep -E "(TEAM_ID|KEY_ID|ISSUER_ID|KEY_PATH|signingCertificate)" "$fastfile_path" >&2
     fi
 }
 

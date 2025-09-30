@@ -109,7 +109,8 @@ ISSUER_ID = "YOUR_ISSUER_ID"
 KEY_PATH = "./private_keys/AuthKey_#{KEY_ID}.p8"
 
 platform :ios do
-  lane :build_and_upload_auto do
+  desc "Build iOS archive"
+  lane :build_archive do
     app_store_connect_api_key(
       key_id: KEY_ID,
       issuer_id: ISSUER_ID,
@@ -119,26 +120,56 @@ platform :ios do
     build_app(
       scheme: "Runner",
       export_method: "app-store",
-      export_options: { signingStyle: "automatic", teamID: TEAM_ID }
+      xcargs: "-allowProvisioningUpdates"
     )
-    
-    upload_to_testflight
   end
   
-  lane :build_and_upload_production do
-    app_store_connect_api_key(
-      key_id: KEY_ID,
-      issuer_id: ISSUER_ID,
-      key_filepath: KEY_PATH
-    )
-    
-    build_app(
-      scheme: "Runner", 
-      export_method: "app-store",
-      export_options: { signingStyle: "automatic", teamID: TEAM_ID }
-    )
-    
-    upload_to_testflight
+  desc "Submit a new Beta Build to TestFlight"
+  lane :beta do
+    if File.exist?("../build/ios/ipa/Runner.ipa")
+      UI.message("Using existing archive at ../build/ios/ipa/Runner.ipa")
+      app_store_connect_api_key(
+        key_id: KEY_ID,
+        issuer_id: ISSUER_ID,
+        key_filepath: KEY_PATH
+      )
+      upload_to_testflight(
+        ipa: "../build/ios/ipa/Runner.ipa",
+        skip_waiting_for_build_processing: true
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive
+      upload_to_testflight(
+        skip_waiting_for_build_processing: true
+      )
+    end
+  end
+
+  desc "Submit a new Production Build to App Store"
+  lane :release do
+    if File.exist?("../build/ios/ipa/Runner.ipa")
+      UI.message("Using existing archive at ../build/ios/ipa/Runner.ipa")
+      app_store_connect_api_key(
+        key_id: KEY_ID,
+        issuer_id: ISSUER_ID,
+        key_filepath: KEY_PATH
+      )
+      upload_to_app_store(
+        ipa: "../build/ios/ipa/Runner.ipa",
+        force: true,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive
+      upload_to_app_store(
+        force: true,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    end
   end
 end
 EOF

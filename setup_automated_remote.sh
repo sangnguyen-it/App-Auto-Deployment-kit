@@ -32,14 +32,25 @@ PACKAGE="📦"
 
 # Script variables with robust path detection
 SCRIPT_PATH="$0"
-if command -v realpath &> /dev/null; then
+
+# Check if script is being run via curl pipe (when $0 is "bash" or "-bash")
+REMOTE_EXECUTION=false
+if [[ "$0" == "bash" || "$0" == "-bash" || "$0" == "/bin/bash" || "$0" == "/usr/bin/bash" ]]; then
+    # When run via curl | bash, we don't have a real script path
+    SCRIPT_PATH="/tmp/setup_automated_remote.sh"
+    SCRIPT_DIR="/tmp"
+    SOURCE_DIR=""
+    REMOTE_EXECUTION=true
+elif command -v realpath &> /dev/null; then
     SCRIPT_PATH=$(realpath "$0")
+    SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+    SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 else
     # Fallback for systems without realpath
     SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+    SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+    SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 fi
-SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
-SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 
 # Robust TARGET_DIR detection - completely dynamic
 detect_target_directory() {
@@ -257,6 +268,11 @@ print_info() {
 print_separator() {
     echo -e "${GRAY}─────────────────────────────────────────────────────────────────${NC}"
 }
+
+# Show remote execution message if applicable
+if [[ "$REMOTE_EXECUTION" == "true" ]]; then
+    print_info "🌐 Running via remote download (curl | bash)"
+fi
 
 # Check and fix Bundler version issues
 check_and_fix_bundler_version() {

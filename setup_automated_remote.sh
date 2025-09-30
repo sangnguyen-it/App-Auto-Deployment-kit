@@ -2134,7 +2134,8 @@ create_project_config() {
         echo ""
         
         # Check if running from remote (curl) - auto-keep existing config
-        if [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
+        # When running via curl | bash, $0 is typically "bash" and script is piped
+        if [[ "$0" == "bash" || "$0" == "sh" || ! -f "$SCRIPT_PATH" || "$SCRIPT_PATH" == *"/bash" ]]; then
             print_info "Running from remote - automatically keeping existing project.config"
             print_success "✅ Keeping existing project.config file"
             print_info "Using current configuration without changes"
@@ -2232,8 +2233,9 @@ copy_automation_scripts() {
         cp "$SOURCE_DIR/scripts/setup_automated.sh" "$TARGET_DIR/scripts/"
         print_success "Copied setup_automated.sh from: $SOURCE_DIR/scripts/"
     else
-        # Check if running from remote (curl) by examining script path
-        if [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
+        # Check if running from remote (curl) by examining script execution context
+        # When running via curl | bash, $0 is typically "bash" and script is piped
+        if [[ "$0" == "bash" || "$0" == "sh" || ! -f "$SCRIPT_PATH" || "$SCRIPT_PATH" == *"/bash" ]]; then
             print_step "Downloading setup_automated.sh from remote repository..."
             # Download setup_automated.sh from GitHub
             if command -v curl >/dev/null 2>&1; then

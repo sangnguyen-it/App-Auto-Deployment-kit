@@ -32,14 +32,25 @@ PACKAGE="📦"
 
 # Script variables with robust path detection
 SCRIPT_PATH="$0"
-if command -v realpath &> /dev/null; then
+
+# Check if script is being run via curl pipe (when $0 is "bash" or "-bash")
+REMOTE_EXECUTION=false
+if [[ "$0" == "bash" || "$0" == "-bash" || "$0" == "/bin/bash" || "$0" == "/usr/bin/bash" ]]; then
+    # When run via curl | bash, we don't have a real script path
+    SCRIPT_PATH="/tmp/setup_automated_remote.sh"
+    SCRIPT_DIR="/tmp"
+    SOURCE_DIR=""
+    REMOTE_EXECUTION=true
+elif command -v realpath &> /dev/null; then
     SCRIPT_PATH=$(realpath "$0")
+    SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+    SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 else
     # Fallback for systems without realpath
     SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+    SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+    SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 fi
-SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
-SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 
 # Robust TARGET_DIR detection - completely dynamic
 detect_target_directory() {
@@ -257,6 +268,11 @@ print_info() {
 print_separator() {
     echo -e "${GRAY}─────────────────────────────────────────────────────────────────${NC}"
 }
+
+# Show remote execution message if applicable
+if [[ "$REMOTE_EXECUTION" == "true" ]]; then
+    print_info "🌐 Running via remote download (curl | bash)"
+fi
 
 # Check and fix Bundler version issues
 check_and_fix_bundler_version() {
@@ -2095,7 +2111,19 @@ create_project_config() {
         fi
         echo ""
         
-        # Ask user what to do
+        # Check if running in remote execution or non-TTY environment
+        if [ "$REMOTE_EXECUTION" = "true" ] || ! [[ -t 0 ]]; then
+            print_info "🤖 Remote execution detected - using existing project.config"
+            print_success "✅ Keeping existing project.config file"
+            print_info "Using current configuration without changes"
+            
+            # Set flag to prevent config updates
+            export PROJECT_CONFIG_USER_APPROVED="false"
+            echo ""
+            return 0
+        fi
+        
+        # Ask user what to do (only in interactive mode)
         echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
         echo "  ${GREEN} - Yes, create new (overwrite existing)"
         echo "  ${RED} - No, keep existing file"
@@ -2178,8 +2206,17 @@ EOF
 copy_automation_scripts() {
     print_header "Copying Automation Scripts"
     
-    # Scripts are already present in target directory
-    print_success "Automation scripts already available"
+    # Copy scripts directory if it doesn't exist or if we're in remote execution
+    if [ ! -d "$TARGET_DIR/scripts" ] || [ "$REMOTE_EXECUTION" = "true" ]; then
+        if [ -d "$SOURCE_DIR/scripts" ]; then
+            cp -r "$SOURCE_DIR/scripts" "$TARGET_DIR/"
+            print_success "Scripts directory copied successfully"
+        else
+            print_warning "Source scripts directory not found at $SOURCE_DIR/scripts"
+        fi
+    else
+        print_success "Automation scripts already available"
+    fi
     
     # Create basic documentation
     if [ ! -f "$TARGET_DIR/docs/README.md" ]; then

@@ -32,25 +32,14 @@ PACKAGE="📦"
 
 # Script variables with robust path detection
 SCRIPT_PATH="$0"
-
-# Check if script is being run via curl pipe (when $0 is "bash" or "-bash")
-REMOTE_EXECUTION=false
-if [[ "$0" == "bash" || "$0" == "-bash" || "$0" == "/bin/bash" || "$0" == "/usr/bin/bash" ]]; then
-    # When run via curl | bash, we don't have a real script path
-    SCRIPT_PATH="/tmp/setup_automated.sh"
-    SCRIPT_DIR="/tmp"
-    SOURCE_DIR=""
-    REMOTE_EXECUTION=true
-elif command -v realpath &> /dev/null; then
+if command -v realpath &> /dev/null; then
     SCRIPT_PATH=$(realpath "$0")
-    SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
-    SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 else
     # Fallback for systems without realpath
     SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
-    SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
-    SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 fi
+SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 
 # Robust TARGET_DIR detection - completely dynamic
 detect_target_directory() {
@@ -842,31 +831,17 @@ EOF
 create_ios_fastlane() {
     print_header "Creating iOS Fastlane Configuration"
     
-    # Load existing config if available to use real values
-    local config_apple_id="your-apple-id@email.com"
-    local config_team_id="YOUR_TEAM_ID"
-    
-    if [ -f "$TARGET_DIR/project.config" ]; then
-        source "$TARGET_DIR/project.config" 2>/dev/null || true
-        if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" ]]; then
-            config_apple_id="$APPLE_ID"
-        fi
-        if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
-            config_team_id="$TEAM_ID"
-        fi
-    fi
-    
-    # Create Appfile with real values when available
+    # Create Appfile template
     cat > "$TARGET_DIR/ios/fastlane/Appfile" << EOF
 # Appfile for $PROJECT_NAME iOS
 # Configuration for App Store Connect and Apple Developer
 
 app_identifier("$BUNDLE_ID") # Your bundle identifier
-apple_id("$config_apple_id") # Apple ID for App Store Connect
-team_id("$config_team_id") # Apple Developer Team ID
+apple_id("your-apple-id@email.com") # Replace with your Apple ID
+team_id("YOUR_TEAM_ID") # Replace with your Apple Developer Team ID
 
 # Optional: If you belong to multiple teams
-# itc_team_id("$config_team_id") # App Store Connect Team ID (if different from team_id)
+# itc_team_id("YOUR_TEAM_ID") # App Store Connect Team ID (if different from team_id)
 
 EOF
     print_success "iOS Appfile template created"
@@ -2120,23 +2095,7 @@ create_project_config() {
         fi
         echo ""
         
-        # Check if running in remote execution, non-TTY environment, or skip-credentials mode
-        if [ "$REMOTE_EXECUTION" = "true" ] || ! [[ -t 0 ]] || [ "$SKIP_CREDENTIALS" = "true" ]; then
-            if [ "$SKIP_CREDENTIALS" = "true" ]; then
-                print_info "🤖 Automated mode (--skip-credentials) - using existing project.config"
-            else
-                print_info "🤖 Remote execution detected - using existing project.config"
-            fi
-            print_success "✅ Keeping existing project.config file"
-            print_info "Using current configuration without changes"
-            
-            # Set flag to prevent config updates
-            export PROJECT_CONFIG_USER_APPROVED="false"
-            echo ""
-            return 0
-        fi
-        
-        # Ask user what to do (only in interactive mode)
+        # Ask user what to do
         echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
         echo "  ${GREEN} - Yes, create new (overwrite existing)"
         echo "  ${RED} - No, keep existing file"
@@ -2219,44 +2178,8 @@ EOF
 copy_automation_scripts() {
     print_header "Copying Automation Scripts"
     
-    # Debug information
-    if [[ "${DEBUG:-}" == "true" ]]; then
-        echo "🐛 DEBUG: SOURCE_DIR = '$SOURCE_DIR'" >&2
-        echo "🐛 DEBUG: TARGET_DIR = '$TARGET_DIR'" >&2
-        echo "🐛 DEBUG: REMOTE_EXECUTION = '$REMOTE_EXECUTION'" >&2
-        echo "🐛 DEBUG: Checking if $SOURCE_DIR/scripts exists..." >&2
-        ls -la "$SOURCE_DIR/scripts" 2>&1 >&2 || echo "🐛 DEBUG: $SOURCE_DIR/scripts does not exist" >&2
-    fi
-    
-    # Copy scripts directory if it doesn't exist, is empty, or if we're in remote execution
-    local scripts_empty=false
-    if [ -d "$TARGET_DIR/scripts" ]; then
-        # Check if directory is empty (only contains . and ..)
-        local file_count=$(find "$TARGET_DIR/scripts" -mindepth 1 -maxdepth 1 | wc -l)
-        if [ "$file_count" -eq 0 ]; then
-            scripts_empty=true
-        fi
-    fi
-    
-    if [ ! -d "$TARGET_DIR/scripts" ] || [ "$scripts_empty" = "true" ] || [ "$REMOTE_EXECUTION" = "true" ]; then
-        if [ -d "$SOURCE_DIR/scripts" ]; then
-            echo "📁 Copying scripts from $SOURCE_DIR/scripts to $TARGET_DIR/"
-            # Remove empty target directory if it exists
-            if [ -d "$TARGET_DIR/scripts" ] && [ "$scripts_empty" = "true" ]; then
-                rm -rf "$TARGET_DIR/scripts"
-            fi
-            cp -r "$SOURCE_DIR/scripts" "$TARGET_DIR/"
-            print_success "Scripts directory copied successfully"
-        else
-            print_warning "Source scripts directory not found at $SOURCE_DIR/scripts"
-            if [[ "${DEBUG:-}" == "true" ]]; then
-                echo "🐛 DEBUG: Available directories in SOURCE_DIR:" >&2
-                ls -la "$SOURCE_DIR" 2>&1 >&2 || echo "🐛 DEBUG: Cannot list $SOURCE_DIR" >&2
-            fi
-        fi
-    else
-        print_success "Automation scripts already available"
-    fi
+    # Scripts are already present in target directory
+    print_success "Automation scripts already available"
     
     # Create basic documentation
     if [ ! -f "$TARGET_DIR/docs/README.md" ]; then
@@ -2920,19 +2843,19 @@ sync_appfile() {
     
     # Read existing Appfile and update values
     while IFS= read -r line; do
-        if [[ "$line" =~ ^[[:space:]]*app_identifier ]]; then
+        if [[ "$line" =~ ^app_identifier ]]; then
             if [[ -n "$BUNDLE_ID" && "$BUNDLE_ID" != "YOUR_BUNDLE_ID" ]]; then
                 echo "app_identifier(\"$BUNDLE_ID\")"
             else
                 echo "$line"
             fi
-        elif [[ "$line" =~ ^[[:space:]]*apple_id ]]; then
+        elif [[ "$line" =~ ^apple_id ]]; then
             if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" ]]; then
                 echo "apple_id(\"$APPLE_ID\")"
             else
                 echo "$line"
             fi
-        elif [[ "$line" =~ ^[[:space:]]*team_id ]]; then
+        elif [[ "$line" =~ ^team_id ]]; then
             if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
                 echo "team_id(\"$TEAM_ID\")"
             else
@@ -3684,18 +3607,8 @@ run_credential_setup() {
     print_header "🔒 Credential Validation & Setup"
     
     if ! validate_credentials; then
-        print_warning "Some credentials are missing."
-        
-        # Check if running in remote execution or non-TTY environment
-        if [ "$REMOTE_EXECUTION" = "true" ] || ! [[ -t 0 ]]; then
-            print_info "🤖 Automated mode detected - skipping interactive credential setup"
-            print_info "You can run the script again interactively to set up credentials"
-            print_info "Or check the detailed guides for manual configuration"
-            return 0
-        fi
-        
+        print_warning "Some credentials are missing. Starting interactive setup..."
         echo ""
-        print_info "Starting interactive setup..."
         
         # Ask user if they want to continue with interactive setup
         echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"

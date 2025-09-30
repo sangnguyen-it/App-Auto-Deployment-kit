@@ -3,7 +3,34 @@
 # Automatically integrates complete CI/CD pipeline into any Flutter project
 # Usage: ./setup_automated.sh [TARGET_PROJECT_PATH]
 
+# Exit on error, but handle curl download gracefully
 set -e
+
+# Ensure we have a proper terminal for interactive operations
+if [ -t 0 ]; then
+    # Running interactively
+    export TERM=${TERM:-xterm}
+else
+    # Running non-interactively (e.g., via curl | bash)
+    export TERM=dumb
+fi
+
+# Set safe locale to prevent encoding issues
+export LC_ALL=C
+export LANG=C
+
+# Validate script integrity (basic check)
+if [ ! -f "$0" ] && [ -z "${BASH_SOURCE[0]}" ]; then
+    echo "Warning: Script integrity check failed. Continuing anyway..."
+fi
+
+# Ensure we have required commands
+for cmd in bash grep sed awk; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "Error: Required command '$cmd' not found." >&2
+        exit 1
+    fi
+done
 
 # Colors and styling
 RED='\033[0;31m'
@@ -32,10 +59,10 @@ PACKAGE="📦"
 
 # Script variables with robust path detection
 SCRIPT_PATH="$0"
-if command -v realpath &> /dev/null; then
+if command -v realpath >/dev/null 2>&1 && realpath "$0" >/dev/null 2>&1; then
     SCRIPT_PATH=$(realpath "$0")
 else
-    # Fallback for systems without realpath
+    # Fallback for systems without realpath or when realpath fails
     SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
 fi
 SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
@@ -53,10 +80,20 @@ detect_target_directory() {
     fi
     
     # Convert to absolute path with fallback
-    if command -v realpath &> /dev/null; then
+    if command -v realpath >/dev/null 2>&1 && realpath "$target" >/dev/null 2>&1; then
         target=$(realpath "$target" 2>/dev/null || echo "$target")
     else
-        target=$(cd "$target" 2>/dev/null && pwd || echo "$target")
+        # Fallback for systems without realpath or when realpath fails
+        if [ -d "$target" ]; then
+            target=$(cd "$target" 2>/dev/null && pwd || echo "$target")
+        else
+            # If target is not a directory, try to get absolute path of parent
+            target_dir=$(dirname "$target")
+            target_name=$(basename "$target")
+            if [ -d "$target_dir" ]; then
+                target=$(cd "$target_dir" 2>/dev/null && pwd)/"$target_name"
+            fi
+        fi
     fi
     
     if [[ "${DEBUG:-}" == "true" ]]; then
@@ -1668,10 +1705,11 @@ create_makefile() {
         if [[ -n "$MAKEFILE_SOURCE" && -f "$MAKEFILE_SOURCE" ]]; then
                     # Get absolute path for comparison
                     local abs_makefile_source
-                    if command -v realpath &> /dev/null; then
+                    if command -v realpath >/dev/null 2>&1 && realpath "$MAKEFILE_SOURCE" >/dev/null 2>&1; then
                         abs_makefile_source=$(realpath "$MAKEFILE_SOURCE" 2>/dev/null || echo "$MAKEFILE_SOURCE")
                     else
-                        abs_makefile_source=$(cd "$(dirname "$MAKEFILE_SOURCE")" 2>/dev/null && pwd)/$(basename "$MAKEFILE_SOURCE") || echo "$MAKEFILE_SOURCE"
+                        # Fallback for systems without realpath or when realpath fails
+                        abs_makefile_source=$(cd "$(dirname "$MAKEFILE_SOURCE")" 2>/dev/null && pwd)/$(basename "$MAKEFILE_SOURCE") 2>/dev/null || echo "$MAKEFILE_SOURCE"
                     fi
                     
                     # Don't copy if source and target are the same
@@ -3695,6 +3733,15 @@ show_final_summary() {
 
 # Main execution function
 main() {
+    # Handle potential curl download issues
+    if [ ! -t 0 ] && [ -z "${BASH_SOURCE[0]}" ]; then
+        # Script is being piped from curl, add small delay to ensure complete download
+        sleep 0.1
+    fi
+    
+    # Ensure we have proper error handling for non-interactive execution
+    trap 'echo "Error occurred at line $LINENO. Exit code: $?" >&2' ERR
+    
     # Show usage if help requested
     if [[ "$1" == "--help" || "$1" == "-h" ]]; then
         echo "Automated Flutter CI/CD Integration Script"
@@ -3881,5 +3928,19 @@ main() {
     show_final_summary
 }
 
-# Script entry point
+# Script entry point - with integrity check for curl downloads
+if [ ! -t 0 ]; then
+    # Non-interactive execution (likely from curl | bash)
+    # Add a small delay to ensure script is fully downloaded
+    sleep 0.2
+    
+    # Basic integrity check - ensure we have the main function
+    if ! declare -f main >/dev/null 2>&1; then
+        echo "Error: Script appears to be incomplete or corrupted during download." >&2
+        echo "Please try downloading again or use a local copy of the script." >&2
+        exit 1
+    fi
+fi
+
+# Execute main function
 main "$@"

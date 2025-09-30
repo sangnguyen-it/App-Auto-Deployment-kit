@@ -57,6 +57,48 @@ WRENCH="🔧"
 STAR="⭐"
 PACKAGE="📦"
 
+# Helper function for remote-safe input reading
+read_with_fallback() {
+    local prompt="$1"
+    local default_value="${2:-n}"
+    local variable_name="$3"
+    
+    if [[ -t 0 ]]; then
+        read -p "$prompt" "$variable_name"
+    else
+        printf "$prompt"
+        if read "$variable_name" < /dev/tty 2>/dev/null; then
+            # Successfully read from /dev/tty
+            :
+        else
+            # Cannot read from terminal, use default
+            echo "$default_value (auto-selected for remote execution)"
+            eval "$variable_name=\"$default_value\""
+        fi
+    fi
+}
+
+# Helper function for required input (skips when remote)
+read_required_or_skip() {
+    local prompt="$1"
+    local variable_name="$2"
+    local skip_message="${3:-Skipping input for remote execution}"
+    
+    if [[ -t 0 ]]; then
+        read -p "$prompt" "$variable_name"
+    else
+        printf "$prompt"
+        if read "$variable_name" < /dev/tty 2>/dev/null; then
+            # Successfully read from /dev/tty
+            :
+        else
+            # Cannot read from terminal, skip this input
+            echo "skip (auto-selected: $skip_message)"
+            eval "$variable_name=\"skip\""
+        fi
+    fi
+}
+
 # Script variables with robust path detection
 SCRIPT_PATH="$0"
 if command -v realpath >/dev/null 2>&1 && realpath "$0" >/dev/null 2>&1; then
@@ -3052,7 +3094,7 @@ collect_ios_credentials() {
         
         # Only ask if file doesn't exist
         while [ ! -f "$key_file" ]; do
-            read -p "Press Enter when you've placed the key file, or 'skip' to continue: " user_input
+            read_with_fallback "Press Enter when you've placed the key file, or 'skip' to continue: " "skip" "user_input"
             if [[ "$user_input" == "skip" ]]; then
                 print_warning "Skipping key file validation - iOS deployment may not work"
                 break
@@ -3102,7 +3144,7 @@ collect_android_credentials() {
     if [ ! "$keystore_found" ]; then
         print_warning "No Android keystore found"
         echo -e "${CYAN}Do you want to create a new keystore? (y/n):${NC}"
-        read -p "Create keystore: " create_keystore
+        read_with_fallback "Create keystore: " "n" "create_keystore"
         
         if [[ "$create_keystore" =~ ^[Yy] ]]; then
             create_android_keystore
@@ -3130,7 +3172,7 @@ collect_android_credentials() {
             echo -e "  ${GRAY}• storePassword=your_store_password${NC}"
             echo ""
             
-            read -p "Press Enter when you've updated key.properties: "
+            read_with_fallback "Press Enter when you've updated key.properties: " "skip" "user_input"
             
             # Re-check after user action
             if [ -f "$TARGET_DIR/android/key.properties" ]; then
@@ -3158,7 +3200,7 @@ collect_android_credentials() {
         
         # Only ask if file doesn't exist
         while [ ! -f "$service_account_file" ]; do
-            read -p "Press Enter when you've placed the JSON file, or 'skip' to continue: " user_input
+            read_with_fallback "Press Enter when you've placed the JSON file, or 'skip' to continue: " "skip" "user_input"
             if [[ "$user_input" == "skip" ]]; then
                 print_warning "Skipping service account - creating demo file for validation"
                 
@@ -3700,7 +3742,9 @@ run_credential_setup() {
         # Ask user if they want to continue with interactive setup
         echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"
         echo -e "${GRAY}This will guide you through collecting iOS and Android credentials${NC}"
-        read -p "Continue with setup: " setup_choice
+        
+        # Use helper function for remote-safe input
+        read_with_fallback "Continue with setup: " "n" "setup_choice"
         
         if [[ "$setup_choice" =~ ^[Yy] ]]; then
             # Interactive iOS setup

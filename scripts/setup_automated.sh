@@ -258,6 +258,44 @@ print_separator() {
     echo -e "${GRAY}─────────────────────────────────────────────────────────────────${NC}"
 }
 
+# Helper function for remote-safe input that can skip when needed
+read_required_or_skip() {
+    local prompt="$1"
+    local var_name="$2"
+    
+    # Check if we're in a remote/automated environment
+    if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
+        # In automated/remote environment, return "skip" to indicate skipping
+        eval "$var_name='skip'"
+        return 0
+    fi
+    
+    # Interactive environment - prompt for input
+    local input
+    read -p "$prompt" input
+    eval "$var_name='$input'"
+}
+
+# Helper function for input with fallback
+read_with_fallback() {
+    local prompt="$1"
+    local var_name="$2"
+    local fallback_value="$3"
+    
+    # Check if we're in a remote/automated environment
+    if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
+        # In automated/remote environment, use fallback
+        eval "$var_name='$fallback_value'"
+        return 0
+    fi
+    
+    # Interactive environment - prompt for input
+    local input
+    read -p "$prompt" input
+    # Use input if provided, otherwise use fallback
+    eval "$var_name='${input:-$fallback_value}'"
+}
+
 # Check and fix Bundler version issues
 check_and_fix_bundler_version() {
     print_step "Checking Bundler version compatibility..."
@@ -2117,7 +2155,7 @@ create_project_config() {
         
         local user_choice=""
         while [[ "$user_choice" != "y" && "$user_choice" != "n" ]]; do
-            read -p "Your choice (y/n): " user_choice
+            read_with_fallback "Your choice (y/n): " user_choice "n"
             user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
             
             if [[ "$user_choice" == "y" ]]; then
@@ -2894,8 +2932,12 @@ collect_ios_credentials() {
     while [[ "$TEAM_ID" == "YOUR_TEAM_ID" || -z "$TEAM_ID" ]]; do
         echo -e "${CYAN}Enter your Apple Developer Team ID:${NC}"
         echo -e "${GRAY}(Find this in App Store Connect → Membership → Team ID)${NC}"
-        read -p "Team ID: " input_team_id
-        if [[ -n "$input_team_id" && "$input_team_id" != "YOUR_TEAM_ID" ]]; then
+        local input_team_id
+        read_required_or_skip "Team ID: " input_team_id
+        if [[ "$input_team_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Team ID setup for remote execution"
+            break
+        elif [[ -n "$input_team_id" && "$input_team_id" != "YOUR_TEAM_ID" ]]; then
             TEAM_ID="$input_team_id"
             # Save immediately after successful input
             update_project_config
@@ -2909,8 +2951,12 @@ collect_ios_credentials() {
     while [[ "$KEY_ID" == "YOUR_KEY_ID" || -z "$KEY_ID" ]]; do
         echo -e "${CYAN}Enter your App Store Connect API Key ID:${NC}"
         echo -e "${GRAY}(Find this in App Store Connect → Users and Access → Keys)${NC}"
-        read -p "Key ID: " input_key_id
-        if [[ -n "$input_key_id" && "$input_key_id" != "YOUR_KEY_ID" ]]; then
+        local input_key_id
+        read_required_or_skip "Key ID: " input_key_id
+        if [[ "$input_key_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Key ID setup for remote execution"
+            break
+        elif [[ -n "$input_key_id" && "$input_key_id" != "YOUR_KEY_ID" ]]; then
             KEY_ID="$input_key_id"
             # Save immediately after successful input
             update_project_config
@@ -2924,8 +2970,12 @@ collect_ios_credentials() {
     while [[ "$ISSUER_ID" == "YOUR_ISSUER_ID" || -z "$ISSUER_ID" ]]; do
         echo -e "${CYAN}Enter your App Store Connect Issuer ID:${NC}"
         echo -e "${GRAY}(Find this in App Store Connect → Users and Access → Keys)${NC}"
-        read -p "Issuer ID: " input_issuer_id
-        if [[ -n "$input_issuer_id" && "$input_issuer_id" != "YOUR_ISSUER_ID" ]]; then
+        local input_issuer_id
+        read_required_or_skip "Issuer ID: " input_issuer_id
+        if [[ "$input_issuer_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Issuer ID setup for remote execution"
+            break
+        elif [[ -n "$input_issuer_id" && "$input_issuer_id" != "YOUR_ISSUER_ID" ]]; then
             ISSUER_ID="$input_issuer_id"
             # Save immediately after successful input
             update_project_config
@@ -2938,8 +2988,12 @@ collect_ios_credentials() {
     # Collect Apple ID
     while [[ "$APPLE_ID" == "your-apple-id@email.com" || -z "$APPLE_ID" ]]; do
         echo -e "${CYAN}Enter your Apple ID (email):${NC}"
-        read -p "Apple ID: " input_apple_id
-        if [[ "$input_apple_id" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        local input_apple_id
+        read_required_or_skip "Apple ID: " input_apple_id
+        if [[ "$input_apple_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Apple ID setup for remote execution"
+            break
+        elif [[ "$input_apple_id" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
             APPLE_ID="$input_apple_id"
             # Save immediately after successful input
             update_project_config
@@ -2966,7 +3020,8 @@ collect_ios_credentials() {
         
         # Only ask if file doesn't exist
         while [ ! -f "$key_file" ]; do
-            read -p "Press Enter when you've placed the key file, or 'skip' to continue: " user_input
+            local user_input
+            read_with_fallback "Press Enter when you've placed the key file, or 'skip' to continue: " user_input "skip"
             if [[ "$user_input" == "skip" ]]; then
                 print_warning "Skipping key file validation - iOS deployment may not work"
                 break
@@ -3016,7 +3071,8 @@ collect_android_credentials() {
     if [ ! "$keystore_found" ]; then
         print_warning "No Android keystore found"
         echo -e "${CYAN}Do you want to create a new keystore? (y/n):${NC}"
-        read -p "Create keystore: " create_keystore
+        local create_keystore
+        read_with_fallback "Create keystore: " create_keystore "n"
         
         if [[ "$create_keystore" =~ ^[Yy] ]]; then
             create_android_keystore
@@ -3044,7 +3100,8 @@ collect_android_credentials() {
             echo -e "  ${GRAY}• storePassword=your_store_password${NC}"
             echo ""
             
-            read -p "Press Enter when you've updated key.properties: "
+            local user_input
+            read_with_fallback "Press Enter when you've updated key.properties: " user_input ""
             
             # Re-check after user action
             if [ -f "$TARGET_DIR/android/key.properties" ]; then
@@ -3072,7 +3129,8 @@ collect_android_credentials() {
         
         # Only ask if file doesn't exist
         while [ ! -f "$service_account_file" ]; do
-            read -p "Press Enter when you've placed the JSON file, or 'skip' to continue: " user_input
+            local user_input
+            read_with_fallback "Press Enter when you've placed the JSON file, or 'skip' to continue: " user_input "skip"
             if [[ "$user_input" == "skip" ]]; then
                 print_warning "Skipping service account - creating demo file for validation"
                 
@@ -3614,7 +3672,8 @@ run_credential_setup() {
         # Ask user if they want to continue with interactive setup
         echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"
         echo -e "${GRAY}This will guide you through collecting iOS and Android credentials${NC}"
-        read -p "Continue with setup: " setup_choice
+        local setup_choice
+        read_with_fallback "Continue with setup: " setup_choice "y"
         
         if [[ "$setup_choice" =~ ^[Yy] ]]; then
             # Interactive iOS setup

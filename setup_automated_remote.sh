@@ -1282,6 +1282,8 @@ menu: ## PROJECT_PLACEHOLDER - Automated Build & Deploy System
 		*) printf "$(RED)Invalid choice. Please select 1-3.$(NC)\n" ;; \
 	esac
 
+tester: auto-build-tester ## 🧪 Alias for auto-build-tester
+
 auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 	@printf "\n"
 	@printf "$(CYAN)🚀 Building for Testers$(NC)\n"
@@ -1385,6 +1387,8 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 	@if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$(IPA_NAME)" ]; then \
 		printf "$(WHITE)🍎 iOS IPA:$(NC) $(OUTPUT_DIR)/$(IPA_NAME)\n"; \
 	fi
+
+live: auto-build-live ## 🚀 Alias for auto-build-live
 
 auto-build-live: ## 🚀 Automated Live Production Pipeline
 	@printf "\n"
@@ -1785,7 +1789,7 @@ help: ## Show detailed help and all available commands
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -v "menu\|interactive\|auto-build" | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(CYAN)  %-20s$(NC) %s\n", $$1, $$2}'
 	@printf "\n"
 
-.PHONY: help system-check system-tester doctor clean deps test auto-build-tester auto-build-live setup menu manual-operations build-management-menu build-android-apk build-android-aab build-ios build trigger-github-actions
+.PHONY: help system-check system-tester doctor clean deps test auto-build-tester auto-build-live setup menu manual-operations build-management-menu build-android-apk build-android-aab build-ios build trigger-github-actions tester live
 EOF
 }
 

@@ -5,31 +5,208 @@
 
 set -e
 
-# Import common functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common_functions.sh"
+# Colors and styling
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+GRAY='\033[0;90m'
+NC='\033[0m'
+
+# Unicode symbols
+CHECK="✅"
+CROSS="❌"
+WARNING="⚠️"
+INFO="💡"
+ROCKET="🚀"
+GEAR="⚙️"
+FOLDER="📁"
+MOBILE="📱"
+KEY="🔑"
+WRENCH="🔧"
+STAR="⭐"
+PACKAGE="📦"
 
 # Script variables with robust path detection
 SCRIPT_PATH="$0"
-
-# Check if script is being run via curl pipe (when $0 is "bash" or "-bash")
-REMOTE_EXECUTION=false
-if [[ "$0" == "bash" || "$0" == "-bash" || "$0" == "/bin/bash" || "$0" == "/usr/bin/bash" ]]; then
-    # When run via curl | bash, we don't have a real script path
-    SCRIPT_PATH="/tmp/setup_automated.sh"
-    SCRIPT_DIR="/tmp"
-    SOURCE_DIR=""
-    REMOTE_EXECUTION=true
-elif command -v realpath &> /dev/null; then
+if command -v realpath &> /dev/null; then
     SCRIPT_PATH=$(realpath "$0")
-    SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
-    SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 else
     # Fallback for systems without realpath
     SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
-    SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
-    SOURCE_DIR=$(dirname "$SCRIPT_DIR")
 fi
+SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+SOURCE_DIR=$(dirname "$SCRIPT_DIR")
+
+# Robust TARGET_DIR detection - completely dynamic
+detect_target_directory() {
+    local initial_target="${1:-$(pwd)}"
+    local target="$initial_target"
+    
+    # Debug information
+    if [[ "${DEBUG:-}" == "true" ]]; then
+        echo "🐛 DEBUG: Initial target = '$initial_target'" >&2
+        echo "🐛 DEBUG: Current pwd = '$(pwd)'" >&2
+    fi
+    
+    # Convert to absolute path with fallback
+    if command -v realpath &> /dev/null; then
+        target=$(realpath "$target" 2>/dev/null || echo "$target")
+    else
+        target=$(cd "$target" 2>/dev/null && pwd || echo "$target")
+    fi
+    
+    if [[ "${DEBUG:-}" == "true" ]]; then
+        echo "🐛 DEBUG: After realpath = '$target'" >&2
+    fi
+
+# Auto-detect if running from scripts/ directory
+    local basename_target=$(basename "$target")
+    if [[ "$basename_target" == "scripts" ]]; then
+        local parent_target="$(dirname "$target")"
+        echo "🔄 Auto-detected: Running from scripts/ directory" >&2
+        echo "   Adjusting from: $target" >&2
+        echo "   Adjusting to: $parent_target" >&2
+        target="$parent_target"
+    fi
+    
+    # Check if target directory has pubspec.yaml
+    if [[ -f "$target/pubspec.yaml" ]]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: Found pubspec.yaml at '$target'" >&2
+        fi
+        echo "$target"
+        return 0
+    fi
+    
+    # If not found, try intelligent search patterns
+    local search_paths=(
+        "$target"                      # Original target
+        "$(dirname "$target")"         # Parent of target
+        "$(pwd)"                       # Current working directory
+        "$(dirname "$(pwd)")"          # Parent of current directory
+    )
+    
+    # Add script-relative paths if SCRIPT_DIR is available
+    if [[ -n "${SCRIPT_DIR:-}" ]]; then
+        search_paths+=(
+            "$(dirname "$SCRIPT_DIR")"     # Parent of script directory
+            "$(dirname "$(dirname "$SCRIPT_DIR")")"  # Grandparent of script directory
+        )
+    fi
+    
+    if [[ "${DEBUG:-}" == "true" ]]; then
+        echo "🐛 DEBUG: Searching in paths:" >&2
+        for p in "${search_paths[@]}"; do
+            echo "   - $p" >&2
+        done
+    fi
+    
+    for path in "${search_paths[@]}"; do
+        if [[ -n "$path" && -f "$path/pubspec.yaml" ]]; then
+            echo "🔍 Found Flutter project at: $path" >&2
+            echo "$path"
+            return 0
+        fi
+    done
+    
+    # Last resort: return original target
+    if [[ "${DEBUG:-}" == "true" ]]; then
+        echo "🐛 DEBUG: No pubspec.yaml found, returning original target" >&2
+    fi
+    echo "$target"
+    return 1
+}
+
+# TARGET_DIR will be set later in main() after argument parsing
+
+# Intelligent source directory detection - completely dynamic
+detect_source_directory() {
+    # Generic search patterns for any CI/CD source project
+    local search_dirs=(
+        "$(dirname "$TARGET_DIR")"
+        "$(dirname "$(dirname "$TARGET_DIR")")"
+        "$(dirname "$(dirname "$(dirname "$TARGET_DIR")")")"
+    )
+    
+    # Add common development locations (no hardcoded project names)
+    local common_locations=(
+        "$HOME"
+        "$HOME/Desktop"
+        "$HOME/Documents" 
+        "$HOME/Downloads"
+        "$HOME/Projects"
+        "$HOME/Development"
+        "/tmp"
+        "/var/tmp"
+    )
+    
+    # Search in parent directories first (most likely)
+    for path in "${search_dirs[@]}"; do
+        if is_cicd_source_directory "$path"; then
+            echo "$path"
+            return 0
+        fi
+    done
+    
+    # Search in common locations for any CI/CD project
+    for base_dir in "${common_locations[@]}"; do
+        if [[ -d "$base_dir" ]]; then
+            # Look for directories with CI/CD characteristics
+            for project_dir in "$base_dir"/*; do
+                if [[ -d "$project_dir" ]] && is_cicd_source_directory "$project_dir"; then
+                    echo "$project_dir"
+                    return 0
+                fi
+            done
+        fi
+    done
+    
+    # Fallback: recursive search in parent directories
+    local current_dir="$TARGET_DIR"
+    for i in {1..8}; do
+        current_dir="$(dirname "$current_dir")"
+        if [[ "$current_dir" == "/" ]]; then
+            break
+        fi
+        
+        if is_cicd_source_directory "$current_dir"; then
+            echo "$current_dir"
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+# Check if directory is a CI/CD source project
+is_cicd_source_directory() {
+    local dir="$1"
+    
+    if [[ -z "$dir" || ! -d "$dir" ]]; then
+        return 1
+    fi
+    
+    # Must have essential CI/CD files
+    [[ -f "$dir/Makefile" ]] || return 1
+    [[ -d "$dir/scripts" ]] || return 1
+    [[ -f "$dir/scripts/setup_automated.sh" ]] || return 1
+    
+    # Verify it's actually a CI/CD source by checking Makefile content
+    if grep -q "Flutter CI/CD\|CI.*CD\|PACKAGE_NAME.*:=\|auto-build\|fastlane" "$dir/Makefile" 2>/dev/null; then
+        return 0
+    fi
+    
+    # Alternative check: scripts directory with automation files
+    if [[ -f "$dir/scripts/version_manager.dart" ]] || [[ -f "$dir/scripts/flutter_project_analyzer.dart" ]]; then
+        return 0  
+    fi
+    
+    return 1
+}
 
 PROJECT_NAME=""
 BUNDLE_ID=""
@@ -37,11 +214,127 @@ PACKAGE_NAME=""
 GIT_REPO=""
 CURRENT_VERSION=""
 
+# Interactive mode flag
+INTERACTIVE_MODE=false
+
 # Validation flags
 VALIDATION_REQUIRED=true
 CREDENTIALS_COMPLETE=false
 ANDROID_READY=false
 IOS_READY=false
+
+# Print functions (defined early to be available everywhere)
+print_header() {
+    echo ""
+    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC} ${ROCKET} ${WHITE}Flutter CI/CD Automated Setup${NC} ${BLUE}║${NC}"
+    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${CYAN}${STAR} $1${NC}"
+    echo ""
+}
+
+print_step() {
+    echo -e "${CYAN}${GEAR} $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}${CHECK} $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}${CROSS} $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}${WARNING} $1${NC}"
+}
+
+print_info() {
+    echo -e "${BLUE}${INFO} $1${NC}"
+}
+
+print_separator() {
+    echo -e "${GRAY}─────────────────────────────────────────────────────────────────${NC}"
+}
+
+# Check and fix Bundler version issues
+check_and_fix_bundler_version() {
+    print_step "Checking Bundler version compatibility..."
+    
+    # Check if Bundler is installed
+    if ! command -v bundle >/dev/null 2>&1; then
+        print_warning "Bundler not found. Installing..."
+        if gem install bundler >/dev/null 2>&1; then
+            print_success "Bundler installed successfully"
+        else
+            print_error "Failed to install Bundler"
+            return 1
+        fi
+    fi
+    
+    # Get current Bundler version
+    CURRENT_BUNDLER_VERSION=$(bundle --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+    if [ -z "$CURRENT_BUNDLER_VERSION" ]; then
+        print_warning "Could not determine current Bundler version"
+        return 0
+    fi
+    
+    print_info "Current Bundler version: $CURRENT_BUNDLER_VERSION"
+    
+    # Check Gemfile.lock files for required Bundler version
+    REQUIRED_VERSION=""
+    GEMFILE_LOCK_PATHS=("$TARGET_DIR/Gemfile.lock" "$TARGET_DIR/android/Gemfile.lock" "$TARGET_DIR/ios/Gemfile.lock")
+    
+    for GEMFILE_LOCK in "${GEMFILE_LOCK_PATHS[@]}"; do
+        if [ -f "$GEMFILE_LOCK" ]; then
+            BUNDLED_WITH=$(grep -A1 "BUNDLED WITH" "$GEMFILE_LOCK" 2>/dev/null | tail -1 | tr -d ' ')
+            if [ -n "$BUNDLED_WITH" ]; then
+                REQUIRED_VERSION="$BUNDLED_WITH"
+                print_info "Found required Bundler version in $(basename "$(dirname "$GEMFILE_LOCK")"): $REQUIRED_VERSION"
+                break
+            fi
+        fi
+    done
+    
+    # If we found a required version and it's different from current, update
+    if [ -n "$REQUIRED_VERSION" ] && [ "$CURRENT_BUNDLER_VERSION" != "$REQUIRED_VERSION" ]; then
+        print_warning "Bundler version mismatch detected!"
+        print_info "Current: $CURRENT_BUNDLER_VERSION, Required: $REQUIRED_VERSION"
+        print_step "Updating Bundler to version $REQUIRED_VERSION..."
+        
+        if gem install bundler -v "$REQUIRED_VERSION" >/dev/null 2>&1; then
+            print_success "Bundler updated to version $REQUIRED_VERSION"
+            
+            # Verify the update
+            NEW_VERSION=$(bundle --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+            if [ "$NEW_VERSION" = "$REQUIRED_VERSION" ]; then
+                print_success "Bundler version verified: $NEW_VERSION"
+            else
+                print_warning "Bundler version verification failed. Expected: $REQUIRED_VERSION, Got: $NEW_VERSION"
+            fi
+        else
+            print_error "Failed to update Bundler to version $REQUIRED_VERSION"
+            return 1
+        fi
+    else
+        print_success "Bundler version is compatible"
+    fi
+    
+    # Install gems in directories that have Gemfile
+    for DIR in "$TARGET_DIR" "$TARGET_DIR/android" "$TARGET_DIR/ios"; do
+        if [ -f "$DIR/Gemfile" ]; then
+            print_step "Installing gems in $(basename "$DIR")..."
+            if (cd "$DIR" && bundle install >/dev/null 2>&1); then
+                print_success "Gems installed in $(basename "$DIR")"
+            else
+                print_warning "Failed to install gems in $(basename "$DIR")"
+            fi
+        fi
+    done
+    
+    print_success "Bundler version check completed"
+}
 
 # Fix SOURCE_DIR if we're running from copied scripts in target project
 if [[ "$SOURCE_DIR" == "$TARGET_DIR" ]]; then
@@ -56,6 +349,169 @@ if [[ "$SOURCE_DIR" == "$TARGET_DIR" ]]; then
         SOURCE_DIR=""
     fi
 fi
+
+# Validate target directory
+validate_target_directory() {
+    print_header "Validating Flutter Project"
+    
+    print_step "Checking target directory: $TARGET_DIR"
+    
+    # Check if directory exists
+    if [ ! -d "$TARGET_DIR" ]; then
+        print_error "Directory does not exist: $TARGET_DIR"
+        print_info "Current working directory: $(pwd)"
+        print_info "Attempted target: $TARGET_DIR"
+        exit 1
+    fi
+    
+    # Check if it's a Flutter project with detailed debugging
+    if [ ! -f "$TARGET_DIR/pubspec.yaml" ]; then
+        print_error "Not a Flutter project (no pubspec.yaml found)"
+        echo ""
+        print_warning "DEBUGGING INFORMATION:"
+        print_info "Target directory: $TARGET_DIR"
+        print_info "Current working directory: $(pwd)"
+        print_info "Script location: $SCRIPT_PATH"
+        
+        echo ""
+        print_info "Contents of target directory:"
+        if ls -la "$TARGET_DIR" >/dev/null 2>&1; then
+            ls -la "$TARGET_DIR" | head -10 | while read line; do
+                echo "  $line"
+            done
+            echo "  ..."
+        else
+            print_error "Cannot list directory contents"
+        fi
+        
+        echo ""
+        print_info "Looking for pubspec.yaml in nearby directories:"
+        local search_locations=(
+            "$(pwd)"
+            "$(dirname "$(pwd)")" 
+            "$(dirname "$TARGET_DIR")"
+            "$(dirname "$SCRIPT_DIR")"
+        )
+        
+        for location in "${search_locations[@]}"; do
+            if [[ -f "$location/pubspec.yaml" ]]; then
+                print_success "Found pubspec.yaml at: $location"
+                print_info "Try running: cd '$location' && ./scripts/setup_automated.sh ."
+            else
+                print_info "Not found in: $location"
+            fi
+        done
+        
+        echo ""
+        print_warning "SOLUTIONS:"
+        echo "  1. Navigate to your Flutter project root directory"
+        echo "  2. Make sure pubspec.yaml exists in the target directory"
+        echo "  3. Run: find . -name 'pubspec.yaml' -type f"
+        echo "  4. Use absolute path: ./scripts/setup_automated.sh /full/path/to/project"
+        
+        exit 1
+    fi
+    
+    # Check for Android and iOS directories
+    if [ ! -d "$TARGET_DIR/android" ]; then
+        print_error "Android directory not found"
+        print_info "This might not be a complete Flutter project"
+        exit 1
+    fi
+    
+    if [ ! -d "$TARGET_DIR/ios" ]; then
+        print_error "iOS directory not found"
+        print_info "This might not be a complete Flutter project"
+        exit 1
+    fi
+    
+    print_success "Valid Flutter project found"
+    print_info "Project location: $TARGET_DIR"
+    echo ""
+}
+
+# Extract project information
+extract_project_info() {
+    print_header "Extracting Project Information"
+    
+    cd "$TARGET_DIR"
+    
+    # Extract project name from pubspec.yaml
+    PROJECT_NAME=$(grep "^name:" pubspec.yaml | cut -d':' -f2 | tr -d ' ' | tr -d '"')
+    print_success "Project name: $PROJECT_NAME"
+    
+    # Extract version
+    CURRENT_VERSION=$(grep "^version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
+    print_success "Current version: $CURRENT_VERSION"
+    
+    # Extract Android package name (try build.gradle.kts first, then AndroidManifest.xml)
+    PACKAGE_NAME=""
+    
+    # Try build.gradle.kts first (newer Flutter projects)
+    if [ -f "android/app/build.gradle.kts" ]; then
+        # Try applicationId first
+        PACKAGE_NAME=$(grep 'applicationId' "android/app/build.gradle.kts" | sed 's/.*applicationId = "\([^"]*\)".*/\1/' | head -1)
+        
+        # Try namespace as fallback
+        if [ -z "$PACKAGE_NAME" ]; then
+            PACKAGE_NAME=$(grep 'namespace' "android/app/build.gradle.kts" | sed 's/.*namespace = "\([^"]*\)".*/\1/' | head -1)
+        fi
+        
+        if [ ! -z "$PACKAGE_NAME" ]; then
+            print_success "Android package ID: $PACKAGE_NAME"
+        fi
+    fi
+    
+    # Fallback to AndroidManifest.xml if not found in build.gradle.kts
+    if [ -z "$PACKAGE_NAME" ] && [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+        PACKAGE_NAME=$(grep -o 'package="[^"]*"' "android/app/src/main/AndroidManifest.xml" | cut -d'"' -f2)
+        if [ ! -z "$PACKAGE_NAME" ]; then
+            print_success "Android package (from AndroidManifest.xml): $PACKAGE_NAME"
+        fi
+    fi
+    
+    # Final fallback - generate based on project name
+    if [ -z "$PACKAGE_NAME" ]; then
+        print_warning "Package name not found, generating from project name"
+        # Create package name from project name (clean and lowercase)
+        CLEAN_PROJECT=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | sed 's/__*/_/g' | sed 's/^_\|_$//g')
+        PACKAGE_NAME="com.${CLEAN_PROJECT}.app"
+        print_info "Generated package name: $PACKAGE_NAME"
+    fi
+    
+    # Extract iOS bundle ID
+    if [ -f "ios/Runner/Info.plist" ]; then
+        BUNDLE_ID=$(grep -A1 "CFBundleIdentifier" "ios/Runner/Info.plist" | tail -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | tr -d ' ')
+        if [[ "$BUNDLE_ID" == *"PRODUCT_BUNDLE_IDENTIFIER"* ]]; then
+            BUNDLE_ID="$PACKAGE_NAME"
+        fi
+        print_success "iOS bundle ID: $BUNDLE_ID"
+    else
+        BUNDLE_ID="$PACKAGE_NAME"
+        print_warning "Info.plist not found, using package name as bundle ID"
+    fi
+    
+    # Get Git repository info
+    if git rev-parse --is-inside-work-tree &>/dev/null; then
+        GIT_REPO=$(git remote get-url origin 2>/dev/null || echo "")
+        if [ ! -z "$GIT_REPO" ]; then
+            print_success "Git repository: $GIT_REPO"
+        else
+            print_warning "No Git remote origin found"
+        fi
+    else
+        print_warning "Not a Git repository"
+    fi
+    
+    print_separator
+    print_info "Project Summary:"
+    echo -e "  ${WHITE}• Name:${NC} $PROJECT_NAME"
+    echo -e "  ${WHITE}• Version:${NC} $CURRENT_VERSION"
+    echo -e "  ${WHITE}• Bundle ID:${NC} $BUNDLE_ID"
+    echo -e "  ${WHITE}• Package:${NC} $PACKAGE_NAME"
+    echo -e "  ${WHITE}• Git repo:${NC} ${GIT_REPO:-'None'}"
+    echo ""
+}
 
 # Check GitHub CLI authentication status
 check_github_auth() {
@@ -218,6 +674,22 @@ check_github_auth() {
     fi
     
     print_success "🎉 GitHub authentication verified successfully"
+    echo ""
+}
+
+# Create directory structure
+create_directory_structure() {
+    print_header "Creating Directory Structure"
+    
+    # Create required directories
+    mkdir -p "$TARGET_DIR/.github/workflows"
+    mkdir -p "$TARGET_DIR/android/fastlane"
+    mkdir -p "$TARGET_DIR/ios/fastlane"
+    mkdir -p "$TARGET_DIR/scripts"
+    mkdir -p "$TARGET_DIR/docs"
+    mkdir -p "$TARGET_DIR/builder"
+    
+    print_success "Directory structure created"
     echo ""
 }
 
@@ -1637,19 +2109,7 @@ create_project_config() {
         fi
         echo ""
         
-        # Check if running in remote execution or non-TTY environment
-        if [ "$REMOTE_EXECUTION" = "true" ] || ! [[ -t 0 ]]; then
-            print_info "🤖 Remote execution detected - using existing project.config"
-            print_success "✅ Keeping existing project.config file"
-            print_info "Using current configuration without changes"
-            
-            # Set flag to prevent config updates
-            export PROJECT_CONFIG_USER_APPROVED="false"
-            echo ""
-            return 0
-        fi
-        
-        # Ask user what to do (only in interactive mode)
+        # Ask user what to do
         echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
         echo "  ${GREEN} - Yes, create new (overwrite existing)"
         echo "  ${RED} - No, keep existing file"
@@ -1732,44 +2192,8 @@ EOF
 copy_automation_scripts() {
     print_header "Copying Automation Scripts"
     
-    # Debug information
-    if [[ "${DEBUG:-}" == "true" ]]; then
-        echo "🐛 DEBUG: SOURCE_DIR = '$SOURCE_DIR'" >&2
-        echo "🐛 DEBUG: TARGET_DIR = '$TARGET_DIR'" >&2
-        echo "🐛 DEBUG: REMOTE_EXECUTION = '$REMOTE_EXECUTION'" >&2
-        echo "🐛 DEBUG: Checking if $SOURCE_DIR/scripts exists..." >&2
-        ls -la "$SOURCE_DIR/scripts" 2>&1 >&2 || echo "🐛 DEBUG: $SOURCE_DIR/scripts does not exist" >&2
-    fi
-    
-    # Copy scripts directory if it doesn't exist, is empty, or if we're in remote execution
-    local scripts_empty=false
-    if [ -d "$TARGET_DIR/scripts" ]; then
-        # Check if directory is empty (only contains . and ..)
-        local file_count=$(find "$TARGET_DIR/scripts" -mindepth 1 -maxdepth 1 | wc -l)
-        if [ "$file_count" -eq 0 ]; then
-            scripts_empty=true
-        fi
-    fi
-    
-    if [ ! -d "$TARGET_DIR/scripts" ] || [ "$scripts_empty" = "true" ] || [ "$REMOTE_EXECUTION" = "true" ]; then
-        if [ -d "$SOURCE_DIR/scripts" ]; then
-            echo "📁 Copying scripts from $SOURCE_DIR/scripts to $TARGET_DIR/"
-            # Remove empty target directory if it exists
-            if [ -d "$TARGET_DIR/scripts" ] && [ "$scripts_empty" = "true" ]; then
-                rm -rf "$TARGET_DIR/scripts"
-            fi
-            cp -r "$SOURCE_DIR/scripts" "$TARGET_DIR/"
-            print_success "Scripts directory copied successfully"
-        else
-            print_warning "Source scripts directory not found at $SOURCE_DIR/scripts"
-            if [[ "${DEBUG:-}" == "true" ]]; then
-                echo "🐛 DEBUG: Available directories in SOURCE_DIR:" >&2
-                ls -la "$SOURCE_DIR" 2>&1 >&2 || echo "🐛 DEBUG: Cannot list $SOURCE_DIR" >&2
-            fi
-        fi
-    else
-        print_success "Automation scripts already available"
-    fi
+    # Scripts are already present in target directory
+    print_success "Automation scripts already available"
     
     # Create basic documentation
     if [ ! -f "$TARGET_DIR/docs/README.md" ]; then
@@ -3197,18 +3621,8 @@ run_credential_setup() {
     print_header "🔒 Credential Validation & Setup"
     
     if ! validate_credentials; then
-        print_warning "Some credentials are missing."
-        
-        # Check if running in remote execution or non-TTY environment
-        if [ "$REMOTE_EXECUTION" = "true" ] || ! [[ -t 0 ]]; then
-            print_info "🤖 Automated mode detected - skipping interactive credential setup"
-            print_info "You can run the script again interactively to set up credentials"
-            print_info "Or check the detailed guides for manual configuration"
-            return 0
-        fi
-        
+        print_warning "Some credentials are missing. Starting interactive setup..."
         echo ""
-        print_info "Starting interactive setup..."
         
         # Ask user if they want to continue with interactive setup
         echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"

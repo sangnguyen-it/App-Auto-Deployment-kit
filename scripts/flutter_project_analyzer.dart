@@ -247,6 +247,8 @@ class FlutterProjectAnalyzer {
           projectInfo['iosAPIKeyId'] = keyIdMatch.group(1);
         }
       }
+    } else {
+      projectInfo['iosHasAPIKey'] = false;
     }
 
     // Check for workspace

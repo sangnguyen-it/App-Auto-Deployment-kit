@@ -2135,6 +2135,9 @@ create_project_config() {
         
         # Check if running from remote (curl) - auto-keep existing config
         # When running via curl | bash, $0 is typically "bash" and script is piped
+        echo "🐛 DEBUG: \$0 = '$0'" >&2
+        echo "🐛 DEBUG: SCRIPT_PATH = '$SCRIPT_PATH'" >&2
+        echo "🐛 DEBUG: -f SCRIPT_PATH = $([ -f "$SCRIPT_PATH" ] && echo "true" || echo "false")" >&2
         if [[ "$0" == "bash" || "$0" == "sh" || ! -f "$SCRIPT_PATH" || "$SCRIPT_PATH" == *"/bash" ]]; then
             print_info "Running from remote - automatically keeping existing project.config"
             print_success "✅ Keeping existing project.config file"

@@ -2215,8 +2215,17 @@ EOF
 copy_automation_scripts() {
     print_header "Copying Automation Scripts"
     
-    # Scripts are already present in target directory
-    print_success "Automation scripts already available"
+    # Copy scripts directory if it doesn't exist or if we're in remote execution
+    if [ ! -d "$TARGET_DIR/scripts" ] || [ "$REMOTE_EXECUTION" = "true" ]; then
+        if [ -d "$SOURCE_DIR/scripts" ]; then
+            cp -r "$SOURCE_DIR/scripts" "$TARGET_DIR/"
+            print_success "Scripts directory copied successfully"
+        else
+            print_warning "Source scripts directory not found at $SOURCE_DIR/scripts"
+        fi
+    else
+        print_success "Automation scripts already available"
+    fi
     
     # Create basic documentation
     if [ ! -f "$TARGET_DIR/docs/README.md" ]; then
@@ -3644,8 +3653,18 @@ run_credential_setup() {
     print_header "🔒 Credential Validation & Setup"
     
     if ! validate_credentials; then
-        print_warning "Some credentials are missing. Starting interactive setup..."
+        print_warning "Some credentials are missing."
+        
+        # Check if running in remote execution or non-TTY environment
+        if [ "$REMOTE_EXECUTION" = "true" ] || ! [[ -t 0 ]]; then
+            print_info "🤖 Automated mode detected - skipping interactive credential setup"
+            print_info "You can run the script again interactively to set up credentials"
+            print_info "Or check the detailed guides for manual configuration"
+            return 0
+        fi
+        
         echo ""
+        print_info "Starting interactive setup..."
         
         # Ask user if they want to continue with interactive setup
         echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"

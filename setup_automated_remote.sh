@@ -3626,52 +3626,33 @@ run_credential_setup() {
         print_warning "Some credentials are missing. Starting interactive setup..."
         echo ""
         
-        # Check if we can do interactive input (not running via curl pipe)
-        if [[ "$REMOTE_EXECUTION" == "true" ]] || ! [[ -t 0 ]]; then
-            # Running via curl pipe or no TTY - cannot do interactive input
-            print_info "🌐 Detected remote execution (curl | bash) - Interactive input not available"
-            echo ""
-            echo -e "${CYAN}To set up credentials interactively, please run:${NC}"
-            echo -e "${WHITE}  # Download and run locally:${NC}"
-            echo -e "${GRAY}  curl -fsSL https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/setup_automated_remote.sh -o setup.sh${NC}"
-            echo -e "${GRAY}  chmod +x setup.sh${NC}"
-            echo -e "${GRAY}  ./setup.sh${NC}"
-            echo ""
-            echo -e "${WHITE}  # Or use the interactive setup script:${NC}"
-            echo -e "${GRAY}  curl -fsSL https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/setup_interactive.sh -o setup_interactive.sh${NC}"
-            echo -e "${GRAY}  chmod +x setup_interactive.sh${NC}"
-            echo -e "${GRAY}  ./setup_interactive.sh${NC}"
-            echo ""
-            print_info "Continuing with automated setup using existing credentials..."
-        else
-            # Can do interactive input
-            echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"
-            echo -e "${GRAY}This will guide you through collecting iOS and Android credentials${NC}"
-            read -p "Continue with setup: " setup_choice
-            
-            if [[ "$setup_choice" =~ ^[Yy] ]]; then
-                # Interactive iOS setup
-                if [[ "$IOS_READY" != "true" ]]; then
-                    collect_ios_credentials
-                fi
-                
-                # Interactive Android setup  
-                if [[ "$ANDROID_READY" != "true" ]]; then
-                    collect_android_credentials
-                fi
-                
-                # Update project config with collected credentials
-                update_project_config_with_credentials
-                
-                # Re-validate after collection
-                if validate_credentials; then
-                    print_success "All credentials configured successfully!"
-                else
-                    print_warning "Some credentials are still missing. Check the setup guides for manual configuration."
-                fi
-            else
-                print_info "Skipping interactive setup. You can run this script again or check the detailed guides."
+        # Ask user if they want to continue with interactive setup
+        echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"
+        echo -e "${GRAY}This will guide you through collecting iOS and Android credentials${NC}"
+        read -p "Continue with setup: " setup_choice
+        
+        if [[ "$setup_choice" =~ ^[Yy] ]]; then
+            # Interactive iOS setup
+            if [[ "$IOS_READY" != "true" ]]; then
+                collect_ios_credentials
             fi
+            
+            # Interactive Android setup  
+            if [[ "$ANDROID_READY" != "true" ]]; then
+                collect_android_credentials
+            fi
+            
+            # Update project config with collected credentials
+            update_project_config_with_credentials
+            
+            # Re-validate after collection
+            if validate_credentials; then
+                print_success "All credentials configured successfully!"
+            else
+                print_warning "Some credentials are still missing. Check the setup guides for manual configuration."
+            fi
+        else
+            print_info "Skipping interactive setup. You can run this script again or check the detailed guides."
         fi
     else
         print_success "All credentials are already configured!"

@@ -2133,39 +2133,51 @@ create_project_config() {
         fi
         echo ""
         
-        # Ask user what to do
-        echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
-        echo "  ${GREEN} - Yes, create new (overwrite existing)"
-        echo "  ${RED} - No, keep existing file"
-        echo ""
-        
-        local user_choice=""
-        while [[ "$user_choice" != "y" && "$user_choice" != "n" ]]; do
-            read -p "Your choice (y/n): " user_choice
-            user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+        # Check if running from remote (curl) - auto-keep existing config
+        if [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
+            print_info "Running from remote - automatically keeping existing project.config"
+            print_success "✅ Keeping existing project.config file"
+            print_info "Using current configuration without changes"
             
-            if [[ "$user_choice" == "y" ]]; then
-                print_info "Creating new project.config file..."
+            # Set flag to prevent config updates
+            export PROJECT_CONFIG_USER_APPROVED="false"
+            echo ""
+            return 0
+        else
+            # Ask user what to do (local execution)
+            echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
+            echo "  ${GREEN} - Yes, create new (overwrite existing)"
+            echo "  ${RED} - No, keep existing file"
+            echo ""
+            
+            local user_choice=""
+            while [[ "$user_choice" != "y" && "$user_choice" != "n" ]]; do
+                read -p "Your choice (y/n): " user_choice
+                user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
                 
-                # Set flag to allow config updates
-                export PROJECT_CONFIG_USER_APPROVED="true"
-                
-                # Create new config
-                create_new_project_config
-                
-            elif [[ "$user_choice" == "n" ]]; then
-                print_success "✅ Keeping existing project.config file"
-                print_info "Using current configuration without changes"
-                
-                # Set flag to prevent config updates
-                export PROJECT_CONFIG_USER_APPROVED="false"
-                echo ""
-                return 0
-                
-            else
-                print_error "Please enter 'y' for yes or 'n' for no"
-            fi
-        done
+                if [[ "$user_choice" == "y" ]]; then
+                    print_info "Creating new project.config file..."
+                    
+                    # Set flag to allow config updates
+                    export PROJECT_CONFIG_USER_APPROVED="true"
+                    
+                    # Create new config
+                    create_new_project_config
+                    
+                elif [[ "$user_choice" == "n" ]]; then
+                    print_success "✅ Keeping existing project.config file"
+                    print_info "Using current configuration without changes"
+                    
+                    # Set flag to prevent config updates
+                    export PROJECT_CONFIG_USER_APPROVED="false"
+                    echo ""
+                    return 0
+                    
+                else
+                    print_error "Please enter 'y' for yes or 'n' for no"
+                fi
+            done
+        fi
     else
         print_info "No existing project.config found - creating new one"
         # Set flag to allow config updates for new files

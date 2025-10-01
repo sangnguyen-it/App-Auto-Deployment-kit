@@ -1265,7 +1265,7 @@ ENV["FASTLANE_SKIP_UPDATE_CHECK"] = "1"
 begin
   require 'fastlane'
 rescue LoadError => e
-  UI.error("Failed to load Fastlane: #{e.message}")
+  UI.error("Failed to load Fastlane: \#{e.message}")
   exit(1)
 end
 
@@ -1275,20 +1275,20 @@ BUNDLE_ID = "$BUNDLE_ID"
 TEAM_ID = "YOUR_TEAM_ID"
 KEY_ID = "YOUR_KEY_ID"
 ISSUER_ID = "YOUR_ISSUER_ID"
-TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"]
+TESTER_GROUPS = ["\#{PROJECT_NAME} Internal Testers", "\#{PROJECT_NAME} Beta Testers"]
 
 # File paths (relative to fastlane directory)
-KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"
+KEY_PATH = "AuthKey_\#{KEY_ID}.p8"
 CHANGELOG_PATH = "../builder/changelog.txt"
 IPA_OUTPUT_DIR = "../build/ios/ipa"
 # Project-specific paths
-PROJECT_KEYSTORE_PATH = "../app/#{PROJECT_NAME.downcase.gsub(/[^a-z0-9]/, '_')}-release.keystore"
+PROJECT_KEYSTORE_PATH = "../app/\#{PROJECT_NAME.downcase.gsub(/[^a-z0-9]/, '_')}-release.keystore"
 
 platform :ios do
   desc "Setup iOS environment"
   lane :setup do
     # Setup tasks would go here
-    UI.message("Setting up iOS environment for #{PROJECT_NAME}")
+    UI.message("Setting up iOS environment for \#{PROJECT_NAME}")
   end
 
   desc "Build iOS archive for TestFlight"
@@ -1322,10 +1322,10 @@ platform :ios do
   
   desc "Submit a new Beta Build to TestFlight"
   lane :beta do
-    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
-      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
+    if File.exist?("\#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at \#{IPA_OUTPUT_DIR}/Runner.ipa")
       upload_to_testflight(
-        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+        ipa: "\#{IPA_OUTPUT_DIR}/Runner.ipa",
         changelog: read_changelog,
         skip_waiting_for_build_processing: true,
         distribute_external: false,
@@ -1347,10 +1347,10 @@ platform :ios do
 
   desc "Submit a new Production Build to App Store"
   lane :release do
-    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
-      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
+    if File.exist?("\#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at \#{IPA_OUTPUT_DIR}/Runner.ipa")
       upload_to_app_store(
-        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+        ipa: "\#{IPA_OUTPUT_DIR}/Runner.ipa",
         force: true,
         reject_if_possible: true,
         skip_metadata: false,
@@ -1377,7 +1377,7 @@ platform :ios do
     setup_signing
     
     upload_to_testflight(
-      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+      ipa: "\#{IPA_OUTPUT_DIR}/Runner.ipa",
       changelog: read_changelog,
       skip_waiting_for_build_processing: true,
       distribute_external: false,
@@ -1391,7 +1391,7 @@ platform :ios do
     setup_signing
     
     upload_to_app_store(
-      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+      ipa: "\#{IPA_OUTPUT_DIR}/Runner.ipa",
       force: true,
       reject_if_possible: true,
       skip_metadata: false,
@@ -1424,9 +1424,9 @@ platform :ios do
       changelog_content = File.read(CHANGELOG_PATH)
     else
       if mode == "production"
-        changelog_content = "🚀 #{PROJECT_NAME} Production Release\\n\\n• New features and improvements\\n• Performance optimizations\\n• Bug fixes and stability enhancements"
+        changelog_content = "🚀 \#{PROJECT_NAME} Production Release\\n\\n• New features and improvements\\n• Performance optimizations\\n• Bug fixes and stability enhancements"
       else
-        changelog_content = "🚀 #{PROJECT_NAME} Update\\n\\n• Performance improvements\\n• Bug fixes and stability enhancements\\n• Updated dependencies"
+        changelog_content = "🚀 \#{PROJECT_NAME} Update\\n\\n• Performance improvements\\n• Bug fixes and stability enhancements\\n• Updated dependencies"
       end
     end
     

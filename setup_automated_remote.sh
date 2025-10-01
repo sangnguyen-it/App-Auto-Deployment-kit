@@ -4505,7 +4505,48 @@ show_final_summary() {
     echo ""
 }
 
-
+# Main function - Entry point for the script
+main() {
+    print_header "🚀 Flutter CI/CD Auto Deployment Setup"
+    print_info "Starting automated setup for Flutter project..."
+    
+    # Detect target directory
+    TARGET_DIR=$(detect_target_directory "$1")
+    export TARGET_DIR
+    
+    print_step "Target directory: $TARGET_DIR"
+    
+    # Validate target directory
+    validate_target_directory
+    
+    # Extract project information
+    extract_project_info
+    
+    # Create project configuration
+    create_project_config
+    
+    # Create directory structure
+    create_directory_structure
+    
+    # Create automation files
+    create_android_fastlane
+    create_ios_fastlane
+    create_comprehensive_makefile
+    create_github_workflow
+    create_gemfile
+    create_inline_setup_scripts
+    
+    # Generate documentation
+    generate_detailed_setup_guides
+    
+    # Run credential setup if needed
+    run_credential_setup
+    
+    # Show final summary
+    show_final_summary
+    
+    print_success "🎉 Setup completed successfully!"
+}
 
 # Script entry point - with integrity check for curl downloads
 if [ ! -t 0 ]; then

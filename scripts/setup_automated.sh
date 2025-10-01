@@ -936,7 +936,7 @@ create_ios_fastlane() {
     
     # Check if files already exist and skip creation if they do
     local files_exist=false
-    if [ -f "$TARGET_DIR/ios/fastlane/Appfile" ] && [ -f "$TARGET_DIR/ios/fastlane/Fastfile" ] && [ -f "$TARGET_DIR/ios/ExportOptions.plist" ]; then
+    if [ -f "$TARGET_DIR/ios/fastlane/Appfile" ] && [ -f "$TARGET_DIR/ios/fastlane/Fastfile" ] && [ -f "$TARGET_DIR/ios/fastlane/ExportOptions.plist" ]; then
         files_exist=true
         print_info "iOS Fastlane files already exist, skipping creation to preserve existing configuration"
     fi
@@ -1147,7 +1147,7 @@ EOF
     print_success "iOS Fastfile created and customized"
     
     # Create ExportOptions.plist template
-    cat > "$TARGET_DIR/ios/ExportOptions.plist" << EOF
+    cat > "$TARGET_DIR/ios/fastlane/ExportOptions.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -1347,8 +1347,8 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 				cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_NAME)"; \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_NAME)"; \
 				printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting IPA from Archive..."; \
-				if [ -f "ExportOptions.plist" ]; then \
-					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist ExportOptions.plist; \
+				if [ -f "fastlane/ExportOptions.plist" ]; then \
+				xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
 				else \
 					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
 				fi; \
@@ -1453,8 +1453,8 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 				cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
 				printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting Production IPA from Archive..."; \
-				if [ -f "ExportOptions.plist" ]; then \
-					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist ExportOptions.plist; \
+				if [ -f "fastlane/ExportOptions.plist" ]; then \
+				xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
 				else \
 					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
 				fi; \
@@ -3208,7 +3208,7 @@ sync_fastfile() {
 
 # Sync project.config with iOS ExportOptions.plist
 sync_export_options() {
-    local export_options_path="$TARGET_DIR/ios/ExportOptions.plist"
+    local export_options_path="$TARGET_DIR/ios/fastlane/ExportOptions.plist"
     
     # Check if ExportOptions.plist exists
     if [ ! -f "$export_options_path" ]; then

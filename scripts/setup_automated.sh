@@ -427,9 +427,9 @@ auto_sync_project_config() {
             sync_fastfile  
             sync_export_options
             
-            print_success "✅ iOS fastlane files synchronized with project.config"
+            print_success "iOS fastlane files synchronized with project.config"
         else
-            print_info "ℹ️  No valid iOS credentials found in project.config, skipping sync"
+            print_info "ℹ️ No valid iOS credentials found in project.config, skipping sync"
             print_info "    Update project.config with your TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID to enable auto-sync"
         fi
     else
@@ -545,9 +545,45 @@ extract_project_info() {
     
     # Extract version
     CURRENT_VERSION=$(grep "^version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
-    print_success "Current version: $CURRENT_VERSION"
+    print_success "Version: $CURRENT_VERSION"
     
-    # Extract Android package name (try build.gradle.kts first, then AndroidManifest.xml)
+    # Extract iOS version from Info.plist
+    IOS_VERSION=""
+    if [ -f "ios/Runner/Info.plist" ]; then
+        IOS_VERSION=$(grep -A1 "CFBundleShortVersionString" "ios/Runner/Info.plist" | tail -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | tr -d ' ')
+        if [ -n "$IOS_VERSION" ] && [ "$IOS_VERSION" != "\$(MARKETING_VERSION)" ] && [ "$IOS_VERSION" != "\$(FLUTTER_BUILD_NAME)" ]; then
+            print_success "iOS version (Info.plist): $IOS_VERSION"
+        else
+            IOS_VERSION=""
+        fi
+    fi
+    
+    # Fallback to project.pbxproj for iOS version
+    if [ -z "$IOS_VERSION" ] && [ -f "ios/Runner.xcodeproj/project.pbxproj" ]; then
+        IOS_VERSION=$(grep "MARKETING_VERSION" "ios/Runner.xcodeproj/project.pbxproj" | head -1 | sed 's/.*MARKETING_VERSION = \([^;]*\);.*/\1/' | tr -d ' ')
+        if [ -n "$IOS_VERSION" ]; then
+            print_success "iOS version (project.pbxproj): $IOS_VERSION"
+        fi
+    fi
+     
+     # Extract Android version from build.gradle.kts
+     ANDROID_VERSION=""
+     if [ -f "android/app/build.gradle.kts" ]; then
+         ANDROID_VERSION=$(grep 'versionName' "android/app/build.gradle.kts" | sed 's/.*versionName = "\([^"]*\)".*/\1/' | head -1)
+         if [ -n "$ANDROID_VERSION" ]; then
+             print_success "Android version (build.gradle.kts): $ANDROID_VERSION"
+         fi
+     fi
+     
+     # Fallback to build.gradle for Android version
+     if [ -z "$ANDROID_VERSION" ] && [ -f "android/app/build.gradle" ]; then
+         ANDROID_VERSION=$(grep 'versionName' "android/app/build.gradle" | sed 's/.*versionName "\([^"]*\)".*/\1/' | head -1)
+         if [ -n "$ANDROID_VERSION" ]; then
+             print_success "Android version (build.gradle): $ANDROID_VERSION"
+         fi
+     fi
+     
+     # Extract Android package name (try build.gradle.kts first, then AndroidManifest.xml)
     PACKAGE_NAME=""
     
     # Try build.gradle.kts first (newer Flutter projects)
@@ -606,14 +642,6 @@ extract_project_info() {
         print_warning "Not a Git repository"
     fi
     
-    print_separator
-    print_info "Project Summary:"
-    echo -e "  ${WHITE}• Name:${NC} $PROJECT_NAME"
-    echo -e "  ${WHITE}• Version:${NC} $CURRENT_VERSION"
-    echo -e "  ${WHITE}• Bundle ID:${NC} $BUNDLE_ID"
-    echo -e "  ${WHITE}• Package:${NC} $PACKAGE_NAME"
-    echo -e "  ${WHITE}• Git repo:${NC} ${GIT_REPO:-'None'}"
-    echo ""
 }
 
 # Check GitHub CLI authentication status
@@ -2494,7 +2522,6 @@ create_setup_guide() {
 **Project**: $PROJECT_NAME  
 **Bundle ID**: $BUNDLE_ID  
 **Package Name**: $PACKAGE_NAME  
-**Current Version**: $CURRENT_VERSION  
 
 ## 📁 Files Created
 
@@ -3085,7 +3112,7 @@ sync_appfile() {
         return 0
     fi
     
-    print_step "🔄 Syncing project.config with iOS Fastlane Appfile..."
+    print_step "Syncing project.config with iOS Fastlane Appfile..."
     
     # Load current project config
     if [ -f "$TARGET_DIR/project.config" ]; then
@@ -3128,7 +3155,7 @@ sync_appfile() {
     # Replace original Appfile with updated version
     mv "$temp_appfile" "$appfile_path"
     
-    print_success "✅ iOS Fastlane Appfile updated with project.config values"
+    print_success "iOS Fastlane Appfile updated with project.config values"
     
     if [[ "${DEBUG:-}" == "true" ]]; then
         echo "🐛 DEBUG: Updated Appfile content:" >&2

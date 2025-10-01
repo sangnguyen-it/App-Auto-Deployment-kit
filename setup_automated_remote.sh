@@ -593,7 +593,7 @@ auto_sync_project_config() {
             sync_fastfile  
             sync_export_options
             
-            print_success "✅ iOS fastlane files synchronized with project.config"
+            print_success "iOS fastlane files synchronized with project.config"
         else
             print_info "ℹ️  No valid iOS credentials found in project.config, skipping sync"
             print_info "    Update project.config with your TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID to enable auto-sync"
@@ -734,7 +734,7 @@ extract_project_info() {
     # Try to get iOS version from Info.plist
     if [ -f "ios/Runner/Info.plist" ]; then
         IOS_VERSION=$(grep -A1 "CFBundleShortVersionString" "ios/Runner/Info.plist" | tail -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | tr -d ' ')
-        if [ -n "$IOS_VERSION" ] && [ "$IOS_VERSION" != "\$(MARKETING_VERSION)" ]; then
+        if [ -n "$IOS_VERSION" ] && [ "$IOS_VERSION" != "\$(MARKETING_VERSION)" ] && [ "$IOS_VERSION" != "\$(FLUTTER_BUILD_NAME)" ]; then
             print_success "iOS version (Info.plist): $IOS_VERSION"
         else
             IOS_VERSION=""
@@ -830,23 +830,6 @@ extract_project_info() {
         print_warning "Not a Git repository"
     fi
     
-    print_separator
-    print_info "Project Summary:"
-    echo -e "  ${WHITE}• Name:${NC} $PROJECT_NAME"
-    echo -e "  ${WHITE}• Current Version:${NC} $CURRENT_VERSION"
-    if [ -n "$ANDROID_VERSION" ]; then
-        echo -e "  ${WHITE}• Android Version:${NC} $ANDROID_VERSION"
-    fi
-    if [ -n "$IOS_VERSION" ]; then
-        echo -e "  ${WHITE}• iOS Version:${NC} $IOS_VERSION"
-    fi
-    if [ -n "$PUBSPEC_VERSION" ]; then
-        echo -e "  ${WHITE}• Pubspec Version:${NC} $PUBSPEC_VERSION"
-    fi
-    echo -e "  ${WHITE}• Bundle ID:${NC} $BUNDLE_ID"
-    echo -e "  ${WHITE}• Package:${NC} $PACKAGE_NAME"
-    echo -e "  ${WHITE}• Git repo:${NC} ${GIT_REPO:-'None'}"
-    echo ""
 }
 
 # Check GitHub CLI authentication status
@@ -2790,7 +2773,6 @@ create_setup_guide() {
 **Project**: $PROJECT_NAME  
 **Bundle ID**: $BUNDLE_ID  
 **Package Name**: $PACKAGE_NAME  
-**Current Version**: $CURRENT_VERSION  
 
 ## 📁 Files Created
 
@@ -3375,7 +3357,7 @@ sync_appfile() {
         return 0
     fi
     
-    print_step "🔄 Syncing project.config with iOS Fastlane Appfile..."
+    print_step "Syncing project.config with iOS Fastlane Appfile..."
     
     # Load current project config
     if [ -f "$TARGET_DIR/project.config" ]; then
@@ -3418,7 +3400,7 @@ sync_appfile() {
     # Replace original Appfile with updated version
     mv "$temp_appfile" "$appfile_path"
     
-    print_success "✅ iOS Fastlane Appfile updated with project.config values"
+    print_success "iOS Fastlane Appfile updated with project.config values"
     
     if [[ "${DEBUG:-}" == "true" ]]; then
         echo "🐛 DEBUG: Updated Appfile content:" >&2
@@ -3446,7 +3428,7 @@ sync_fastfile() {
         return 0
     fi
     
-    print_step "🔄 Syncing project.config with iOS Fastlane Fastfile..."
+    print_step "Syncing project.config with iOS Fastlane Fastfile..."
     
     # Load current project config
     if [ -f "$TARGET_DIR/project.config" ]; then
@@ -3521,7 +3503,7 @@ sync_fastfile() {
     # Replace original Fastfile with updated version
     mv "$temp_fastfile" "$fastfile_path"
     
-    print_success "✅ iOS Fastlane Fastfile updated with project.config values and iOS build fixes"
+    print_success "iOS Fastlane Fastfile updated with project.config values and iOS build fixes"
     
     if [[ "${DEBUG:-}" == "true" ]]; then
         echo "🐛 DEBUG: Updated Fastfile content (relevant lines):" >&2
@@ -3541,7 +3523,7 @@ sync_export_options() {
         return 0
     fi
     
-    print_step "🔄 Syncing project.config with iOS ExportOptions.plist..."
+    print_step "Syncing project.config with iOS ExportOptions.plist..."
     
     # Load project.config values
     if [ -f "$TARGET_DIR/project.config" ]; then
@@ -3569,7 +3551,7 @@ sync_export_options() {
             echo "🐛 DEBUG: Updated ExportOptions.plist teamID to: $TEAM_ID" >&2
         fi
     else
-        print_info "ℹ️  Skipping ExportOptions.plist update (TEAM_ID not set or is placeholder)"
+        print_info "Skipping ExportOptions.plist update (TEAM_ID not set or is placeholder)"
     fi
 }
 

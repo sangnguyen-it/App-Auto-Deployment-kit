@@ -235,11 +235,7 @@ Future<String?> getStoreVersion() async {
     print('🔍 Checking store versions with Ruby script...');
 
     // Run Ruby script to get store version
-    final result = await Process.run(
-      'ruby',
-      ['scripts/store_version_checker.rb', 'all'],
-      workingDirectory: Directory.current.path,
-    );
+    final result = await Process.run('ruby', ['scripts/store_version_checker.rb', 'all'], workingDirectory: Directory.current.path);
 
     if (result.exitCode == 0) {
       // Try to read cached version from temp file
@@ -523,11 +519,7 @@ Future<String?> getGooglePlayVersion() async {
     print('🔍 Checking Google Play Store with Ruby script...');
 
     // Run Google Play version checker script
-    final result = await Process.run(
-      'ruby',
-      ['scripts/google_play_version_checker.rb', 'simple'],
-      workingDirectory: Directory.current.path,
-    );
+    final result = await Process.run('ruby', ['scripts/google_play_version_checker.rb', 'simple'], workingDirectory: Directory.current.path);
 
     if (result.exitCode == 0) {
       // Try to read cached version from temp file

@@ -63,13 +63,28 @@ read_with_fallback() {
     local default_value="${2:-n}"
     local variable_name="$3"
     
+    # Check if we're in a remote/automated environment
+    if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
+        # In automated/remote environment, use default value
+        echo "$default_value (auto-selected for remote execution)"
+        eval "$variable_name=\"$default_value\""
+        return 0
+    fi
+    
+    # Interactive environment - prompt for input
     if [[ -t 0 ]]; then
         read -p "$prompt" "$variable_name"
+        # Use default if no input provided
+        if [[ -z "${!variable_name}" ]]; then
+            eval "$variable_name=\"$default_value\""
+        fi
     else
         printf "$prompt"
         if read "$variable_name" < /dev/tty 2>/dev/null; then
             # Successfully read from /dev/tty
-            :
+            if [[ -z "${!variable_name}" ]]; then
+                eval "$variable_name=\"$default_value\""
+            fi
         else
             # Cannot read from terminal, use default
             echo "$default_value (auto-selected for remote execution)"
@@ -84,6 +99,15 @@ read_required_or_skip() {
     local variable_name="$2"
     local skip_message="${3:-Skipping input for remote execution}"
     
+    # Check if we're in a remote/automated environment
+    if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
+        # In automated/remote environment, return "skip" to indicate skipping
+        echo "skip (auto-selected: $skip_message)"
+        eval "$variable_name=\"skip\""
+        return 0
+    fi
+    
+    # Interactive environment - prompt for input
     if [[ -t 0 ]]; then
         read -p "$prompt" "$variable_name"
     else
@@ -272,7 +296,16 @@ is_cicd_source_directory() {
     # Must have essential CI/CD files
     [[ -f "$dir/Makefile" ]] || return 1
     [[ -d "$dir/scripts" ]] || return 1
-    [[ -f "$dir/scripts/setup_automated.sh" ]] || return 1
+    
+    # Check for optimized scripts (new structure)
+    if [[ -f "$dir/scripts/setup.sh" && -f "$dir/scripts/common_functions.sh" ]]; then
+        return 0
+    fi
+    
+    # Fallback: check for old structure
+    if [[ -f "$dir/scripts/setup_automated.sh" ]]; then
+        return 0
+    fi
     
     # Verify it's actually a CI/CD source by checking Makefile content
     if grep -q "Flutter CI/CD\|CI.*CD\|PACKAGE_NAME.*:=\|auto-build\|fastlane" "$dir/Makefile" 2>/dev/null; then
@@ -280,7 +313,7 @@ is_cicd_source_directory() {
     fi
     
     # Alternative check: scripts directory with automation files
-    if [[ -f "$dir/scripts/version_manager.dart" ]] || [[ -f "$dir/scripts/flutter_project_analyzer.dart" ]]; then
+    if [[ -f "$dir/scripts/version_manager.dart" ]] || [[ -f "$dir/scripts/build_info_generator.dart" ]]; then
         return 0  
     fi
     
@@ -665,7 +698,7 @@ validate_target_directory() {
         for location in "${search_locations[@]}"; do
             if [[ -f "$location/pubspec.yaml" ]]; then
                 print_success "Found pubspec.yaml at: $location"
-                print_info "Try running: cd '$location' && ./scripts/setup_automated.sh ."
+                print_info "Try running: cd '$location' && ./scripts/setup.sh . (or ./scripts/setup_automated.sh . for legacy)"
             else
                 print_info "Not found in: $location"
             fi
@@ -676,7 +709,7 @@ validate_target_directory() {
         echo "  1. Navigate to your Flutter project root directory"
         echo "  2. Make sure pubspec.yaml exists in the target directory"
         echo "  3. Run: find . -name 'pubspec.yaml' -type f"
-        echo "  4. Use absolute path: ./scripts/setup_automated.sh /full/path/to/project"
+        echo "  4. Use absolute path: ./scripts/setup.sh /full/path/to/project (or ./scripts/setup_automated.sh for legacy)"
         
         exit 1
     fi
@@ -2666,23 +2699,35 @@ copy_automation_scripts() {
     # Create scripts directory if it doesn't exist
     mkdir -p "$TARGET_DIR/scripts"
     
-    # Copy or create setup_automated.sh if source is available
-    if [[ -n "$SOURCE_DIR" && -f "$SOURCE_DIR/scripts/setup_automated.sh" && "$SOURCE_DIR" != "$TARGET_DIR" ]]; then
-        print_step "Copying setup_automated.sh from source..."
-        cp "$SOURCE_DIR/scripts/setup_automated.sh" "$TARGET_DIR/scripts/"
-        print_success "Copied setup_automated.sh from: $SOURCE_DIR/scripts/"
+    # Copy or create optimized setup scripts if source is available
+    if [[ -n "$SOURCE_DIR" && -f "$SOURCE_DIR/scripts/setup.sh" && "$SOURCE_DIR" != "$TARGET_DIR" ]]; then
+        print_step "Copying optimized setup scripts from source..."
+        cp "$SOURCE_DIR/scripts/setup.sh" "$TARGET_DIR/scripts/" 2>/dev/null || true
+        cp "$SOURCE_DIR/scripts/common_functions.sh" "$TARGET_DIR/scripts/" 2>/dev/null || true
+        print_success "Copied optimized scripts from: $SOURCE_DIR/scripts/"
+    elif [[ -n "$SOURCE_DIR" && -f "$SOURCE_DIR/scripts/setup_automated.sh" && "$SOURCE_DIR" != "$TARGET_DIR" ]]; then
+        print_step "Copying legacy setup script from source..."
+        cp "$SOURCE_DIR/scripts/setup_automated.sh" "$TARGET_DIR/scripts/" 2>/dev/null || true
+        print_success "Copied legacy script from: $SOURCE_DIR/scripts/"
     else
-        print_step "Downloading setup_automated.sh from remote repository..."
-        # Download setup_automated.sh from GitHub
+        print_step "Downloading optimized setup scripts from remote repository..."
+        # Download optimized scripts from GitHub
         if command -v curl >/dev/null 2>&1; then
-            if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/setup_automated.sh" -o "$TARGET_DIR/scripts/setup_automated.sh"; then
-                print_success "Downloaded setup_automated.sh from remote repository"
+            # Try to download optimized scripts first
+            if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/setup.sh" -o "$TARGET_DIR/scripts/setup.sh" 2>/dev/null && \
+               curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/common_functions.sh" -o "$TARGET_DIR/scripts/common_functions.sh" 2>/dev/null; then
+                print_success "Downloaded optimized setup scripts from remote repository"
+                chmod +x "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
+            # Fallback to legacy script
+            elif curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/setup_automated.sh" -o "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null; then
+                print_success "Downloaded legacy setup script from remote repository"
+                chmod +x "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
             else
-                print_error "Failed to download setup_automated.sh from remote repository"
+                print_error "Failed to download setup scripts from remote repository"
                 return 1
             fi
         else
-            print_error "curl not available - cannot download setup_automated.sh"
+            print_error "curl not available - cannot download setup scripts"
             return 1
         fi
     fi
@@ -2693,7 +2738,8 @@ copy_automation_scripts() {
         for script_file in "$SOURCE_DIR/scripts"/*.sh "$SOURCE_DIR/scripts"/*.dart "$SOURCE_DIR/scripts"/*.rb; do
             if [[ -f "$script_file" ]]; then
                 script_name=$(basename "$script_file")
-                if [[ "$script_name" != "setup_automated.sh" ]]; then
+                # Skip setup scripts as they're handled separately
+                if [[ "$script_name" != "setup_automated.sh" && "$script_name" != "setup.sh" ]]; then
                     cp "$script_file" "$TARGET_DIR/scripts/" 2>/dev/null || true
                     print_info "Copied: $script_name"
                 fi
@@ -2702,11 +2748,15 @@ copy_automation_scripts() {
         print_success "Additional scripts copied"
     elif [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
         print_step "Downloading additional automation scripts from remote..."
-        # Download essential scripts from GitHub
-        local essential_scripts=("common_functions.sh" "integration_test.sh" "quick_setup.sh" "setup_interactive.sh" "version_manager.dart" "build_info_generator.dart" "flutter_project_analyzer.dart" "version_checker.rb")
+        # Download essential scripts from GitHub (optimized list)
+        local essential_scripts=("version_manager.dart" "build_info_generator.dart")
         for script_name in "${essential_scripts[@]}"; do
             if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/$script_name" -o "$TARGET_DIR/scripts/$script_name" 2>/dev/null; then
                 print_info "Downloaded $script_name"
+                # Set execute permissions for Dart scripts
+                if [[ "$script_name" == *.dart ]]; then
+                    chmod +x "$TARGET_DIR/scripts/$script_name" 2>/dev/null || true
+                fi
             else
                 print_warning "Could not download $script_name (optional)"
             fi
@@ -3917,7 +3967,8 @@ This guide walks you through setting up Android deployment for your Flutter proj
 ### Option A: Use our script (Recommended)
 \`\`\`bash
 # Run the setup script and choose to create keystore
-./scripts/setup_automated.sh
+./scripts/setup.sh
+# Or use legacy script: ./scripts/setup_automated.sh
 \`\`\`
 
 ### Option B: Manual creation
@@ -4146,7 +4197,8 @@ Edit \`ios/ExportOptions.plist\`:
 ### 3.4 Update project.config
 Run the setup script to update automatically:
 \`\`\`bash
-./scripts/setup_automated.sh
+./scripts/setup.sh
+# Or use legacy script: ./scripts/setup_automated.sh
 \`\`\`
 
 ## Step 4: Xcode Project Setup
@@ -4403,7 +4455,7 @@ show_final_summary() {
         echo -e "  • ${WHITE}Review docs/ANDROID_SETUP_GUIDE.md${NC} for Android setup"
         echo -e "  • ${WHITE}Review docs/IOS_SETUP_GUIDE.md${NC} for iOS setup"
         echo -e "  • ${WHITE}Run this script again${NC} after placing credentials"
-        echo -e "  • ${WHITE}./scripts/setup_automated.sh --setup-only .${NC} for credential setup only"
+        echo -e "  • ${WHITE}./scripts/setup.sh --setup-only .${NC} for credential setup only"
     fi
     echo ""
 }

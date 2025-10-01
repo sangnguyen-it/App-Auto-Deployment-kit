@@ -65,8 +65,15 @@ read_with_fallback() {
     local default_value="${2:-n}"
     local variable_name="$3"
     
-    # Always prompt for user input, even in pipe mode
-    # This ensures the script waits for user confirmation
+    # Check if we're in pipe mode (REMOTE_EXECUTION=true)
+    if [[ "${REMOTE_EXECUTION:-}" == "true" ]]; then
+        # In pipe mode, automatically use default value
+        echo "${prompt}${default_value} (auto-selected in pipe mode)"
+        eval "$variable_name=\"$default_value\""
+        return 0
+    fi
+    
+    # Interactive mode - prompt for user input
     echo -n "$prompt"
     read "$variable_name"
     

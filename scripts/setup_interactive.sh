@@ -1,5 +1,5 @@
 #!/bin/bash
-# Auto Deploy Setup - Complete Interactive Integration Script
+# Interactive Setup - Complete Interactive Integration Script
 # Automatically integrates CI/CD into any Flutter project with guided setup
 
 set -e
@@ -75,9 +75,9 @@ print_info() {
 # Show welcome screen
 show_welcome() {
     clear
-    print_header "${ROCKET} Flutter CI/CD Auto-Deploy Setup"
+    print_header "${ROCKET} Flutter CI/CD Interactive Setup"
     
-    echo -e "${WHITE}Welcome to the automatic Flutter CI/CD integration tool!${NC}"
+    echo -e "${WHITE}Welcome to the interactive Flutter CI/CD integration tool!${NC}"
     echo ""
     echo -e "${GREEN}This script will:${NC}"
     echo -e "  ${CHECK} Analyze your Flutter project"
@@ -216,7 +216,7 @@ EOF
     
     # Create Fastfile
     cat > "$TARGET_DIR/android/fastlane/Fastfile" << 'EOF'
-fastlane_version "2.210.1"
+fastlane_version "2.228.0"
 default_platform(:android)
 
 platform :android do
@@ -280,8 +280,19 @@ EOF
     
     # Create optimized Fastfile
     cat > "$TARGET_DIR/ios/fastlane/Fastfile" << EOF
-fastlane_version "2.210.1"
+fastlane_version "2.228.0"
 default_platform(:ios)
+
+# Disable update checker to prevent initialization issues
+ENV["FASTLANE_SKIP_UPDATE_CHECK"] = "1"
+
+# Error handling for FastlaneCore issues
+begin
+  require 'fastlane'
+rescue LoadError => e
+  UI.error("Failed to load Fastlane: \#{e.message}")
+  exit(1)
+end
 
 # Project Configuration
 PROJECT_NAME = "$PROJECT_NAME"
@@ -297,55 +308,96 @@ CHANGELOG_PATH = "../builder/changelog.txt"
 IPA_OUTPUT_DIR = "../build/ios/ipa"
 
 platform :ios do
-  desc "Build archive and upload to TestFlight with automatic signing"
-  lane :build_and_upload_auto do
+  desc "Build iOS archive"
+  lane :build_archive do
     setup_signing
     
     build_app(
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
-      export_options: {
-        method: "app-store",
-        signingStyle: "automatic",
-        teamID: TEAM_ID
-      }
+      xcargs: "-allowProvisioningUpdates"
     )
-    
-    changelog_content = read_changelog
+  end
+  
+  desc "Submit a new Beta Build to TestFlight"
+  lane :beta do
+    if File.exist?("\#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at \#{IPA_OUTPUT_DIR}/Runner.ipa")
+      upload_to_testflight(
+        ipa: "\#{IPA_OUTPUT_DIR}/Runner.ipa",
+        changelog: read_changelog,
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        groups: TESTER_GROUPS,
+        notify_external_testers: true
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive
+      upload_to_testflight(
+        changelog: read_changelog,
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        groups: TESTER_GROUPS,
+        notify_external_testers: true
+      )
+    end
+  end
+
+  desc "Submit a new Production Build to App Store"
+  lane :release do
+    if File.exist?("\#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at \#{IPA_OUTPUT_DIR}/Runner.ipa")
+      upload_to_app_store(
+        ipa: "\#{IPA_OUTPUT_DIR}/Runner.ipa",
+        force: true,
+        reject_if_possible: true,
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive
+      upload_to_app_store(
+        force: true,
+        reject_if_possible: true,
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    end
+  end
+
+  desc "Upload existing IPA to TestFlight"
+  lane :upload_testflight do
+    setup_signing
     
     upload_to_testflight(
-      changelog: changelog_content,
+      ipa: "\#{IPA_OUTPUT_DIR}/Runner.ipa",
+      changelog: read_changelog,
       skip_waiting_for_build_processing: true,
       distribute_external: false,
       groups: TESTER_GROUPS,
       notify_external_testers: true
     )
   end
-  
-  desc "Build archive and upload to App Store for production release"
-  lane :build_and_upload_production do
+
+  desc "Upload existing IPA to App Store"
+  lane :upload_appstore do
     setup_signing
     
-    build_app(
-      scheme: "Runner",
-      export_method: "app-store",
-      output_directory: IPA_OUTPUT_DIR,
-      export_options: {
-        method: "app-store",
-        signingStyle: "automatic",
-        teamID: TEAM_ID
-      }
-    )
-    
-    changelog_content = read_changelog("production")
-    
-    upload_to_testflight(
-      changelog: changelog_content,
-      skip_waiting_for_build_processing: true,
-      distribute_external: false,
-      groups: TESTER_GROUPS,
-      notify_external_testers: false
+    upload_to_app_store(
+      ipa: "\#{IPA_OUTPUT_DIR}/Runner.ipa",
+      force: true,
+      reject_if_possible: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: false,
+      automatic_release: false
     )
   end
   
@@ -372,7 +424,7 @@ platform :ios do
       end
     end
     
-    return changelog_content
+    changelog_content
   end
 end
 EOF
@@ -398,6 +450,28 @@ EOF
 </dict>
 </plist>
 EOF
+    
+    # Validate provisioning profiles
+    if command -v security >/dev/null 2>&1; then
+        print_step "🔍 Validating provisioning profiles..."
+        
+        # Check for valid provisioning profiles
+        local profiles_dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+        if [ -d "$profiles_dir" ]; then
+            local profile_count=$(find "$profiles_dir" -name "*.mobileprovision" 2>/dev/null | wc -l)
+            if [ "$profile_count" -gt 0 ]; then
+                print_success "✅ Found $profile_count provisioning profile(s)"
+            else
+                print_warning "⚠️  No provisioning profiles found. You may need to download them from Xcode."
+                echo "   To fix this:"
+                echo "   1. Open Xcode"
+                echo "   2. Go to Preferences → Accounts"
+                echo "   3. Select your Apple ID and download provisioning profiles"
+            fi
+        else
+            print_warning "⚠️  Provisioning profiles directory not found. Ensure Xcode is properly configured."
+        fi
+    fi
     
     print_success "iOS Fastlane configuration created"
     echo ""
@@ -857,7 +931,7 @@ show_completion() {
     echo -e "  • Run ${CYAN}./scripts/verify_paths.sh${NC} to validate setup"
     echo ""
     
-    print_success "Thank you for using Flutter CI/CD Auto-Deploy Setup!"
+    print_success "Thank you for using Flutter CI/CD Interactive Setup!"
     echo ""
 }
 
@@ -887,7 +961,7 @@ main() {
 
 # Script entry point
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Flutter CI/CD Auto-Deploy Setup"
+    echo "Flutter CI/CD Interactive Setup"
     echo "Usage: $0"
     echo ""
     echo "This script will interactively set up CI/CD automation for your Flutter project."

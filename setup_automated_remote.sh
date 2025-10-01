@@ -371,8 +371,9 @@ detect_scripts_directory() {
                     echo "$dir"
                     return 0
                 fi
-                # Priority 3: Old structure compatibility
-                if [[ -f "$dir/auto_deploy_setup.sh" ]] || [[ -f "$dir/setup_automated.sh" ]]; then
+                # Priority 3: Legacy compatibility (check for old project structures)
+                # Note: These files may not exist in the source but could exist in target projects
+                if [[ -f "$dir/setup_automated.sh" ]]; then
                     echo "$dir"
                     return 0
                 fi
@@ -2809,10 +2810,6 @@ copy_automation_scripts() {
                 print_success "Copied setup script with build generator from local repository"
                 chmod +x "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
             # Fallback to legacy scripts if available
-            elif [[ -f "$local_scripts_dir/auto_deploy_setup.sh" ]]; then
-                cp "$local_scripts_dir/auto_deploy_setup.sh" "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
-                print_success "Copied legacy setup script from local repository"
-                chmod +x "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
             elif [[ -f "$local_scripts_dir/setup_automated.sh" ]]; then
                 cp "$local_scripts_dir/setup_automated.sh" "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
                 print_success "Copied legacy setup script from local repository"
@@ -2853,7 +2850,7 @@ copy_automation_scripts() {
                 if [[ -f "$script_file" ]]; then
                     script_name=$(basename "$script_file")
                     # Skip setup scripts as they're handled separately
-                    if [[ "$script_name" != "setup_automated.sh" && "$script_name" != "setup.sh" && "$script_name" != "auto_deploy_setup.sh" ]]; then
+                    if [[ "$script_name" != "setup_automated.sh" && "$script_name" != "setup.sh" ]]; then
                         cp "$script_file" "$TARGET_DIR/scripts/" 2>/dev/null || true
                         print_info "Copied: $script_name"
                         # Set execute permissions for scripts

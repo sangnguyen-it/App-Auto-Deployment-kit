@@ -395,8 +395,12 @@ PACKAGE_NAME=""
 GIT_REPO=""
 CURRENT_VERSION=""
 
-# Interactive mode flag
-INTERACTIVE_MODE=false
+# Interactive mode flag - detect based on terminal availability
+if [ -t 0 ] && [ -t 1 ] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]] && [[ "${REMOTE_EXECUTION:-}" != "true" ]]; then
+    INTERACTIVE_MODE=true
+else
+    INTERACTIVE_MODE=false
+fi
 
 # Validation flags
 VALIDATION_REQUIRED=true
@@ -408,31 +412,31 @@ IOS_READY=false
 print_header() {
     echo ""
     echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC} ${ROCKET} ${WHITE}Flutter CI/CD Automated Setup${NC} ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC} ${WHITE}Flutter CI/CD Automated Setup${NC} ${BLUE}║${NC}"
     echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${CYAN}${STAR} $1${NC}"
+    echo -e "${CYAN}$1${NC}"
     echo ""
 }
 
 print_step() {
-    echo -e "${CYAN}${GEAR} $1${NC}"
+    echo -e "${CYAN}$1${NC}"
 }
 
 print_success() {
-    echo -e "${GREEN}${CHECK} $1${NC}"
+    echo -e "${GREEN}✅ $1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}${CROSS} $1${NC}"
+    echo -e "${RED}❌ $1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}${WARNING} $1${NC}"
+    echo -e "${YELLOW}⚠️ $1${NC}"
 }
 
 print_info() {
-    echo -e "${BLUE}${INFO} $1${NC}"
+    echo -e "${BLUE}$1${NC}"
 }
 
 print_separator() {
@@ -564,83 +568,7 @@ get_production_version() {
     echo "$production_version"
 }
 
-# Check and fix Bundler version issues
-check_and_fix_bundler_version() {
-    print_step "Checking Bundler version compatibility..."
-    
-    # Check if Bundler is installed
-    if ! command -v bundle >/dev/null 2>&1; then
-        print_warning "Bundler not found. Installing..."
-        if gem install bundler >/dev/null 2>&1; then
-            print_success "Bundler installed successfully"
-        else
-            print_error "Failed to install Bundler"
-            return 1
-        fi
-    fi
-    
-    # Get current Bundler version
-    CURRENT_BUNDLER_VERSION=$(bundle --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
-    if [ -z "$CURRENT_BUNDLER_VERSION" ]; then
-        print_warning "Could not determine current Bundler version"
-        return 0
-    fi
-    
-    print_info "Current Bundler version: $CURRENT_BUNDLER_VERSION"
-    
-    # Check Gemfile.lock files for required Bundler version
-    REQUIRED_VERSION=""
-    GEMFILE_LOCK_PATHS=("$TARGET_DIR/Gemfile.lock" "$TARGET_DIR/android/Gemfile.lock" "$TARGET_DIR/ios/Gemfile.lock")
-    
-    for GEMFILE_LOCK in "${GEMFILE_LOCK_PATHS[@]}"; do
-        if [ -f "$GEMFILE_LOCK" ]; then
-            BUNDLED_WITH=$(grep -A1 "BUNDLED WITH" "$GEMFILE_LOCK" 2>/dev/null | tail -1 | tr -d ' ')
-            if [ -n "$BUNDLED_WITH" ]; then
-                REQUIRED_VERSION="$BUNDLED_WITH"
-                print_info "Found required Bundler version in $(basename "$(dirname "$GEMFILE_LOCK")"): $REQUIRED_VERSION"
-                break
-            fi
-        fi
-    done
-    
-    # If we found a required version and it's different from current, update
-    if [ -n "$REQUIRED_VERSION" ] && [ "$CURRENT_BUNDLER_VERSION" != "$REQUIRED_VERSION" ]; then
-        print_warning "Bundler version mismatch detected!"
-        print_info "Current: $CURRENT_BUNDLER_VERSION, Required: $REQUIRED_VERSION"
-        print_step "Updating Bundler to version $REQUIRED_VERSION..."
-        
-        if gem install bundler -v "$REQUIRED_VERSION" >/dev/null 2>&1; then
-            print_success "Bundler updated to version $REQUIRED_VERSION"
-            
-            # Verify the update
-            NEW_VERSION=$(bundle --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
-            if [ "$NEW_VERSION" = "$REQUIRED_VERSION" ]; then
-                print_success "Bundler version verified: $NEW_VERSION"
-            else
-                print_warning "Bundler version verification failed. Expected: $REQUIRED_VERSION, Got: $NEW_VERSION"
-            fi
-        else
-            print_error "Failed to update Bundler to version $REQUIRED_VERSION"
-            return 1
-        fi
-    else
-        print_success "Bundler version is compatible"
-    fi
-    
-    # Install gems in directories that have Gemfile
-    for DIR in "$TARGET_DIR" "$TARGET_DIR/android" "$TARGET_DIR/ios"; do
-        if [ -f "$DIR/Gemfile" ]; then
-            print_step "Installing gems in $(basename "$DIR")..."
-            if (cd "$DIR" && bundle install >/dev/null 2>&1); then
-                print_success "Gems installed in $(basename "$DIR")"
-            else
-                print_warning "Failed to install gems in $(basename "$DIR")"
-            fi
-        fi
-    done
-    
-    print_success "Bundler version check completed"
-}
+
 
 # Auto-sync project.config with iOS fastlane files if config exists
 auto_sync_project_config() {
@@ -701,7 +629,7 @@ auto_sync_project_config() {
             print_info "    Update project.config with your TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID to enable auto-sync"
         fi
     else
-        print_warning "⚠️  Failed to load project.config, skipping auto-sync"
+        print_warning "Failed to load project.config, skipping auto-sync"
     fi
     
     echo ""
@@ -959,7 +887,7 @@ check_github_auth() {
         
         # Check and handle GITHUB_TOKEN environment variable
         if [ -n "$GITHUB_TOKEN" ]; then
-            print_warning "⚠️  GITHUB_TOKEN environment variable detected"
+            print_warning "GITHUB_TOKEN environment variable detected"
             print_info "🧹 Clearing GITHUB_TOKEN to allow interactive authentication..."
             unset GITHUB_TOKEN
             export GITHUB_TOKEN=""
@@ -1012,7 +940,7 @@ check_github_auth() {
                         print_success "🔗 GitHub API access verified"
                         return 0
                     else
-                        print_warning "⚠️  Authentication succeeded but API access failed"
+                        print_warning "Authentication succeeded but API access failed"
                         print_info "🔄 Retrying API verification..."
                         sleep 3
                         if env -u GITHUB_TOKEN gh api user >/dev/null 2>&1; then
@@ -2616,13 +2544,121 @@ EOF
     echo ""
 }
 
+# Create inline setup scripts when no local scripts are found
+create_inline_setup_scripts() {
+    print_step "Creating basic setup.sh script..."
+    
+    # Create a basic setup.sh script
+    cat > "$TARGET_DIR/scripts/setup.sh" << 'EOF'
+#!/bin/bash
+
+# Basic setup script for Flutter project automation
+# This script was auto-generated by the App Auto Deployment Kit
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+
+
+# Main setup function
+main() {
+    print_info "Basic Flutter project setup"
+    print_step "Setting up project structure..."
+    
+    # Ensure basic directories exist
+    mkdir -p android/fastlane
+    mkdir -p ios/fastlane
+    mkdir -p .github/workflows
+    
+    print_success "Basic setup completed!"
+    print_info "For full automation features, please run the complete setup from:"
+    print_info "curl -fsSL https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/setup_automated_remote.sh | bash"
+}
+
+# Execute main function
+main "$@"
+EOF
+
+    chmod +x "$TARGET_DIR/scripts/setup.sh"
+    print_success "Created basic setup.sh script"
+    
+    # Create a basic common_functions.sh
+    print_step "Creating common_functions.sh script..."
+    cat > "$TARGET_DIR/scripts/common_functions.sh" << 'EOF'
+#!/bin/bash
+
+# Common functions for Flutter project automation
+# This script was auto-generated by the App Auto Deployment Kit
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Print functions
+print_info() {
+    echo -e "${BLUE}$1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️ $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+print_step() {
+    echo -e "${BLUE}$1${NC}"
+}
+
+print_header() {
+    echo ""
+    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC} $1 ${BLUE}║${NC}"
+    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+# Basic project detection
+detect_project_type() {
+    if [ -f "pubspec.yaml" ]; then
+        echo "flutter"
+    elif [ -f "package.json" ]; then
+        echo "node"
+    elif [ -f "Gemfile" ]; then
+        echo "ruby"
+    else
+        echo "unknown"
+    fi
+}
+
+# Export functions for use in other scripts
+export -f print_info print_success print_warning print_error print_step print_header detect_project_type
+EOF
+
+    print_success "Created common_functions.sh script"
+}
+
 # Create project configuration with user confirmation
 create_project_config() {
     print_header "Project Configuration Setup"
     
     # Check if config file already exists
     if [ -f "$TARGET_DIR/project.config" ]; then
-        print_warning "⚠️  project.config already exists!"
+        print_warning "project.config already exists!"
         echo ""
         echo "📄 Current config file found at: project.config"
         echo ""
@@ -2791,36 +2827,41 @@ copy_automation_scripts() {
         cp "$SOURCE_DIR/scripts/setup_automated.sh" "$TARGET_DIR/scripts/" 2>/dev/null || true
         print_success "Copied legacy script from: $SOURCE_DIR/scripts/"
     else
-        print_step "Using local setup scripts from project repository..."
-        # Use local scripts from the project repository
+        # Try to use local scripts from the project repository
         local local_scripts_dir
         local_scripts_dir=$(detect_scripts_directory "$TARGET_DIR")
+        local local_scripts_found=false
         
         if [[ -d "$local_scripts_dir" ]]; then
+            print_step "Checking for local setup scripts in project repository..."
             # Copy optimized scripts from local repository
             if [[ -f "$local_scripts_dir/setup.sh" ]] && [[ -f "$local_scripts_dir/common_functions.sh" ]]; then
                 cp "$local_scripts_dir/setup.sh" "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
                 cp "$local_scripts_dir/common_functions.sh" "$TARGET_DIR/scripts/common_functions.sh" 2>/dev/null || true
                 print_success "Copied optimized setup scripts from local repository"
                 chmod +x "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
+                local_scripts_found=true
             # Fallback to setup.sh with build_info_generator.dart
             elif [[ -f "$local_scripts_dir/setup.sh" ]] && [[ -f "$local_scripts_dir/build_info_generator.dart" ]]; then
                 cp "$local_scripts_dir/setup.sh" "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
                 cp "$local_scripts_dir/build_info_generator.dart" "$TARGET_DIR/scripts/build_info_generator.dart" 2>/dev/null || true
                 print_success "Copied setup script with build generator from local repository"
                 chmod +x "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
+                local_scripts_found=true
             # Fallback to legacy scripts if available
             elif [[ -f "$local_scripts_dir/setup_automated.sh" ]]; then
                 cp "$local_scripts_dir/setup_automated.sh" "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
                 print_success "Copied legacy setup script from local repository"
                 chmod +x "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
-            else
-                print_error "No suitable setup scripts found in local repository"
-                return 1
+                local_scripts_found=true
             fi
-        else
-            print_error "Local scripts directory not found: $local_scripts_dir"
-            return 1
+        fi
+        
+        # If no local scripts found, create inline scripts
+        if [[ "$local_scripts_found" == "false" ]]; then
+            print_warning "No suitable setup scripts found in local repository"
+            print_step "Creating inline setup scripts..."
+            create_inline_setup_scripts
         fi
     fi
     
@@ -3079,69 +3120,7 @@ EOF
     echo ""
 }
 
-# Setup basic environment
-setup_basic_environment() {
-    print_header "Setting Up Basic Environment"
-    
-    cd "$TARGET_DIR"
-    
-    # Install Ruby gems if possible
-    if command -v bundle &> /dev/null; then
-        print_step "Installing Ruby gems..."
-        if bundle install 2>/dev/null; then
-            print_success "Ruby gems installed"
-        else
-            print_warning "Bundle install failed (will retry later)"
-            print_info "💡 Fix: Run 'gem install bundler' then 'bundle install'"
-        fi
-    else
-        print_info "Installing bundler first..."
-        if command -v gem &> /dev/null; then
-            if gem install bundler 2>/dev/null; then
-                print_success "Bundler installed"
-                print_step "Installing Ruby gems..."
-                if bundle install 2>/dev/null; then
-                    print_success "Ruby gems installed"
-                else
-                    print_warning "Bundle install failed - manual setup required"
-                    print_info "💡 Run: bundle install"
-                fi
-            else
-                print_warning "Could not install bundler"
-                print_info "💡 Manual setup: gem install bundler && bundle install"
-            fi
-        else
-            print_warning "Ruby gems not available - skip Ruby dependencies"
-        fi
-    fi
-    
-    # Setup iOS dependencies on macOS
-    if [[ "$OSTYPE" == "darwin"* ]] && [ -d "ios" ]; then
-        print_step "Installing iOS dependencies..."
-        if command -v pod &> /dev/null; then
-            cd ios
-            if pod install --silent 2>/dev/null; then
-                print_success "CocoaPods dependencies installed"
-            else
-                print_warning "Pod install failed - continuing anyway"
-                print_info "💡 Run manually: cd ios && pod install"
-            fi
-            cd ..
-        else
-            print_info "CocoaPods not found - install with: sudo gem install cocoapods"
-        fi
-    fi
-    
-    # Update Flutter dependencies
-    print_step "Updating Flutter dependencies..."
-    if flutter pub get; then
-        print_success "Flutter dependencies updated"
-    else
-        print_warning "Flutter pub get failed"
-    fi
-    
-    echo ""
-}
+
 
 # Generate environment configuration
 generate_env_config() {
@@ -3288,43 +3267,7 @@ EOF
     print_success "Credential setup guide generated: $guide_path"
 }
 
-# Show completion summary
-show_completion() {
-    clear
-    print_header "🎉 Integration Complete!"
-    
-    echo -e "${GREEN}🎉 Success! Your Flutter project now has complete CI/CD automation.${NC}"
-    echo ""
-    
-    echo -e "${WHITE}📁 Project:${NC} $TARGET_DIR"
-    echo -e "${WHITE}📱 App Name:${NC} $PROJECT_NAME"  
-    echo -e "${WHITE}📦 Package:${NC} $PACKAGE_NAME"
-    echo -e "${WHITE}🍎 Bundle ID:${NC} $BUNDLE_ID"
-    echo ""
-    
-    echo -e "${BLUE}📋 Files Created:${NC}"
-    echo -e "  ${CHECK} Makefile (customized)"
-    echo -e "  ${CHECK} .github/workflows/deploy.yml"
-    echo -e "  ${CHECK} android/fastlane/ (Appfile, Fastfile)"
-    echo -e "  ${CHECK} ios/fastlane/ (Appfile, Fastfile)"
-    echo -e "  ${CHECK} ios/ExportOptions.plist"
-    echo -e "  ${CHECK} Gemfile"
-    echo -e "  ${CHECK} project.config"
-    echo -e "  ${CHECK} scripts/ (automation tools)"
-    echo -e "  ${CHECK} docs/ (documentation)"
-    echo -e "  ${CHECK} docs/CICD_INTEGRATION_COMPLETE.md (setup guide)"
-    echo ""
-    
-    echo -e "${YELLOW}⚠️ Required Next Steps:${NC}"
-    echo -e "  ${WARNING} Complete iOS configuration (Team ID, API Key, etc.)"
-    echo -e "  ${WARNING} Create Android keystore and update key.properties"
-    echo -e "  ${WARNING} Setup GitHub Secrets for CI/CD"
-    echo ""
-    
-    print_success "CI/CD integration completed successfully!"
-    echo -e "${WHITE}📖 See docs/CICD_INTEGRATION_COMPLETE.md for detailed setup instructions.${NC}"
-    echo ""
-}
+
 
 # Validation and interactive setup functions
 validate_credentials() {
@@ -3520,7 +3463,7 @@ sync_appfile() {
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
     else
-        print_warning "⚠️  project.config not found, skipping Appfile sync"
+        print_warning "project.config not found, skipping Appfile sync"
         return 0
     fi
     
@@ -3591,7 +3534,7 @@ sync_fastfile() {
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
     else
-        print_warning "⚠️  project.config not found, skipping Fastfile sync"
+        print_warning "project.config not found, skipping Fastfile sync"
         return 0
     fi
     
@@ -3686,7 +3629,7 @@ sync_export_options() {
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
     else
-        print_warning "⚠️  project.config not found, skipping ExportOptions.plist sync"
+        print_warning "project.config not found, skipping ExportOptions.plist sync"
         return 0
     fi
     
@@ -3731,7 +3674,7 @@ collect_ios_credentials() {
         local input_team_id
         read_required_or_skip "Team ID: " input_team_id
         if [[ "$input_team_id" == "skip" ]]; then
-            print_warning "⚠️ Skipping Team ID setup for remote execution"
+            print_warning "Skipping Team ID setup for remote execution"
             break
         elif [[ -n "$input_team_id" && "$input_team_id" != "YOUR_TEAM_ID" ]]; then
             TEAM_ID="$input_team_id"
@@ -3750,7 +3693,7 @@ collect_ios_credentials() {
         local input_key_id
         read_required_or_skip "Key ID: " input_key_id
         if [[ "$input_key_id" == "skip" ]]; then
-            print_warning "⚠️ Skipping Key ID setup for remote execution"
+            print_warning "Skipping Key ID setup for remote execution"
             break
         elif [[ -n "$input_key_id" && "$input_key_id" != "YOUR_KEY_ID" ]]; then
             KEY_ID="$input_key_id"
@@ -3769,7 +3712,7 @@ collect_ios_credentials() {
         local input_issuer_id
         read_required_or_skip "Issuer ID: " input_issuer_id
         if [[ "$input_issuer_id" == "skip" ]]; then
-            print_warning "⚠️ Skipping Issuer ID setup for remote execution"
+            print_warning "Skipping Issuer ID setup for remote execution"
             break
         elif [[ -n "$input_issuer_id" && "$input_issuer_id" != "YOUR_ISSUER_ID" ]]; then
             ISSUER_ID="$input_issuer_id"
@@ -3787,7 +3730,7 @@ collect_ios_credentials() {
         local input_apple_id
         read_required_or_skip "Apple ID: " input_apple_id
         if [[ "$input_apple_id" == "skip" ]]; then
-            print_warning "⚠️ Skipping Apple ID setup for remote execution"
+            print_warning "Skipping Apple ID setup for remote execution"
             break
         elif [[ "$input_apple_id" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
             APPLE_ID="$input_apple_id"
@@ -3942,7 +3885,7 @@ collect_android_credentials() {
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/demo-service-account%40demo-project.iam.gserviceaccount.com"
 }
 EOF
-                print_warning "⚠️  Demo service account JSON created for validation"
+                print_warning "Demo service account JSON created for validation"
                 print_info "📝 Replace this with your real service account for production deployment"
                 print_info "📍 File: android/fastlane/play_store_service_account.json"
                 break
@@ -4552,7 +4495,7 @@ show_final_summary() {
         echo -e "  • ${WHITE}make tester${NC} - Test deployment"
         echo -e "  • ${WHITE}make live${NC} - Production deployment"
     else
-        print_warning "⚠️ Complete setup required before deployment"
+        print_warning "Complete setup required before deployment"
         echo -e "${CYAN}Next steps:${NC}"
         echo -e "  • ${WHITE}Review docs/ANDROID_SETUP_GUIDE.md${NC} for Android setup"
         echo -e "  • ${WHITE}Review docs/IOS_SETUP_GUIDE.md${NC} for iOS setup"
@@ -4562,84 +4505,7 @@ show_final_summary() {
     echo ""
 }
 
-# Main execution function
-main() {
-    # Handle potential curl download issues
-    if [ ! -t 0 ] && [ -z "${BASH_SOURCE[0]}" ]; then
-        # Script is being piped from curl, add small delay to ensure complete download
-        sleep 0.1
-    fi
-    
-    # Ensure we have proper error handling for non-interactive execution
-    trap 'echo "Error occurred at line $LINENO. Exit code: $?" >&2' ERR
-    
-    # Set target directory using robust detection (allow non-zero exit for directory detection)
-    set +e  # Temporarily disable exit on error
-    TARGET_DIR=$(detect_target_directory "${1:-$(pwd)}")
-    detect_exit_code=$?
-    set -e  # Re-enable exit on error
-    
-    # Debug information (only in verbose mode)
-    if [[ "${DEBUG:-}" == "true" ]]; then
-        echo "🐛 DEBUG: Final TARGET_DIR = '$TARGET_DIR'" >&2
-        echo "🐛 DEBUG: Current working directory = '$(pwd)'" >&2
-        echo "🐛 DEBUG: Script arguments = '$@'" >&2
-    fi
-    
-    # Check if source directory exists (relaxed for dynamic detection)
-    if [[ -z "$SOURCE_DIR" || ! -d "$SOURCE_DIR" ]]; then
-        print_warning "Source directory not found: $SOURCE_DIR"
-        print_info "Script will use inline templates for file generation"
-        SOURCE_DIR=""  # Clear invalid source dir
-    fi
-    
-    # Always validate target directory and extract project info
-    validate_target_directory
-    extract_project_info
-    
-    # Auto-sync project.config with iOS fastlane files if config exists
-    auto_sync_project_config
-    
-    # Check GitHub CLI authentication status
-    check_github_auth
-    
-    # Check and fix Bundler version issues
-    print_separator
-    print_header "🔧 Bundler Version Check"
-    check_and_fix_bundler_version
-    
-    # Full integration mode - Execute all integration steps
-    create_directory_structure
-    create_android_fastlane
-    create_ios_fastlane  
-    create_makefile
-    create_github_workflow
-    create_gemfile
-    
-    # Only create project.config if it doesn't exist or user hasn't been asked yet
-    if [ ! -f "$TARGET_DIR/project.config" ] || [ -z "$PROJECT_CONFIG_USER_APPROVED" ]; then
-        create_project_config
-    else
-        print_info "Using existing project.config (user choice: keep existing)"
-    fi
-    
-    copy_automation_scripts
-    generate_env_config
-    generate_credential_guide
-    create_setup_guide
-    
-    # Run credential setup
-    run_credential_setup
-    
-    # Basic environment setup
-    setup_basic_environment
-    
-    # Show completion
-    show_completion
-    
-    # Final validation summary (always show)
-    show_final_summary
-}
+
 
 # Script entry point - with integrity check for curl downloads
 if [ ! -t 0 ]; then

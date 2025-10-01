@@ -13,6 +13,8 @@ if [ -t 0 ]; then
 else
     # Running non-interactively (e.g., via curl | bash)
     export TERM=dumb
+    export REMOTE_EXECUTION=true
+    echo "🔄 Detected non-interactive execution (pipe mode) - enabling auto-mode"
 fi
 
 # Set safe locale to prevent encoding issues
@@ -66,7 +68,7 @@ read_with_fallback() {
     # Check if we're in a remote/automated environment
     if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
         # In automated/remote environment, use default value
-        echo "$default_value (auto-selected for remote execution)"
+        echo "→ $prompt$default_value (auto-selected for non-interactive mode)"
         eval "$variable_name=\"$default_value\""
         return 0
     fi
@@ -79,17 +81,9 @@ read_with_fallback() {
             eval "$variable_name=\"$default_value\""
         fi
     else
-        printf "$prompt"
-        if read "$variable_name" < /dev/tty 2>/dev/null; then
-            # Successfully read from /dev/tty
-            if [[ -z "${!variable_name}" ]]; then
-                eval "$variable_name=\"$default_value\""
-            fi
-        else
-            # Cannot read from terminal, use default
-            echo "$default_value (auto-selected for remote execution)"
-            eval "$variable_name=\"$default_value\""
-        fi
+        # Fallback: we're not in a terminal, use default
+        echo "→ $prompt$default_value (auto-selected - no terminal available)"
+        eval "$variable_name=\"$default_value\""
     fi
 }
 
@@ -97,12 +91,12 @@ read_with_fallback() {
 read_required_or_skip() {
     local prompt="$1"
     local variable_name="$2"
-    local skip_message="${3:-Skipping input for remote execution}"
+    local skip_message="${3:-Skipping input for non-interactive mode}"
     
     # Check if we're in a remote/automated environment
     if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
         # In automated/remote environment, return "skip" to indicate skipping
-        echo "skip (auto-selected: $skip_message)"
+        echo "→ $prompt skip (auto-selected: $skip_message)"
         eval "$variable_name=\"skip\""
         return 0
     fi
@@ -111,15 +105,9 @@ read_required_or_skip() {
     if [[ -t 0 ]]; then
         read -p "$prompt" "$variable_name"
     else
-        printf "$prompt"
-        if read "$variable_name" < /dev/tty 2>/dev/null; then
-            # Successfully read from /dev/tty
-            :
-        else
-            # Cannot read from terminal, skip this input
-            echo "skip (auto-selected: $skip_message)"
-            eval "$variable_name=\"skip\""
-        fi
+        # Fallback: we're not in a terminal, skip this input
+        echo "→ $prompt skip (auto-selected: $skip_message)"
+        eval "$variable_name=\"skip\""
     fi
 }
 

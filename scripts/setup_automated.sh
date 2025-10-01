@@ -934,22 +934,31 @@ EOF
 create_ios_fastlane() {
     print_header "Creating iOS Fastlane Configuration"
     
-    # Load existing config if available to use real values
-    local config_apple_id="your-apple-id@email.com"
-    local config_team_id="YOUR_TEAM_ID"
-    
-    if [ -f "$TARGET_DIR/project.config" ]; then
-        source "$TARGET_DIR/project.config" 2>/dev/null || true
-        if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" ]]; then
-            config_apple_id="$APPLE_ID"
-        fi
-        if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
-            config_team_id="$TEAM_ID"
-        fi
+    # Check if files already exist and skip creation if they do
+    local files_exist=false
+    if [ -f "$TARGET_DIR/ios/fastlane/Appfile" ] && [ -f "$TARGET_DIR/ios/fastlane/Fastfile" ] && [ -f "$TARGET_DIR/ios/ExportOptions.plist" ]; then
+        files_exist=true
+        print_info "iOS Fastlane files already exist, skipping creation to preserve existing configuration"
     fi
     
-    # Create Appfile with real values when available
-    cat > "$TARGET_DIR/ios/fastlane/Appfile" << EOF
+    # Only create files if they don't exist
+    if [ "$files_exist" = false ]; then
+        # Load existing config if available to use real values
+        local config_apple_id="your-apple-id@email.com"
+        local config_team_id="YOUR_TEAM_ID"
+        
+        if [ -f "$TARGET_DIR/project.config" ]; then
+            source "$TARGET_DIR/project.config" 2>/dev/null || true
+            if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" ]]; then
+                config_apple_id="$APPLE_ID"
+            fi
+            if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
+                config_team_id="$TEAM_ID"
+            fi
+        fi
+        
+        # Create Appfile with real values when available
+        cat > "$TARGET_DIR/ios/fastlane/Appfile" << EOF
 # Appfile for $PROJECT_NAME iOS
 # Configuration for App Store Connect and Apple Developer
 
@@ -1158,7 +1167,14 @@ EOF
 </dict>
 </plist>
 EOF
-    print_success "iOS ExportOptions.plist template created"
+        print_success "iOS ExportOptions.plist template created"
+    fi
+    
+    # Always sync project config to fastlane files after creation/check
+    if [ -f "$TARGET_DIR/project.config" ]; then
+        print_info "Syncing project.config values to fastlane files..."
+        auto_sync_project_config
+    fi
     
     echo ""
 }
@@ -2259,8 +2275,8 @@ create_project_config() {
                 # Set flag to allow config updates
                 export PROJECT_CONFIG_USER_APPROVED="true"
                 
-                # Create new config
-                create_new_project_config
+                # Create new config with reset values (don't preserve existing)
+                create_new_project_config "reset"
                 
             elif [[ "$user_choice" == "n" ]]; then
                 print_success "✅ Keeping existing project.config file"
@@ -2285,14 +2301,16 @@ create_project_config() {
 
 # Create new project config file (internal function)
 create_new_project_config() {
-    # Preserve existing values if project.config already exists
+    local reset_mode="$1"  # "reset" means don't preserve existing values
+    
+    # Set default placeholder values
     local existing_team_id="YOUR_TEAM_ID"
     local existing_key_id="YOUR_KEY_ID"
     local existing_issuer_id="YOUR_ISSUER_ID"
     local existing_apple_id="your-apple-id@email.com"
     
-    # Load existing values if config file exists
-    if [[ -f "$TARGET_DIR/project.config" ]]; then
+    # Only preserve existing values if NOT in reset mode and config file exists
+    if [[ "$reset_mode" != "reset" && -f "$TARGET_DIR/project.config" ]]; then
         print_step "Preserving existing credentials from project.config..."
         
         # Source the existing config to get current values
@@ -2318,6 +2336,8 @@ create_new_project_config() {
                 print_info "Preserving APPLE_ID: $existing_apple_id"
             fi
         fi
+    elif [[ "$reset_mode" == "reset" ]]; then
+        print_step "Resetting to default placeholder values..."
     fi
     
     cat > "$TARGET_DIR/project.config" << EOF

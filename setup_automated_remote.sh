@@ -1352,15 +1352,19 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 		exit 1; \
 	fi
 	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Syncing version with store..."
-	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/version_manager.dart smart-bump auto 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version synced with store"; \
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking Google Play Store version..."
+	@if command -v ruby >/dev/null 2>&1 && [ -f "scripts/google_play_version_checker.rb" ]; then \
+		if ruby scripts/google_play_version_checker.rb full 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Google Play Store version checked"; \
+			if [ -f "/tmp/google_play_version.txt" ]; then \
+				PLAY_VERSION=$$(cat /tmp/google_play_version.txt 2>/dev/null || echo "unknown"); \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Next version to upload: $$PLAY_VERSION"; \
+			fi; \
 		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Version sync failed - continuing with current version"; \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Google Play version check failed - continuing with build"; \
 		fi; \
 	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping version sync"; \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Ruby or google_play_version_checker.rb not found - skipping version check"; \
 	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"

@@ -4431,11 +4431,23 @@ run_credential_setup() {
             else
                 print_warning "Some credentials are still missing. Check the setup guides for manual configuration."
             fi
+            return 0
         else
             print_info "Skipping interactive setup. You can run this script again or check the detailed guides."
+            print_info "Setup process stopped by user choice."
+            echo ""
+            print_success "🎯 Basic project structure has been created successfully!"
+            echo ""
+            echo -e "${BLUE}📚 Next steps:${NC}"
+            echo -e "  ${CHECK} Review the generated documentation in docs/"
+            echo -e "  ${CHECK} Set up credentials manually using the guides"
+            echo -e "  ${CHECK} Run this script again when ready to complete setup"
+            echo ""
+            return 1  # Return 1 to indicate user chose to stop
         fi
     else
         print_success "All credentials are already configured!"
+        return 0
     fi
 }
 
@@ -4488,7 +4500,11 @@ main() {
     generate_detailed_setup_guides
     
     # Run credential setup if needed
-    run_credential_setup
+    if ! run_credential_setup; then
+        # User chose to stop the setup process
+        print_info "Setup process completed with basic structure only."
+        exit 0
+    fi
     
     # Show final summary
     show_final_summary

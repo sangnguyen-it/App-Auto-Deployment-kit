@@ -2503,7 +2503,7 @@ copy_automation_scripts() {
     # Copy other essential scripts if available
     if [[ -n "$SOURCE_DIR" && -d "$SOURCE_DIR/scripts" && "$SOURCE_DIR" != "$TARGET_DIR" ]]; then
         print_step "Copying additional automation scripts..."
-        for script_file in "$SOURCE_DIR/scripts"/*.sh "$SOURCE_DIR/scripts"/*.dart; do
+        for script_file in "$SOURCE_DIR/scripts"/*.sh "$SOURCE_DIR/scripts"/*.dart "$SOURCE_DIR/scripts"/*.rb; do
             if [[ -f "$script_file" ]]; then
                 script_name=$(basename "$script_file")
                 if [[ "$script_name" != "setup_automated.sh" ]]; then
@@ -2515,7 +2515,7 @@ copy_automation_scripts() {
     elif [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
         print_step "Downloading additional automation scripts from remote..."
         # Download essential scripts from GitHub
-        local essential_scripts=("common_functions.sh" "integration_test.sh" "quick_setup.sh" "setup_interactive.sh" "version_manager.dart" "build_info_generator.dart")
+        local essential_scripts=("common_functions.sh" "integration_test.sh" "quick_setup.sh" "setup_interactive.sh" "version_manager.dart" "build_info_generator.dart" "flutter_project_analyzer.dart" "version_checker.rb")
         for script_name in "${essential_scripts[@]}"; do
             if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/$script_name" -o "$TARGET_DIR/scripts/$script_name" 2>/dev/null; then
                 print_info "Downloaded $script_name"

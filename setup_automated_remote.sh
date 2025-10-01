@@ -814,8 +814,22 @@ extract_project_info() {
     # Final fallback - generate based on project name
     if [ -z "$PACKAGE_NAME" ]; then
         print_warning "Package name not found, generating from project name"
+        
+        # Ensure PROJECT_NAME has a valid value
+        if [[ -z "$PROJECT_NAME" ]]; then
+            PROJECT_NAME=$(basename "$TARGET_DIR")
+            print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+        fi
+        
         # Create package name from project name (clean and lowercase)
         CLEAN_PROJECT=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | sed 's/__*/_/g' | sed 's/^_\|_$//g')
+        
+        # Ensure CLEAN_PROJECT is not empty
+        if [[ -z "$CLEAN_PROJECT" ]]; then
+            CLEAN_PROJECT="flutter_app"
+            print_warning "Using fallback clean project name: $CLEAN_PROJECT"
+        fi
+        
         PACKAGE_NAME="com.${CLEAN_PROJECT}.app"
         print_info "Generated package name: $PACKAGE_NAME"
     fi
@@ -1141,7 +1155,19 @@ EOF
     print_success "Android Fastfile created and customized"
     
     # Create key.properties template with dynamic project name
+    # Ensure PROJECT_NAME has a valid value
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME=$(basename "$TARGET_DIR")
+        print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+    fi
+    
     CLEAN_PROJECT_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | sed 's/__*/_/g' | sed 's/^_\|_$//g')
+    
+    # Ensure CLEAN_PROJECT_NAME is not empty
+    if [[ -z "$CLEAN_PROJECT_NAME" ]]; then
+        CLEAN_PROJECT_NAME="flutter_app"
+        print_warning "Using fallback clean project name: $CLEAN_PROJECT_NAME"
+    fi
     cat > "$TARGET_DIR/android/key.properties.template" << EOF
 # Android signing configuration template for $PROJECT_NAME
 # Copy this to key.properties and update with your keystore information
@@ -2174,17 +2200,43 @@ create_makefile() {
         create_comprehensive_makefile
     fi
     
+    # Ensure PROJECT_NAME has a valid value before replacement
+    if [[ -z "$PROJECT_NAME" ]]; then
+        # Try to extract from pubspec.yaml again
+        if [[ -f "$TARGET_DIR/pubspec.yaml" ]]; then
+            PROJECT_NAME=$(grep "^name:" "$TARGET_DIR/pubspec.yaml" | cut -d':' -f2 | tr -d ' ' | tr -d '"')
+        fi
+        
+        # If still empty, use directory name as fallback
+        if [[ -z "$PROJECT_NAME" ]]; then
+            PROJECT_NAME=$(basename "$TARGET_DIR")
+            print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+        fi
+    fi
+    
+    # Create safe package name (lowercase, no spaces, no special chars)
+    SAFE_PACKAGE_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | sed 's/[^a-z0-9-]//g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
+    
+    # Ensure we have a valid package name
+    if [[ -z "$SAFE_PACKAGE_NAME" ]]; then
+        SAFE_PACKAGE_NAME="flutter-app"
+        print_warning "Using fallback package name: $SAFE_PACKAGE_NAME"
+    fi
+    
+    print_info "Using PROJECT_NAME: $PROJECT_NAME"
+    print_info "Using SAFE_PACKAGE_NAME: $SAFE_PACKAGE_NAME"
+    
     # Customize Makefile with project-specific values
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' "s/PROJECT_NAME := PROJECT_PLACEHOLDER/PROJECT_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i '' "s/PACKAGE_NAME := PACKAGE_PLACEHOLDER/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
         sed -i '' "s/APP_NAME := APP_PLACEHOLDER/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i '' "s/PACKAGE := PACKAGE_PLACEHOLDER/PACKAGE := $(echo "$PROJECT_NAME" | tr ' ' '-')/g" "$TARGET_DIR/Makefile"
+        sed -i '' "s/PACKAGE := PACKAGE_PLACEHOLDER/PACKAGE := $SAFE_PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
     else
         sed -i "s/PROJECT_NAME := PROJECT_PLACEHOLDER/PROJECT_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i "s/PACKAGE_NAME := PACKAGE_PLACEHOLDER/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
         sed -i "s/APP_NAME := APP_PLACEHOLDER/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i "s/PACKAGE := PACKAGE_PLACEHOLDER/PACKAGE := $(echo "$PROJECT_NAME" | tr ' ' '-')/g" "$TARGET_DIR/Makefile"
+        sed -i "s/PACKAGE := PACKAGE_PLACEHOLDER/PACKAGE := $SAFE_PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
     fi
     
     print_success "Customized Makefile created"
@@ -3129,7 +3181,19 @@ generate_env_config() {
     
     local env_config_path="$TARGET_DIR/.env.example"
     
+    # Ensure PROJECT_NAME has a valid value
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME=$(basename "$TARGET_DIR")
+        print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+    fi
+    
     CLEAN_PROJECT_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | sed 's/__*/_/g' | sed 's/^_\|_$//g')
+    
+    # Ensure CLEAN_PROJECT_NAME is not empty
+    if [[ -z "$CLEAN_PROJECT_NAME" ]]; then
+        CLEAN_PROJECT_NAME="flutter_app"
+        print_warning "Using fallback clean project name: $CLEAN_PROJECT_NAME"
+    fi
     cat > "$env_config_path" << EOF
 # Environment Configuration for $PROJECT_NAME
 # Generated on: $(date)
@@ -3789,7 +3853,19 @@ collect_android_credentials() {
     # Check for keystore
     local keystore_found=false
     # Convert project name to lowercase for keystore filename
+    # Ensure PROJECT_NAME has a valid value
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME=$(basename "$TARGET_DIR")
+        print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+    fi
+    
     local project_lower=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]')
+    
+    # Ensure project_lower is not empty
+    if [[ -z "$project_lower" ]]; then
+        project_lower="flutter_app"
+        print_warning "Using fallback project name: $project_lower"
+    fi
     local keystore_files=(
         "$TARGET_DIR/android/app/app.keystore"
         "$TARGET_DIR/android/app/${project_lower}-release.keystore"
@@ -3913,7 +3989,19 @@ create_android_keystore() {
     print_step "Creating Android keystore..."
     
     # Convert project name to lowercase for keystore filename
+    # Ensure PROJECT_NAME has a valid value
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME=$(basename "$TARGET_DIR")
+        print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+    fi
+    
     local project_lower=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]')
+    
+    # Ensure project_lower is not empty
+    if [[ -z "$project_lower" ]]; then
+        project_lower="flutter_app"
+        print_warning "Using fallback project name: $project_lower"
+    fi
     local keystore_path="$TARGET_DIR/android/app/app.keystore"
     
     echo -e "${CYAN}Creating keystore for: $PROJECT_NAME${NC}"

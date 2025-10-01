@@ -320,6 +320,59 @@ is_cicd_source_directory() {
     return 1
 }
 
+# Detect scripts directory dynamically
+detect_scripts_directory() {
+    local base_dir="${1:-$(pwd)}"
+    
+    # If SOURCE_DIR is available and has scripts, use it
+    if [[ -n "$SOURCE_DIR" && -d "$SOURCE_DIR/scripts" ]]; then
+        echo "$SOURCE_DIR/scripts"
+        return 0
+    fi
+    
+    # Search in common locations relative to base directory
+    local potential_dirs=(
+        "$base_dir/scripts"
+        "$(dirname "$base_dir")/scripts"
+        "$base_dir/../scripts"
+        "$base_dir/../../scripts"
+    )
+    
+    # Add common development paths
+    if [[ -n "$HOME" ]]; then
+        potential_dirs+=(
+            "$HOME/Development/*/scripts"
+            "$HOME/Projects/*/scripts"
+            "$HOME/workspace/*/scripts"
+        )
+    fi
+    
+    # Search in /Volumes for macOS development setups
+    if [[ -d "/Volumes" ]]; then
+        potential_dirs+=(
+            "/Volumes/*/Development/*/scripts"
+            "/Volumes/*/Projects/*/scripts"
+            "/Volumes/*/*/scripts"
+        )
+    fi
+    
+    # Find first existing directory with required scripts
+    for dir_pattern in "${potential_dirs[@]}"; do
+        # Handle glob patterns
+        for dir in $dir_pattern; do
+            if [[ -d "$dir" ]]; then
+                # Check if it has essential scripts
+                if [[ -f "$dir/setup.sh" ]] || [[ -f "$dir/auto_deploy_setup.sh" ]] || [[ -f "$dir/version_manager.dart" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+            fi
+        done
+    done
+    
+    return 1
+}
+
 PROJECT_NAME=""
 BUNDLE_ID=""
 PACKAGE_NAME=""
@@ -1443,7 +1496,7 @@ PROJECT_NAME := PROJECT_PLACEHOLDER
 APP_NAME := APP_PLACEHOLDER
 FLUTTER_VERSION := stable
 PACKAGE_NAME := PACKAGE_PLACEHOLDER
-PACKAGE := $(PROJECT_NAME)
+PACKAGE := PACKAGE_PLACEHOLDER
 
 # Version Configuration
 VERSION_FULL := $(shell grep "^version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
@@ -2178,21 +2231,15 @@ create_makefile() {
     
     # Customize Makefile with project-specific values
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s/PROJECT_NAME := TrackAsia Live/PROJECT_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i '' "s/PROJECT_NAME := PROJECT_PLACEHOLDER/PROJECT_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i '' "s/PACKAGE_NAME := com.trackasia.live/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
         sed -i '' "s/PACKAGE_NAME := PACKAGE_PLACEHOLDER/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i '' "s/APP_NAME := trackasiamap/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i '' "s/APP_NAME := APP_PLACEHOLDER/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i '' "s/PACKAGE := TrackAsia-Live/PACKAGE := $(echo "$PROJECT_NAME" | tr ' ' '-')/g" "$TARGET_DIR/Makefile"
+        sed -i '' "s/PACKAGE := PACKAGE_PLACEHOLDER/PACKAGE := $(echo "$PROJECT_NAME" | tr ' ' '-')/g" "$TARGET_DIR/Makefile"
     else
-        sed -i "s/PROJECT_NAME := TrackAsia Live/PROJECT_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i "s/PROJECT_NAME := PROJECT_PLACEHOLDER/PROJECT_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i "s/PACKAGE_NAME := com.trackasia.live/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
         sed -i "s/PACKAGE_NAME := PACKAGE_PLACEHOLDER/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i "s/APP_NAME := trackasiamap/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i "s/APP_NAME := APP_PLACEHOLDER/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i "s/PACKAGE := TrackAsia-Live/PACKAGE := $(echo "$PROJECT_NAME" | tr ' ' '-')/g" "$TARGET_DIR/Makefile"
+        sed -i "s/PACKAGE := PACKAGE_PLACEHOLDER/PACKAGE := $(echo "$PROJECT_NAME" | tr ' ' '-')/g" "$TARGET_DIR/Makefile"
     fi
     
     print_success "Customized Makefile created"
@@ -2728,24 +2775,29 @@ copy_automation_scripts() {
         cp "$SOURCE_DIR/scripts/setup_automated.sh" "$TARGET_DIR/scripts/" 2>/dev/null || true
         print_success "Copied legacy script from: $SOURCE_DIR/scripts/"
     else
-        print_step "Downloading optimized setup scripts from remote repository..."
-        # Download optimized scripts from GitHub
-        if command -v curl >/dev/null 2>&1; then
-            # Try to download optimized scripts first
-            if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/setup.sh" -o "$TARGET_DIR/scripts/setup.sh" 2>/dev/null && \
-               curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/common_functions.sh" -o "$TARGET_DIR/scripts/common_functions.sh" 2>/dev/null; then
-                print_success "Downloaded optimized setup scripts from remote repository"
+        print_step "Using local setup scripts from project repository..."
+        # Use local scripts from the project repository
+        local local_scripts_dir
+        local_scripts_dir=$(detect_scripts_directory "$TARGET_DIR")
+        
+        if [[ -d "$local_scripts_dir" ]]; then
+            # Copy optimized scripts from local repository
+            if [[ -f "$local_scripts_dir/setup.sh" ]] && [[ -f "$local_scripts_dir/common_functions.sh" ]]; then
+                cp "$local_scripts_dir/setup.sh" "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
+                cp "$local_scripts_dir/common_functions.sh" "$TARGET_DIR/scripts/common_functions.sh" 2>/dev/null || true
+                print_success "Copied optimized setup scripts from local repository"
                 chmod +x "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
-            # Fallback to legacy script
-            elif curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/setup_automated.sh" -o "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null; then
-                print_success "Downloaded legacy setup script from remote repository"
+            # Fallback to other available scripts
+            elif [[ -f "$local_scripts_dir/auto_deploy_setup.sh" ]]; then
+                cp "$local_scripts_dir/auto_deploy_setup.sh" "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
+                print_success "Copied setup script from local repository"
                 chmod +x "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
             else
-                print_error "Failed to download setup scripts from remote repository"
+                print_error "No suitable setup scripts found in local repository"
                 return 1
             fi
         else
-            print_error "curl not available - cannot download setup scripts"
+            print_error "Local scripts directory not found: $local_scripts_dir"
             return 1
         fi
     fi
@@ -2765,21 +2817,31 @@ copy_automation_scripts() {
         done
         print_success "Additional scripts copied"
     elif [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
-        print_step "Downloading additional automation scripts from remote..."
-        # Download essential scripts from GitHub (optimized list)
-        local essential_scripts=("version_manager.dart" "build_info_generator.dart")
-        for script_name in "${essential_scripts[@]}"; do
-            if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/$script_name" -o "$TARGET_DIR/scripts/$script_name" 2>/dev/null; then
-                print_info "Downloaded $script_name"
-                # Set execute permissions for Dart scripts
-                if [[ "$script_name" == *.dart ]]; then
-                    chmod +x "$TARGET_DIR/scripts/$script_name" 2>/dev/null || true
+        print_step "Copying additional automation scripts from local repository..."
+        # Copy essential scripts from local repository
+        local local_scripts_dir
+        local_scripts_dir=$(detect_scripts_directory "$TARGET_DIR")
+        
+        if [[ -d "$local_scripts_dir" ]]; then
+            # Copy all available scripts from local repository
+            for script_file in "$local_scripts_dir"/*.sh "$local_scripts_dir"/*.dart "$local_scripts_dir"/*.rb; do
+                if [[ -f "$script_file" ]]; then
+                    script_name=$(basename "$script_file")
+                    # Skip setup scripts as they're handled separately
+                    if [[ "$script_name" != "setup_automated.sh" && "$script_name" != "setup.sh" && "$script_name" != "auto_deploy_setup.sh" ]]; then
+                        cp "$script_file" "$TARGET_DIR/scripts/" 2>/dev/null || true
+                        print_info "Copied: $script_name"
+                        # Set execute permissions for scripts
+                        if [[ "$script_name" == *.sh || "$script_name" == *.dart ]]; then
+                            chmod +x "$TARGET_DIR/scripts/$script_name" 2>/dev/null || true
+                        fi
+                    fi
                 fi
-            else
-                print_warning "Could not download $script_name (optional)"
-            fi
-        done
-        print_success "Essential scripts downloaded"
+            done
+            print_success "Essential scripts copied from local repository"
+        else
+            print_warning "Local scripts directory not found, skipping additional scripts"
+        fi
     fi
     
     print_success "Automation scripts are now available"

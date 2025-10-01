@@ -75,7 +75,7 @@ EOF
 # Android setup
 mkdir -p "$TARGET_DIR/android/fastlane"
 cat > "$TARGET_DIR/android/fastlane/Fastfile" << EOF
-fastlane_version "2.210.1"
+fastlane_version "2.228.0"
 default_platform(:android)
 
 platform :android do
@@ -98,8 +98,19 @@ EOF
 # iOS setup
 mkdir -p "$TARGET_DIR/ios/fastlane" "$TARGET_DIR/ios/private_keys"
 cat > "$TARGET_DIR/ios/fastlane/Fastfile" << EOF
-fastlane_version "2.210.1"
+fastlane_version "2.228.0"
 default_platform(:ios)
+
+# Disable update checker to prevent initialization issues
+ENV["FASTLANE_SKIP_UPDATE_CHECK"] = "1"
+
+# Error handling for FastlaneCore issues
+begin
+  require 'fastlane'
+rescue LoadError => e
+  UI.error("Failed to load Fastlane: #{e.message}")
+  exit(1)
+end
 
 PROJECT_NAME = "$PROJECT_NAME"
 BUNDLE_ID = "$BUNDLE_ID"

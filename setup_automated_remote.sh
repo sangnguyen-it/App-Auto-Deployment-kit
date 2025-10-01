@@ -1,7 +1,7 @@
 #!/bin/bash
 # Automated Setup - Complete CI/CD Integration Script
 # Automatically integrates complete CI/CD pipeline into any Flutter project
-# Usage: ./setup_automated.sh [TARGET_PROJECT_PATH]
+# Usage: ./setup_automated_remote.sh [TARGET_PROJECT_PATH]
 
 # Exit on error, but handle curl download gracefully
 set -e
@@ -361,8 +361,23 @@ detect_scripts_directory() {
         # Handle glob patterns
         for dir in $dir_pattern; do
             if [[ -d "$dir" ]]; then
-                # Check if it has essential scripts
-                if [[ -f "$dir/setup.sh" ]] || [[ -f "$dir/auto_deploy_setup.sh" ]] || [[ -f "$dir/version_manager.dart" ]]; then
+                # Priority 1: New optimized structure (setup.sh + common_functions.sh)
+                if [[ -f "$dir/setup.sh" && -f "$dir/common_functions.sh" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+                # Priority 2: New structure with build_info_generator.dart
+                if [[ -f "$dir/setup.sh" && -f "$dir/build_info_generator.dart" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+                # Priority 3: Old structure compatibility
+                if [[ -f "$dir/auto_deploy_setup.sh" ]] || [[ -f "$dir/setup_automated.sh" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+                # Priority 4: Basic scripts with version_manager.dart
+                if [[ -f "$dir/version_manager.dart" ]]; then
                     echo "$dir"
                     return 0
                 fi
@@ -751,7 +766,7 @@ validate_target_directory() {
         for location in "${search_locations[@]}"; do
             if [[ -f "$location/pubspec.yaml" ]]; then
                 print_success "Found pubspec.yaml at: $location"
-                print_info "Try running: cd '$location' && ./scripts/setup.sh . (or ./scripts/setup_automated.sh . for legacy)"
+                print_info "Try running: cd '$location' && ./scripts/setup.sh . (recommended) or ./scripts/setup_automated.sh . (legacy)"
             else
                 print_info "Not found in: $location"
             fi
@@ -762,7 +777,7 @@ validate_target_directory() {
         echo "  1. Navigate to your Flutter project root directory"
         echo "  2. Make sure pubspec.yaml exists in the target directory"
         echo "  3. Run: find . -name 'pubspec.yaml' -type f"
-        echo "  4. Use absolute path: ./scripts/setup.sh /full/path/to/project (or ./scripts/setup_automated.sh for legacy)"
+        echo "  4. Use absolute path: ./scripts/setup.sh /full/path/to/project (recommended) or ./scripts/setup_automated.sh /full/path/to/project (legacy)"
         
         exit 1
     fi
@@ -2787,10 +2802,20 @@ copy_automation_scripts() {
                 cp "$local_scripts_dir/common_functions.sh" "$TARGET_DIR/scripts/common_functions.sh" 2>/dev/null || true
                 print_success "Copied optimized setup scripts from local repository"
                 chmod +x "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
-            # Fallback to other available scripts
+            # Fallback to setup.sh with build_info_generator.dart
+            elif [[ -f "$local_scripts_dir/setup.sh" ]] && [[ -f "$local_scripts_dir/build_info_generator.dart" ]]; then
+                cp "$local_scripts_dir/setup.sh" "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
+                cp "$local_scripts_dir/build_info_generator.dart" "$TARGET_DIR/scripts/build_info_generator.dart" 2>/dev/null || true
+                print_success "Copied setup script with build generator from local repository"
+                chmod +x "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
+            # Fallback to legacy scripts if available
             elif [[ -f "$local_scripts_dir/auto_deploy_setup.sh" ]]; then
                 cp "$local_scripts_dir/auto_deploy_setup.sh" "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
-                print_success "Copied setup script from local repository"
+                print_success "Copied legacy setup script from local repository"
+                chmod +x "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
+            elif [[ -f "$local_scripts_dir/setup_automated.sh" ]]; then
+                cp "$local_scripts_dir/setup_automated.sh" "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
+                print_success "Copied legacy setup script from local repository"
                 chmod +x "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
             else
                 print_error "No suitable setup scripts found in local repository"

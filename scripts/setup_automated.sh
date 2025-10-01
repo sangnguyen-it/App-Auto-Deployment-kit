@@ -1270,7 +1270,7 @@ menu: ## PROJECT_PLACEHOLDER - Automated Build & Deploy System
 	@printf "$(PURPLE)$(BOLD)Current Project Status:$(NC)\n"
 	@printf "$(WHITE)  📱 Project:$(NC)   $(CYAN)$(PROJECT_NAME)$(NC)\n"
 	@printf "$(WHITE)  📦 Package:$(NC)   $(CYAN)$(PACKAGE_NAME)$(NC)\n"
-	@printf "$(WHITE)  🔢 Version:$(NC)   $(CYAN)%s$(NC)\n" "$$(grep "version:" pubspec.yaml | cut -d' ' -f2 2>/dev/null || echo 'unknown')"
+	@printf "$(WHITE)  🔢 Version:$(NC)   $(CYAN)$(VERSION_FULL)$(NC)\n"
 	@printf "$(WHITE)  💻 Flutter:$(NC)   $(CYAN)%s$(NC)\n" "$$(flutter --version | head -1 | cut -d' ' -f2 2>/dev/null || echo 'unknown')"
 	@printf "\n"
 	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
@@ -1639,7 +1639,7 @@ doctor: ## Run comprehensive health checks and diagnostics
 	@printf "$(PURPLE)$(BOLD)Project Details:$(NC)\n"
 	@printf "$(WHITE)  $(PHONE) Name:$(NC)          $(CYAN)$(PROJECT_NAME)$(NC)\n"
 	@printf "$(WHITE)  $(PACKAGE) Package:$(NC)       $(CYAN)$(PACKAGE_NAME)$(NC)\n"
-	@printf "$(WHITE)  $(SPARKLES) Version:$(NC)       $(CYAN)%s$(NC)\n" "$$(grep "version:" pubspec.yaml | cut -d' ' -f2)"
+	@printf "$(WHITE)  $(SPARKLES) Version:$(NC)       $(CYAN)$(VERSION_FULL)$(NC)\n"
 	@printf "$(WHITE)  $(COMPUTER) Flutter:$(NC)       $(CYAN)%s$(NC)\n" "$$(flutter --version | head -1 | cut -d' ' -f2)"
 	@printf "\n"
 

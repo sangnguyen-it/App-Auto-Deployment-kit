@@ -1232,14 +1232,19 @@ FLUTTER_VERSION := stable
 PACKAGE_NAME := PACKAGE_PLACEHOLDER
 PACKAGE := $(PROJECT_NAME)
 
+# Version Configuration
+VERSION_FULL := $(shell grep "^version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
+VERSION_NAME := $(shell echo $(VERSION_FULL) | cut -d'+' -f1)
+VERSION_CODE := $(shell echo $(VERSION_FULL) | cut -d'+' -f2)
+
 # Output Configuration
 OUTPUT_DIR := builder
-APK_NAME := $(PACKAGE)-release.apk
-AAB_NAME := $(PACKAGE)-production.aab
-IPA_NAME := $(PACKAGE)-release.ipa
-IPA_PROD_NAME := $(PACKAGE)-production.ipa
-ARCHIVE_NAME := $(PACKAGE)-release.xcarchive
-ARCHIVE_PROD_NAME := $(PACKAGE)-production.xcarchive
+APK_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-release.apk
+AAB_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-production.aab
+IPA_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-release.ipa
+IPA_PROD_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-production.ipa
+ARCHIVE_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-release.xcarchive
+ARCHIVE_PROD_NAME := $(PACKAGE)-v$(VERSION_NAME)-$(VERSION_CODE)-production.xcarchive
 
 # Enhanced Colors and Styles
 RED := \033[0;31m
@@ -1287,7 +1292,7 @@ menu: ## PROJECT_PLACEHOLDER - Automated Build & Deploy System
 	@printf "$(PURPLE)$(BOLD)Current Project Status:$(NC)\n"
 	@printf "$(WHITE)  📱 Project:$(NC)   $(CYAN)$(PROJECT_NAME)$(NC)\n"
 	@printf "$(WHITE)  📦 Package:$(NC)   $(CYAN)$(PACKAGE_NAME)$(NC)\n"
-	@printf "$(WHITE)  🔢 Version:$(NC)   $(CYAN)%s$(NC)\n" "$$(grep "version:" pubspec.yaml | cut -d' ' -f2 2>/dev/null || echo 'unknown')"
+	@printf "$(WHITE)  🔢 Version:$(NC)   $(CYAN)$(VERSION_FULL)$(NC)\n"
 	@printf "$(WHITE)  💻 Flutter:$(NC)   $(CYAN)%s$(NC)\n" "$$(flutter --version | head -1 | cut -d' ' -f2 2>/dev/null || echo 'unknown')"
 	@printf "\n"
 	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
@@ -1347,9 +1352,31 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 		exit 1; \
 	fi
 	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Syncing version with store..."
+	@if command -v dart >/dev/null 2>&1; then \
+		if dart scripts/version_manager.dart smart-bump auto 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version synced with store"; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Version sync failed - continuing with current version"; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping version sync"; \
+	fi
+	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
 	@mkdir -p $(OUTPUT_DIR)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
+	@if command -v dart >/dev/null 2>&1; then \
+		if dart scripts/build_info_generator.dart 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Build information generated"; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Build info generation failed - continuing"; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping build info generation"; \
+	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building Android APK for Testing"
 	@flutter clean && flutter pub get
@@ -1453,9 +1480,31 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 		exit 1; \
 	fi
 	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Syncing version with store..."
+	@if command -v dart >/dev/null 2>&1; then \
+		if dart scripts/version_manager.dart smart-bump auto 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version synced with store"; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Version sync failed - continuing with current version"; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping version sync"; \
+	fi
+	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
 	@mkdir -p $(OUTPUT_DIR)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
+	@if command -v dart >/dev/null 2>&1; then \
+		if dart scripts/build_info_generator.dart 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Build information generated"; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Build info generation failed - continuing"; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping build info generation"; \
+	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building Android AAB for Google Play Production"
 	@flutter clean && flutter pub get
@@ -1656,7 +1705,7 @@ doctor: ## Run comprehensive health checks and diagnostics
 	@printf "$(PURPLE)$(BOLD)Project Details:$(NC)\n"
 	@printf "$(WHITE)  $(PHONE) Name:$(NC)          $(CYAN)$(PROJECT_NAME)$(NC)\n"
 	@printf "$(WHITE)  $(PACKAGE) Package:$(NC)       $(CYAN)$(PACKAGE_NAME)$(NC)\n"
-	@printf "$(WHITE)  $(SPARKLES) Version:$(NC)       $(CYAN)%s$(NC)\n" "$$(grep "version:" pubspec.yaml | cut -d' ' -f2)"
+	@printf "$(WHITE)  $(SPARKLES) Version:$(NC)       $(CYAN)$(VERSION_FULL)$(NC)\n"
 	@printf "$(WHITE)  $(COMPUTER) Flutter:$(NC)       $(CYAN)%s$(NC)\n" "$$(flutter --version | head -1 | cut -d' ' -f2)"
 	@printf "\n"
 
@@ -2466,7 +2515,7 @@ copy_automation_scripts() {
     elif [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
         print_step "Downloading additional automation scripts from remote..."
         # Download essential scripts from GitHub
-        local essential_scripts=("common_functions.sh" "integration_test.sh" "quick_setup.sh" "setup_interactive.sh")
+        local essential_scripts=("common_functions.sh" "integration_test.sh" "quick_setup.sh" "setup_interactive.sh" "version_manager.dart" "build_info_generator.dart")
         for script_name in "${essential_scripts[@]}"; do
             if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/$script_name" -o "$TARGET_DIR/scripts/$script_name" 2>/dev/null; then
                 print_info "Downloaded $script_name"

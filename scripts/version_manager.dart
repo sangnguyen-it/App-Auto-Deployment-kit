@@ -182,22 +182,6 @@ String getCurrentVersion() {
   return versionMatch.group(1)!.trim();
 }
 
-String getProjectName() {
-  final pubspec = File('pubspec.yaml');
-  if (!pubspec.existsSync()) {
-    return 'Flutter Project'; // Fallback if pubspec.yaml not found
-  }
-
-  final content = pubspec.readAsStringSync();
-  final nameMatch = RegExp(r'name:\s*(.+)').firstMatch(content);
-
-  if (nameMatch == null) {
-    return 'Flutter Project'; // Fallback if name not found
-  }
-
-  return nameMatch.group(1)!.trim().replaceAll('"', '');
-}
-
 String calculateNextVersion(String current, String type) {
   final parts = current.split('+');
   final versionPart = parts[0];
@@ -253,7 +237,7 @@ Future<String?> getStoreVersion() async {
     // Run Ruby script to get store version
     final result = await Process.run(
       'ruby',
-      ['scripts/version_checker.rb', 'all'],
+      ['scripts/store_version_checker.rb', 'all'],
       workingDirectory: Directory.current.path,
     );
 
@@ -332,23 +316,61 @@ Future<void> smartBump([String type = 'auto']) async {
     print('=====================================');
     print('');
 
-    // First compare with store
-    await compareWithStore();
-
-    // Then proceed with normal bump if needed
+    // Get current local version
     final current = getCurrentVersion();
-    final storeVersion = await getStoreVersion();
+    print('📱 Current local version: $current');
 
-    if (storeVersion != null) {
-      final comparison = compareVersions(current, storeVersion);
-      if (comparison == VersionComparison.lower) {
-        print('✅ Version already updated based on store comparison');
-        return;
+    // Get store versions
+    final appStoreVersion = await getStoreVersion();
+    final playStoreVersion = await getGooglePlayVersion();
+
+    print('🍎 App Store version: ${appStoreVersion ?? 'Unknown'}');
+    print('🤖 Google Play version: ${playStoreVersion ?? 'Unknown'}');
+    print('');
+
+    // Find highest store version
+    final storeVersions = [appStoreVersion, playStoreVersion].whereType<String>().toList();
+
+    if (storeVersions.isNotEmpty) {
+      // Get highest version from all stores
+      final highestStoreVersion = storeVersions.reduce((a, b) {
+        final comparison = compareVersions(a, b);
+        return comparison == VersionComparison.higher ? a : b;
+      });
+
+      print('🏆 Highest store version: $highestStoreVersion');
+
+      // Compare with highest store version
+      final comparison = compareVersions(current, highestStoreVersion);
+
+      switch (comparison) {
+        case VersionComparison.higher:
+          print('✅ Local version is HIGHER than store versions');
+          print('💡 Safe to proceed with current version');
+          break;
+        case VersionComparison.equal:
+          print('⚠️  Local version is EQUAL to store version');
+          print('🚀 Auto-incrementing build number for next release');
+          final nextVersion = calculateNextVersionFromStore(highestStoreVersion);
+          updatePubspecVersion(nextVersion);
+          print('✅ Version updated to: $nextVersion');
+          return;
+        case VersionComparison.lower:
+          print('❌ Local version is LOWER than store versions');
+          print('🚨 Auto-fixing version conflict!');
+          final nextVersion = calculateNextVersionFromStore(highestStoreVersion);
+          updatePubspecVersion(nextVersion);
+          print('✅ Version updated to: $nextVersion');
+          return;
       }
+    } else {
+      print('⚠️  No store versions available, using local bump logic');
     }
 
-    // Normal bump logic
-    await bumpVersion(type);
+    // Only do manual bump if local version is higher than store
+    if (type != 'auto') {
+      await bumpVersion(type);
+    }
   } catch (e) {
     print('❌ Error in smart version bump: $e');
     exit(1);
@@ -531,5 +553,26 @@ Future<String?> getGooglePlayVersion() async {
   } catch (e) {
     print('⚠️  Error getting Google Play version: $e');
     return null;
+  }
+}
+
+// Helper function to get project name from pubspec.yaml
+String getProjectName() {
+  try {
+    final pubspec = File('pubspec.yaml');
+    if (!pubspec.existsSync()) {
+      return 'Flutter Project';
+    }
+
+    final content = pubspec.readAsStringSync();
+    final nameMatch = RegExp(r'name:\s*(.+)').firstMatch(content);
+
+    if (nameMatch != null) {
+      return nameMatch.group(1)!.trim();
+    }
+
+    return 'Flutter Project';
+  } catch (e) {
+    return 'Flutter Project';
   }
 }

@@ -337,6 +337,131 @@ print_separator() {
     echo -e "${GRAY}─────────────────────────────────────────────────────────────────${NC}"
 }
 
+# Function to prompt user for production version
+prompt_production_version() {
+    local platform="$1"
+    local current_version="$2"
+    local production_version=""
+    
+    print_warning "Không thể lấy version từ $platform store"
+    echo -e "${CYAN}${INFO} Version hiện tại trong project: ${WHITE}$current_version${NC}"
+    echo ""
+    
+    while true; do
+        if [[ -t 0 ]]; then
+            read -p "$(echo -e "${YELLOW}Vui lòng nhập version production hiện tại trên $platform store: ${NC}")" production_version
+        else
+            # For non-interactive mode, use current version as fallback
+            production_version="$current_version"
+            print_info "Chế độ non-interactive: sử dụng version hiện tại ($current_version)"
+            break
+        fi
+        
+        if [[ -n "$production_version" ]]; then
+            # Validate version format (basic check)
+            if [[ "$production_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\+[0-9]+)?$ ]]; then
+                break
+            else
+                print_error "Format version không hợp lệ. Vui lòng sử dụng format: x.y.z hoặc x.y.z+build"
+            fi
+        else
+            print_error "Version không được để trống"
+        fi
+    done
+    
+    echo "$production_version"
+}
+
+# Function to save version to changelog
+save_to_changelog() {
+    local version="$1"
+    local platform="$2"
+    local changelog_file="CHANGELOG.md"
+    local temp_file="/tmp/changelog_temp.md"
+    
+    # Create changelog if it doesn't exist
+    if [ ! -f "$changelog_file" ]; then
+        cat > "$changelog_file" << EOF
+# Changelog
+
+Tất cả các thay đổi quan trọng của project sẽ được ghi lại trong file này.
+
+EOF
+        print_success "Đã tạo file changelog mới: $changelog_file"
+    fi
+    
+    # Prepare new entry
+    local date_str=$(date '+%Y-%m-%d %H:%M:%S')
+    local new_entry="## [$version] - $date_str - $platform Release"
+    
+    # Check if this version already exists in changelog
+    if grep -q "## \[$version\]" "$changelog_file"; then
+        print_info "Version $version đã tồn tại trong changelog"
+        return 0
+    fi
+    
+    # Add new entry to changelog
+    {
+        head -n 3 "$changelog_file"
+        echo ""
+        echo "$new_entry"
+        echo ""
+        echo "### Added"
+        echo "- Production release version $version for $platform"
+        echo ""
+        tail -n +4 "$changelog_file"
+    } > "$temp_file"
+    
+    mv "$temp_file" "$changelog_file"
+    print_success "Đã lưu version $version vào changelog cho $platform"
+}
+
+# Function to get production version with fallback to user input
+get_production_version() {
+    local platform="$1"
+    local current_version="$2"
+    local store_version=""
+    local production_version=""
+    
+    case "$platform" in
+        "Android"|"Google Play")
+            # Try to get from Google Play Store
+            if command -v ruby >/dev/null 2>&1 && [ -f "scripts/google_play_version_checker.rb" ]; then
+                if ruby scripts/google_play_version_checker.rb simple 2>/dev/null; then
+                    if [ -f "/tmp/google_play_version.txt" ]; then
+                        store_version=$(cat /tmp/google_play_version.txt 2>/dev/null | head -1)
+                        if [ -n "$store_version" ] && [ "$store_version" != "unknown" ] && [ "$store_version" != "1.0.0" ]; then
+                            print_success "Đã lấy version từ Google Play Store: $store_version"
+                            production_version="$store_version"
+                        fi
+                    fi
+                fi
+            fi
+            ;;
+        "iOS"|"App Store")
+            # Try to get from App Store
+            if command -v ruby >/dev/null 2>&1 && [ -f "scripts/store_version_checker.rb" ]; then
+                if ruby scripts/store_version_checker.rb simple 2>/dev/null; then
+                    if [ -f "/tmp/app_store_version.txt" ]; then
+                        store_version=$(cat /tmp/app_store_version.txt 2>/dev/null | head -1)
+                        if [ -n "$store_version" ] && [ "$store_version" != "unknown" ] && [ "$store_version" != "1.0.0" ]; then
+                            print_success "Đã lấy version từ App Store: $store_version"
+                            production_version="$store_version"
+                        fi
+                    fi
+                fi
+            fi
+            ;;
+    esac
+    
+    # If couldn't get from store, prompt user
+    if [ -z "$production_version" ]; then
+        production_version=$(prompt_production_version "$platform" "$current_version")
+    fi
+    
+    echo "$production_version"
+}
+
 # Check and fix Bundler version issues
 check_and_fix_bundler_version() {
     print_step "Checking Bundler version compatibility..."
@@ -584,9 +709,67 @@ extract_project_info() {
     PROJECT_NAME=$(grep "^name:" pubspec.yaml | cut -d':' -f2 | tr -d ' ' | tr -d '"')
     print_success "Project name: $PROJECT_NAME"
     
-    # Extract version
-    CURRENT_VERSION=$(grep "^version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
-    print_success "Current version: $CURRENT_VERSION"
+    # Extract version - prioritize platform-specific files over pubspec.yaml
+    ANDROID_VERSION=""
+    IOS_VERSION=""
+    PUBSPEC_VERSION=""
+    PRODUCTION_VERSION=""
+    
+    # Try to get Android version from build files
+    if [ -f "android/app/build.gradle.kts" ]; then
+        ANDROID_VERSION=$(grep -E 'versionName\s*=' "android/app/build.gradle.kts" | sed 's/.*versionName = "\([^"]*\)".*/\1/' | head -1)
+        if [ -n "$ANDROID_VERSION" ]; then
+            print_success "Android version (build.gradle.kts): $ANDROID_VERSION"
+        fi
+    fi
+    
+    # Fallback to build.gradle for Android
+    if [ -z "$ANDROID_VERSION" ] && [ -f "android/app/build.gradle" ]; then
+        ANDROID_VERSION=$(grep -E 'versionName\s*' "android/app/build.gradle" | sed 's/.*versionName "\([^"]*\)".*/\1/' | head -1)
+        if [ -n "$ANDROID_VERSION" ]; then
+            print_success "Android version (build.gradle): $ANDROID_VERSION"
+        fi
+    fi
+    
+    # Try to get iOS version from Info.plist
+    if [ -f "ios/Runner/Info.plist" ]; then
+        IOS_VERSION=$(grep -A1 "CFBundleShortVersionString" "ios/Runner/Info.plist" | tail -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | tr -d ' ')
+        if [ -n "$IOS_VERSION" ] && [ "$IOS_VERSION" != "\$(MARKETING_VERSION)" ]; then
+            print_success "iOS version (Info.plist): $IOS_VERSION"
+        else
+            IOS_VERSION=""
+        fi
+    fi
+    
+    # Fallback to project.pbxproj for iOS
+    if [ -z "$IOS_VERSION" ] && [ -f "ios/Runner.xcodeproj/project.pbxproj" ]; then
+        IOS_VERSION=$(grep "MARKETING_VERSION" "ios/Runner.xcodeproj/project.pbxproj" | head -1 | sed 's/.*MARKETING_VERSION = \([^;]*\);.*/\1/' | tr -d ' ')
+        if [ -n "$IOS_VERSION" ]; then
+            print_success "iOS version (project.pbxproj): $IOS_VERSION"
+        fi
+    fi
+    
+    # Get pubspec.yaml version as fallback
+    PUBSPEC_VERSION=$(grep "^version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
+    if [ -n "$PUBSPEC_VERSION" ]; then
+        print_info "Pubspec version (fallback): $PUBSPEC_VERSION"
+    fi
+    
+    # Determine current version priority: Android > iOS > Pubspec
+    if [ -n "$ANDROID_VERSION" ]; then
+        CURRENT_VERSION="$ANDROID_VERSION"
+        print_success "Using Android version as current: $CURRENT_VERSION"
+    elif [ -n "$IOS_VERSION" ]; then
+        CURRENT_VERSION="$IOS_VERSION"
+        print_success "Using iOS version as current: $CURRENT_VERSION"
+    elif [ -n "$PUBSPEC_VERSION" ]; then
+        CURRENT_VERSION="$PUBSPEC_VERSION"
+        print_warning "Using pubspec.yaml version as fallback: $CURRENT_VERSION"
+    else
+        print_error "No version found in any platform files"
+        CURRENT_VERSION="1.0.0+1"
+        print_warning "Using default version: $CURRENT_VERSION"
+    fi
     
     # Extract Android package name (try build.gradle.kts first, then AndroidManifest.xml)
     PACKAGE_NAME=""
@@ -650,7 +833,16 @@ extract_project_info() {
     print_separator
     print_info "Project Summary:"
     echo -e "  ${WHITE}• Name:${NC} $PROJECT_NAME"
-    echo -e "  ${WHITE}• Version:${NC} $CURRENT_VERSION"
+    echo -e "  ${WHITE}• Current Version:${NC} $CURRENT_VERSION"
+    if [ -n "$ANDROID_VERSION" ]; then
+        echo -e "  ${WHITE}• Android Version:${NC} $ANDROID_VERSION"
+    fi
+    if [ -n "$IOS_VERSION" ]; then
+        echo -e "  ${WHITE}• iOS Version:${NC} $IOS_VERSION"
+    fi
+    if [ -n "$PUBSPEC_VERSION" ]; then
+        echo -e "  ${WHITE}• Pubspec Version:${NC} $PUBSPEC_VERSION"
+    fi
     echo -e "  ${WHITE}• Bundle ID:${NC} $BUNDLE_ID"
     echo -e "  ${WHITE}• Package:${NC} $PACKAGE_NAME"
     echo -e "  ${WHITE}• Git repo:${NC} ${GIT_REPO:-'None'}"
@@ -1353,18 +1545,21 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking Google Play Store version..."
-	@if command -v ruby >/dev/null 2>&1 && [ -f "scripts/google_play_version_checker.rb" ]; then \
-		if ruby scripts/google_play_version_checker.rb full 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Google Play Store version checked"; \
-			if [ -f "/tmp/google_play_version.txt" ]; then \
-				PLAY_VERSION=$$(cat /tmp/google_play_version.txt 2>/dev/null || echo "unknown"); \
-				printf "$(CYAN)$(INFO) %s$(NC)\n" "Next version to upload: $$PLAY_VERSION"; \
-			fi; \
-		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Google Play version check failed - continuing with build"; \
-		fi; \
+	@ANDROID_PRODUCTION_VERSION=$$(get_production_version "Google Play" "$(CURRENT_VERSION)"); \
+	if [ -n "$$ANDROID_PRODUCTION_VERSION" ]; then \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Google Play production version: $$ANDROID_PRODUCTION_VERSION"; \
+		save_to_changelog "$$ANDROID_PRODUCTION_VERSION" "Android"; \
 	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Ruby or google_play_version_checker.rb not found - skipping version check"; \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Could not determine Google Play production version"; \
+	fi
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking iOS App Store version..."
+	@IOS_PRODUCTION_VERSION=$$(get_production_version "App Store" "$(CURRENT_VERSION)"); \
+	if [ -n "$$IOS_PRODUCTION_VERSION" ]; then \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "App Store production version: $$IOS_PRODUCTION_VERSION"; \
+		save_to_changelog "$$IOS_PRODUCTION_VERSION" "iOS"; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Could not determine App Store production version"; \
 	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"

@@ -1231,91 +1231,96 @@ platform :ios do
     UI.message("Setting up iOS environment for #{PROJECT_NAME}")
   end
 
-  desc "Build archive and upload to TestFlight with automatic signing"
-  lane :build_and_upload_auto do
+  desc "Build iOS archive"
+  lane :build_archive do
     setup_signing
     
     build_app(
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
-      xcargs: "-allowProvisioningUpdates",
-      export_options: {
-        method: "app-store-connect",
-        signingStyle: "automatic",
-        teamID: TEAM_ID,
-        signingCertificate: "Apple Distribution",
-        compileBitcode: false,
-        uploadBitcode: false,
-        uploadSymbols: true,
-        provisioningProfiles: {
-          "\${BUNDLE_ID}" => "AUTO_DETECTED"
-        }
-      }
-    )
-    
-    changelog_content = read_changelog
-    
-    upload_to_testflight(
-      changelog: changelog_content,
-      skip_waiting_for_build_processing: true,
-      distribute_external: false,
-      groups: TESTER_GROUPS,
-      notify_external_testers: true
-    )
-  end
-  
-  desc "Build archive and upload to App Store for production release"
-  lane :build_and_upload_production do
-    setup_signing
-    
-    build_app(
-      scheme: "Runner",
-      export_method: "app-store",
-      output_directory: IPA_OUTPUT_DIR,
-      xcargs: "-allowProvisioningUpdates",
-      export_options: {
-        method: "app-store-connect",
-        signingStyle: "automatic",
-        teamID: TEAM_ID,
-        signingCertificate: "Apple Distribution",
-        compileBitcode: false,
-        uploadBitcode: false,
-        uploadSymbols: true,
-        provisioningProfiles: {
-          "\${BUNDLE_ID}" => "AUTO_DETECTED"
-        }
-      }
-    )
-    
-    changelog_content = read_changelog("production")
-    
-    upload_to_testflight(
-      changelog: changelog_content,
-      skip_waiting_for_build_processing: true,
-      distribute_external: false,
-      groups: TESTER_GROUPS,
-      notify_external_testers: false
+      xcargs: "-allowProvisioningUpdates"
     )
   end
   
   desc "Submit a new Beta Build to TestFlight"
   lane :beta do
-    build_and_upload_auto
+    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
+      upload_to_testflight(
+        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+        changelog: read_changelog,
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        groups: TESTER_GROUPS,
+        notify_external_testers: true
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive
+      upload_to_testflight(
+        changelog: read_changelog,
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        groups: TESTER_GROUPS,
+        notify_external_testers: true
+      )
+    end
   end
 
   desc "Submit a new Production Build to App Store"
   lane :release do
-    build_and_upload_production
+    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
+      upload_to_app_store(
+        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+        force: true,
+        reject_if_possible: true,
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive
+      upload_to_app_store(
+        force: true,
+        reject_if_possible: true,
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    end
   end
 
-  desc "Upload archive to TestFlight"
-  lane :upload_only do
+  desc "Upload existing IPA to TestFlight"
+  lane :upload_testflight do
+    setup_signing
+    
     upload_to_testflight(
+      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+      changelog: read_changelog,
       skip_waiting_for_build_processing: true,
       distribute_external: false,
       groups: TESTER_GROUPS,
       notify_external_testers: true
+    )
+  end
+
+  desc "Upload existing IPA to App Store"
+  lane :upload_appstore do
+    setup_signing
+    
+    upload_to_app_store(
+      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+      force: true,
+      reject_if_possible: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: false,
+      automatic_release: false
     )
   end
 

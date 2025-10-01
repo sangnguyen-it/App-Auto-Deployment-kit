@@ -4405,15 +4405,21 @@ run_credential_setup() {
     print_header "🔒 Credential Validation & Setup"
     
     if ! validate_credentials; then
-        print_warning "Some credentials are missing. Starting interactive setup..."
-        echo ""
-        
-        # Ask user if they want to continue with interactive setup
-        echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"
-        echo -e "${GRAY}This will guide you through collecting iOS and Android credentials${NC}"
-        
-        # Use helper function for remote-safe input
-        read_with_fallback "Continue with setup: " "n" "setup_choice"
+        if [[ "$REMOTE_EXECUTION" == "true" ]]; then
+            # In pipe mode, skip interactive setup silently
+            print_info "Skipping credential setup in non-interactive mode."
+            setup_choice="n"
+        else
+            print_warning "Some credentials are missing. Starting interactive setup..."
+            echo ""
+            
+            # Ask user if they want to continue with interactive setup
+            echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"
+            echo -e "${GRAY}This will guide you through collecting iOS and Android credentials${NC}"
+            
+            # Use helper function for remote-safe input
+            read_with_fallback "Continue with setup: " "n" "setup_choice"
+        fi
         
         if [[ "$setup_choice" =~ ^[Yy] ]]; then
             # Interactive iOS setup
@@ -4448,25 +4454,6 @@ show_final_summary() {
     print_separator
     print_header "📊 Setup Summary"
     
-    echo -e "${WHITE}Project Status:${NC}"
-    if [[ "$CREDENTIALS_COMPLETE" == "true" ]]; then
-        echo -e "  ${CHECK} ${GREEN}All credentials configured${NC}"
-    else
-        echo -e "  ${WARNING} ${YELLOW}Some credentials missing${NC}"
-    fi
-    
-    if [[ "$ANDROID_READY" == "true" ]]; then
-        echo -e "  ${CHECK} ${GREEN}Android ready for deployment${NC}"
-    else
-        echo -e "  ${CROSS} ${RED}Android needs setup${NC} - See docs/ANDROID_SETUP_GUIDE.md"
-    fi
-    
-    if [[ "$IOS_READY" == "true" ]]; then
-        echo -e "  ${CHECK} ${GREEN}iOS ready for deployment${NC}"
-    else
-        echo -e "  ${CROSS} ${RED}iOS needs setup${NC} - See docs/IOS_SETUP_GUIDE.md"
-    fi
-    
     echo ""
     echo -e "${BLUE}📚 Generated Guides:${NC}"
     echo -e "  ${CHECK} docs/ANDROID_SETUP_GUIDE.md - Complete Android setup instructions"
@@ -4474,23 +4461,6 @@ show_final_summary() {
     echo -e "  ${CHECK} docs/CICD_INTEGRATION_COMPLETE.md - Full integration guide"
     echo -e "  ${CHECK} docs/CREDENTIAL_SETUP.md - Credential configuration guide"
     
-    echo ""
-    if [[ "$CREDENTIALS_COMPLETE" == "true" ]]; then
-        print_success "🎉 Your project is ready for automated deployment!"
-        echo -e "${CYAN}Quick commands:${NC}"
-        echo -e "  • ${WHITE}make help${NC} - All commands"
-        echo -e "  • ${WHITE}make system-check${NC} - Verify configuration"
-        echo -e "  • ${WHITE}make tester${NC} - Test deployment"
-        echo -e "  • ${WHITE}make live${NC} - Production deployment"
-    else
-        print_warning "Complete setup required before deployment"
-        echo -e "${CYAN}Next steps:${NC}"
-        echo -e "  • ${WHITE}Review docs/ANDROID_SETUP_GUIDE.md${NC} for Android setup"
-        echo -e "  • ${WHITE}Review docs/IOS_SETUP_GUIDE.md${NC} for iOS setup"
-        echo -e "  • ${WHITE}Run this script again${NC} after placing credentials"
-        echo -e "  • ${WHITE}./scripts/setup.sh --setup-only .${NC} for credential setup only"
-    fi
-    echo ""
 }
 
 # Main function - Entry point for the script

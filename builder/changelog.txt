@@ -1,9 +1,0 @@
-# Changelog
-
-## Latest Changes
-
-- Performance improvements
-- Bug fixes and stability enhancements
-- Updated dependencies
-
-Generated automatically by build system.

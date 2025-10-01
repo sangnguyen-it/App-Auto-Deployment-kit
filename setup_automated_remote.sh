@@ -1635,7 +1635,16 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to TestFlight..."; \
 					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
-						if fastlane ios beta 2>/dev/null; then \
+						if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+							if bundle exec fastlane ios beta 2>/dev/null; then \
+								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight via bundle"; \
+							elif fastlane ios beta 2>/dev/null; then \
+								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight"; \
+							else \
+								printf "$(YELLOW)$(WARNING) %s$(NC)\n" "TestFlight upload failed - check fastlane configuration"; \
+								printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && bundle exec fastlane ios beta"; \
+							fi; \
+						elif fastlane ios beta 2>/dev/null; then \
 							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight"; \
 						else \
 							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "TestFlight upload failed - check fastlane configuration"; \
@@ -1763,7 +1772,16 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
 					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
-						if fastlane ios release 2>/dev/null; then \
+						if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+							if bundle exec fastlane ios release 2>/dev/null; then \
+								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store via bundle"; \
+							elif fastlane ios release 2>/dev/null; then \
+								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
+							else \
+								printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
+								printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && bundle exec fastlane ios release"; \
+							fi; \
+						elif fastlane ios release 2>/dev/null; then \
 							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
 						else \
 							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \

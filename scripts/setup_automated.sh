@@ -2285,6 +2285,41 @@ create_project_config() {
 
 # Create new project config file (internal function)
 create_new_project_config() {
+    # Preserve existing values if project.config already exists
+    local existing_team_id="YOUR_TEAM_ID"
+    local existing_key_id="YOUR_KEY_ID"
+    local existing_issuer_id="YOUR_ISSUER_ID"
+    local existing_apple_id="your-apple-id@email.com"
+    
+    # Load existing values if config file exists
+    if [[ -f "$TARGET_DIR/project.config" ]]; then
+        print_step "Preserving existing credentials from project.config..."
+        
+        # Source the existing config to get current values
+        if source "$TARGET_DIR/project.config" 2>/dev/null; then
+            # Only preserve non-placeholder values
+            if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" && "$TEAM_ID" != "TEAM_ID" ]]; then
+                existing_team_id="$TEAM_ID"
+                print_info "Preserving TEAM_ID: $existing_team_id"
+            fi
+            
+            if [[ -n "$KEY_ID" && "$KEY_ID" != "YOUR_KEY_ID" && "$KEY_ID" != "KEY_ID" ]]; then
+                existing_key_id="$KEY_ID"
+                print_info "Preserving KEY_ID: $existing_key_id"
+            fi
+            
+            if [[ -n "$ISSUER_ID" && "$ISSUER_ID" != "YOUR_ISSUER_ID" && "$ISSUER_ID" != "ISSUER_ID" ]]; then
+                existing_issuer_id="$ISSUER_ID"
+                print_info "Preserving ISSUER_ID: $existing_issuer_id"
+            fi
+            
+            if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" && "$APPLE_ID" != "APPLE_ID" && "$APPLE_ID" != "your-apple-id@email.com" ]]; then
+                existing_apple_id="$APPLE_ID"
+                print_info "Preserving APPLE_ID: $existing_apple_id"
+            fi
+        fi
+    fi
+    
     cat > "$TARGET_DIR/project.config" << EOF
 # Flutter CI/CD Project Configuration
 # Auto-generated for project: $PROJECT_NAME
@@ -2295,11 +2330,11 @@ BUNDLE_ID="$BUNDLE_ID"
 CURRENT_VERSION="$CURRENT_VERSION"
 GIT_REPO="$GIT_REPO"
 
-# Credentials (to be updated)
-TEAM_ID="YOUR_TEAM_ID"
-KEY_ID="YOUR_KEY_ID"
-ISSUER_ID="YOUR_ISSUER_ID"
-APPLE_ID="your-apple-id@email.com"
+# Credentials (preserved from existing config or defaults)
+TEAM_ID="$existing_team_id"
+KEY_ID="$existing_key_id"
+ISSUER_ID="$existing_issuer_id"
+APPLE_ID="$existing_apple_id"
 
 # Output settings
 OUTPUT_DIR="builder"
@@ -2312,7 +2347,34 @@ TESTFLIGHT_GROUPS="$PROJECT_NAME Internal Testers,$PROJECT_NAME Beta Testers"
 # Auto-generated on: $(date)
 EOF
     
-    print_success "✅ New project configuration created"
+    print_success "✅ New project configuration created with preserved credentials"
+    
+    # Auto-sync fastlane files if we have valid credentials
+    local has_valid_credentials=false
+    if [[ "$existing_team_id" != "YOUR_TEAM_ID" ]] || [[ "$existing_key_id" != "YOUR_KEY_ID" ]] || [[ "$existing_issuer_id" != "YOUR_ISSUER_ID" ]] || [[ "$existing_apple_id" != "your-apple-id@email.com" ]]; then
+        has_valid_credentials=true
+    fi
+    
+    if [ "$has_valid_credentials" = true ]; then
+        print_step "Auto-syncing fastlane files with preserved credentials..."
+        
+        # Load the new config
+        source "$TARGET_DIR/project.config" 2>/dev/null
+        
+        # Sync fastlane files if they exist
+        if [[ -f "$TARGET_DIR/ios/fastlane/Appfile" ]]; then
+            sync_appfile
+        fi
+        if [[ -f "$TARGET_DIR/ios/fastlane/Fastfile" ]]; then
+            sync_fastfile
+        fi
+        if [[ -f "$TARGET_DIR/ios/fastlane/ExportOptions.plist" ]]; then
+            sync_export_options
+        fi
+        
+        print_success "✅ Fastlane files synchronized with preserved credentials"
+    fi
+    
     echo ""
 }
 

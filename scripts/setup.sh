@@ -174,10 +174,28 @@ platform :ios do
     build_app(
       scheme: "Runner", 
       workspace: "Runner.xcworkspace",
-      export_method: "app-store"
+      export_method: "ad-hoc"
     )
     upload_to_testflight(
       skip_waiting_for_build_processing: true
+    )
+  end
+  
+  desc "Build archive for TestFlight (Beta)"
+  lane :build_archive_beta do
+    build_app(
+      scheme: "Runner",
+      workspace: "Runner.xcworkspace",
+      export_method: "ad-hoc"
+    )
+  end
+  
+  desc "Build archive for App Store (Production)"
+  lane :build_archive_production do
+    build_app(
+      scheme: "Runner",
+      workspace: "Runner.xcworkspace",
+      export_method: "app-store"
     )
   end
 end

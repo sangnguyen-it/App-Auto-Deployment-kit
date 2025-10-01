@@ -1245,8 +1245,25 @@ platform :ios do
     UI.message("Setting up iOS environment for #{PROJECT_NAME}")
   end
 
-  desc "Build iOS archive"
+  desc "Build iOS archive for TestFlight"
   lane :build_archive do
+    build_archive_beta
+  end
+  
+  desc "Build iOS archive for TestFlight (Beta)"
+  lane :build_archive_beta do
+    setup_signing
+    
+    build_app(
+      scheme: "Runner",
+      export_method: "ad-hoc",
+      output_directory: IPA_OUTPUT_DIR,
+      xcargs: "-allowProvisioningUpdates"
+    )
+  end
+  
+  desc "Build iOS archive for App Store (Production)"
+  lane :build_archive_production do
     setup_signing
     
     build_app(
@@ -1271,7 +1288,7 @@ platform :ios do
       )
     else
       UI.message("No existing archive found, building new one...")
-      build_archive
+      build_archive_beta
       upload_to_testflight(
         changelog: read_changelog,
         skip_waiting_for_build_processing: true,
@@ -1297,7 +1314,7 @@ platform :ios do
       )
     else
       UI.message("No existing archive found, building new one...")
-      build_archive
+      build_archive_production
       upload_to_app_store(
         force: true,
         reject_if_possible: true,
@@ -3547,8 +3564,8 @@ sync_fastfile() {
         sed -i.bak "s/^ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
     fi
     
-    # Fix KEY_PATH to use correct relative path from ios/ directory
-    sed -i.bak 's|KEY_PATH = "./AuthKey_#{KEY_ID}.p8"|KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"|g' "$temp_fastfile"
+    # Fix KEY_PATH to use correct relative path from fastlane directory
+    sed -i.bak 's|KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"|KEY_PATH = "./AuthKey_#{KEY_ID}.p8"|g' "$temp_fastfile"
     
     # Update export_options to include proper signing certificate and bitcode settings
     # Fix build_and_upload_auto lane

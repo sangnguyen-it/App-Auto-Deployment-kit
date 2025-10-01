@@ -721,6 +721,19 @@ extract_project_info() {
     
     # Extract project name from pubspec.yaml
     PROJECT_NAME=$(grep "^name:" pubspec.yaml | cut -d':' -f2 | tr -d ' ' | tr -d '"')
+    
+    # Ensure PROJECT_NAME has a valid value
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME=$(basename "$TARGET_DIR")
+        print_warning "Could not extract project name from pubspec.yaml, using directory name: $PROJECT_NAME"
+    fi
+    
+    # Final fallback if PROJECT_NAME is still empty
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME="flutter_app"
+        print_warning "Using fallback project name: $PROJECT_NAME"
+    fi
+    
     print_success "Project name: $PROJECT_NAME"
     
     # Extract version - prioritize platform-specific files over pubspec.yaml
@@ -844,6 +857,13 @@ extract_project_info() {
     else
         BUNDLE_ID="$PACKAGE_NAME"
         print_warning "Info.plist not found, using package name as bundle ID"
+    fi
+    
+    # Final validation - ensure PACKAGE_NAME is not empty
+    if [[ -z "$PACKAGE_NAME" ]]; then
+        print_warning "PACKAGE_NAME is empty, generating fallback"
+        PACKAGE_NAME="com.flutter_app.app"
+        print_info "Using fallback PACKAGE_NAME: $PACKAGE_NAME"
     fi
     
     # Get Git repository info
@@ -2214,6 +2234,13 @@ create_makefile() {
         fi
     fi
     
+    # Ensure PACKAGE_NAME has a valid value
+    if [[ -z "$PACKAGE_NAME" ]]; then
+        print_warning "PACKAGE_NAME is empty, generating fallback"
+        PACKAGE_NAME="com.flutter_app.app"
+        print_info "Using fallback PACKAGE_NAME: $PACKAGE_NAME"
+    fi
+    
     # Create safe package name (lowercase, no spaces, no special chars)
     SAFE_PACKAGE_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | sed 's/[^a-z0-9-]//g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
     
@@ -2224,7 +2251,21 @@ create_makefile() {
     fi
     
     print_info "Using PROJECT_NAME: $PROJECT_NAME"
+    print_info "Using PACKAGE_NAME: $PACKAGE_NAME"
     print_info "Using SAFE_PACKAGE_NAME: $SAFE_PACKAGE_NAME"
+    
+    # Verify Makefile exists before customization
+    if [[ ! -f "$TARGET_DIR/Makefile" ]]; then
+        print_error "Makefile not found at $TARGET_DIR/Makefile"
+        return 1
+    fi
+    
+    # Show current PACKAGE value in Makefile before replacement
+    if grep -q "PACKAGE := PACKAGE_PLACEHOLDER" "$TARGET_DIR/Makefile"; then
+        print_info "Found PACKAGE_PLACEHOLDER in Makefile, replacing with: $SAFE_PACKAGE_NAME"
+    else
+        print_warning "PACKAGE_PLACEHOLDER not found in Makefile"
+    fi
     
     # Customize Makefile with project-specific values
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -2237,6 +2278,18 @@ create_makefile() {
         sed -i "s/PACKAGE_NAME := PACKAGE_PLACEHOLDER/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
         sed -i "s/APP_NAME := APP_PLACEHOLDER/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i "s/PACKAGE := PACKAGE_PLACEHOLDER/PACKAGE := $SAFE_PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
+    fi
+    
+    # Verify replacement was successful
+    if grep -q "PACKAGE := PACKAGE_PLACEHOLDER" "$TARGET_DIR/Makefile"; then
+        print_error "Failed to replace PACKAGE_PLACEHOLDER in Makefile!"
+        print_info "Current PACKAGE line in Makefile:"
+        grep "PACKAGE :=" "$TARGET_DIR/Makefile" || echo "No PACKAGE line found"
+        return 1
+    else
+        print_success "Successfully replaced PACKAGE_PLACEHOLDER with: $SAFE_PACKAGE_NAME"
+        print_info "Current PACKAGE line in Makefile:"
+        grep "PACKAGE :=" "$TARGET_DIR/Makefile" || echo "No PACKAGE line found"
     fi
     
     print_success "Customized Makefile created"
@@ -4596,7 +4649,7 @@ main() {
     # Create automation files
     create_android_fastlane
     create_ios_fastlane
-    create_comprehensive_makefile
+    create_makefile
     create_github_workflow
     create_gemfile
     create_inline_setup_scripts

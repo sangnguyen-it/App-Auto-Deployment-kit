@@ -3049,19 +3049,19 @@ sync_appfile() {
     
     # Read existing Appfile and update values
     while IFS= read -r line; do
-        if [[ "$line" =~ ^app_identifier ]]; then
+        if [[ "$line" =~ ^[[:space:]]*app_identifier ]]; then
             if [[ -n "$BUNDLE_ID" && "$BUNDLE_ID" != "YOUR_BUNDLE_ID" ]]; then
                 echo "app_identifier(\"$BUNDLE_ID\")"
             else
                 echo "$line"
             fi
-        elif [[ "$line" =~ ^apple_id ]]; then
-            if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" ]]; then
+        elif [[ "$line" =~ ^[[:space:]]*apple_id ]]; then
+            if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" && "$APPLE_ID" != "your-apple-id@email.com" ]]; then
                 echo "apple_id(\"$APPLE_ID\")"
             else
                 echo "$line"
             fi
-        elif [[ "$line" =~ ^team_id ]]; then
+        elif [[ "$line" =~ ^[[:space:]]*team_id ]]; then
             if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
                 echo "team_id(\"$TEAM_ID\")"
             else
@@ -3120,19 +3120,22 @@ sync_fastfile() {
     # Update TEAM_ID
     if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
         sed -i.bak "s/TEAM_ID = \"YOUR_TEAM_ID\"/TEAM_ID = \"$TEAM_ID\"/g" "$temp_fastfile"
-        sed -i.bak "s/TEAM_ID = \"[^\"]*\"/TEAM_ID = \"$TEAM_ID\"/g" "$temp_fastfile"
+        # More specific pattern to avoid replacing other variables
+        sed -i.bak "s/^TEAM_ID = \"[^\"]*\"/TEAM_ID = \"$TEAM_ID\"/g" "$temp_fastfile"
     fi
     
     # Update KEY_ID
     if [[ -n "$KEY_ID" && "$KEY_ID" != "YOUR_KEY_ID" ]]; then
         sed -i.bak "s/KEY_ID = \"YOUR_KEY_ID\"/KEY_ID = \"$KEY_ID\"/g" "$temp_fastfile"
-        sed -i.bak "s/KEY_ID = \"[^\"]*\"/KEY_ID = \"$KEY_ID\"/g" "$temp_fastfile"
+        # More specific pattern to avoid replacing other variables
+        sed -i.bak "s/^KEY_ID = \"[^\"]*\"/KEY_ID = \"$KEY_ID\"/g" "$temp_fastfile"
     fi
     
     # Update ISSUER_ID
     if [[ -n "$ISSUER_ID" && "$ISSUER_ID" != "YOUR_ISSUER_ID" ]]; then
         sed -i.bak "s/ISSUER_ID = \"YOUR_ISSUER_ID\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
-        sed -i.bak "s/ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
+        # More specific pattern to avoid replacing other variables
+        sed -i.bak "s/^ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
     fi
     
     # Fix KEY_PATH to use correct relative path from ios/ directory

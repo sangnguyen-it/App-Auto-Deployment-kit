@@ -3000,7 +3000,7 @@ sync_appfile() {
                 echo "$line"
             fi
         elif [[ "$line" =~ ^[[:space:]]*apple_id ]]; then
-            if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" ]]; then
+            if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" && "$APPLE_ID" != "your-apple-id@email.com" ]]; then
                 echo "apple_id(\"$APPLE_ID\")"
             else
                 echo "$line"
@@ -3060,7 +3060,7 @@ sync_fastfile() {
     # Update Fastfile with values from project.config (only if not placeholders)
     if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
         sed -i '' "s/TEAM_ID = \"YOUR_TEAM_ID\"/TEAM_ID = \"$TEAM_ID\"/g" "$fastfile_path"
-        sed -i '' "s/TEAM_ID = \"[^\"]*\"/TEAM_ID = \"$TEAM_ID\"/g" "$fastfile_path"
+        sed -i '' "s/^TEAM_ID = \"[^\"]*\"/TEAM_ID = \"$TEAM_ID\"/g" "$fastfile_path"
         if [[ "${DEBUG:-}" == "true" ]]; then
             echo "🐛 DEBUG: Updated TEAM_ID to $TEAM_ID" >&2
         fi
@@ -3068,7 +3068,7 @@ sync_fastfile() {
     
     if [[ -n "$KEY_ID" && "$KEY_ID" != "YOUR_KEY_ID" ]]; then
         sed -i '' "s/KEY_ID = \"YOUR_KEY_ID\"/KEY_ID = \"$KEY_ID\"/g" "$fastfile_path"
-        sed -i '' "s/KEY_ID = \"[^\"]*\"/KEY_ID = \"$KEY_ID\"/g" "$fastfile_path"
+        sed -i '' "s/^KEY_ID = \"[^\"]*\"/KEY_ID = \"$KEY_ID\"/g" "$fastfile_path"
         if [[ "${DEBUG:-}" == "true" ]]; then
             echo "🐛 DEBUG: Updated KEY_ID to $KEY_ID" >&2
         fi
@@ -3076,7 +3076,7 @@ sync_fastfile() {
     
     if [[ -n "$ISSUER_ID" && "$ISSUER_ID" != "YOUR_ISSUER_ID" ]]; then
         sed -i '' "s/ISSUER_ID = \"YOUR_ISSUER_ID\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$fastfile_path"
-        sed -i '' "s/ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$fastfile_path"
+        sed -i '' "s/^ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$fastfile_path"
         if [[ "${DEBUG:-}" == "true" ]]; then
             echo "🐛 DEBUG: Updated ISSUER_ID to $ISSUER_ID" >&2
         fi

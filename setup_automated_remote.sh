@@ -1020,7 +1020,19 @@ EOF
 # Uncomment the line if you want fastlane to automatically update itself
 # update_fastlane
 
+fastlane_version "2.228.0"
 default_platform(:ios)
+
+# Disable update checker to prevent initialization issues
+ENV["FASTLANE_SKIP_UPDATE_CHECK"] = "1"
+
+# Error handling for FastlaneCore issues
+begin
+  require 'fastlane'
+rescue LoadError => e
+  UI.error("Failed to load Fastlane: #{e.message}")
+  exit(1)
+end
 
 # Project Configuration
 PROJECT_NAME = "$PROJECT_NAME"

@@ -451,6 +451,28 @@ EOF
 </plist>
 EOF
     
+    # Validate provisioning profiles
+    if command -v security >/dev/null 2>&1; then
+        print_step "🔍 Validating provisioning profiles..."
+        
+        # Check for valid provisioning profiles
+        local profiles_dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+        if [ -d "$profiles_dir" ]; then
+            local profile_count=$(find "$profiles_dir" -name "*.mobileprovision" 2>/dev/null | wc -l)
+            if [ "$profile_count" -gt 0 ]; then
+                print_success "✅ Found $profile_count provisioning profile(s)"
+            else
+                print_warning "⚠️  No provisioning profiles found. You may need to download them from Xcode."
+                echo "   To fix this:"
+                echo "   1. Open Xcode"
+                echo "   2. Go to Preferences → Accounts"
+                echo "   3. Select your Apple ID and download provisioning profiles"
+            fi
+        else
+            print_warning "⚠️  Provisioning profiles directory not found. Ensure Xcode is properly configured."
+        fi
+    fi
+    
     print_success "iOS Fastlane configuration created"
     echo ""
 }

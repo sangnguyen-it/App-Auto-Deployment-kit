@@ -65,24 +65,13 @@ read_with_fallback() {
     local default_value="${2:-n}"
     local variable_name="$3"
     
-    # Check if we're in a remote/automated environment
-    if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
-        # In automated/remote environment, use default value
-        echo "→ $prompt$default_value (auto-selected for non-interactive mode)"
-        eval "$variable_name=\"$default_value\""
-        return 0
-    fi
+    # Always prompt for user input, even in pipe mode
+    # This ensures the script waits for user confirmation
+    echo -n "$prompt"
+    read "$variable_name"
     
-    # Interactive environment - prompt for input
-    if [[ -t 0 ]]; then
-        read -p "$prompt" "$variable_name"
-        # Use default if no input provided
-        if [[ -z "${!variable_name}" ]]; then
-            eval "$variable_name=\"$default_value\""
-        fi
-    else
-        # Fallback: we're not in a terminal, use default
-        echo "→ $prompt$default_value (auto-selected - no terminal available)"
+    # Use default if no input provided
+    if [[ -z "${!variable_name}" ]]; then
         eval "$variable_name=\"$default_value\""
     fi
 }
@@ -4405,21 +4394,15 @@ run_credential_setup() {
     print_header "🔒 Credential Validation & Setup"
     
     if ! validate_credentials; then
-        if [[ "$REMOTE_EXECUTION" == "true" ]]; then
-            # In pipe mode, skip interactive setup silently
-            print_info "Skipping credential setup in non-interactive mode."
-            setup_choice="n"
-        else
-            print_warning "Some credentials are missing. Starting interactive setup..."
-            echo ""
-            
-            # Ask user if they want to continue with interactive setup
-            echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"
-            echo -e "${GRAY}This will guide you through collecting iOS and Android credentials${NC}"
-            
-            # Use helper function for remote-safe input
-            read_with_fallback "Continue with setup: " "n" "setup_choice"
-        fi
+        print_warning "Some credentials are missing. Starting interactive setup..."
+        echo ""
+        
+        # Ask user if they want to continue with interactive setup
+        echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"
+        echo -e "${GRAY}This will guide you through collecting iOS and Android credentials${NC}"
+        
+        # Use helper function for input - will always wait for user
+        read_with_fallback "Continue with setup: " "n" "setup_choice"
         
         if [[ "$setup_choice" =~ ^[Yy] ]]; then
             # Interactive iOS setup

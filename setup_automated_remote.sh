@@ -1315,7 +1315,7 @@ platform :ios do
     
     build_app(
       scheme: "Runner",
-      export_method: "app-store",
+      export_method: "app-store-connect",
       output_directory: IPA_OUTPUT_DIR,
       xcargs: "-allowProvisioningUpdates"
     )
@@ -1445,7 +1445,7 @@ EOF
 <plist version="1.0">
 <dict>
     <key>method</key>
-    <string>app-store</string>
+    <string>app-store-connect</string>
     <key>teamID</key>
     <string>YOUR_TEAM_ID</string>
     <key>uploadBitcode</key>
@@ -1671,7 +1671,7 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 				if [ -f "fastlane/ExportOptions.plist" ]; then \
 					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
 				else \
-					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
 				fi; \
 				IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
@@ -1808,7 +1808,7 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 				if [ -f "fastlane/ExportOptions.plist" ]; then \
 				xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
 				else \
-					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
 				fi; \
 				IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
@@ -3693,7 +3693,7 @@ sync_fastfile() {
     sed -i.bak '/build_and_upload_auto/,/^  end$/{
         /export_options: {/,/}$/{
             s/export_options: {.*/export_options: {/
-            /method: "app-store",/a\
+            /method: "app-store-connect",/a\
         signingStyle: "automatic",\
         teamID: TEAM_ID,\
         signingCertificate: "Apple Distribution",\
@@ -3708,7 +3708,7 @@ sync_fastfile() {
     sed -i.bak '/build_and_upload_production/,/^  end$/{
         /export_options: {/,/}$/{
             s/export_options: {.*/export_options: {/
-            /method: "app-store",/a\
+            /method: "app-store-connect",/a\
         signingStyle: "automatic",\
         teamID: TEAM_ID,\
         signingCertificate: "Apple Distribution",\

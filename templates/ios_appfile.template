@@ -1,9 +1,9 @@
 # Appfile for {{PROJECT_NAME}} iOS
 # Configuration for App Store Connect and Apple Developer
 
-app_identifier("{{BUNDLE_ID}}") # Your bundle identifier
-apple_id("your-apple-id@email.com") # Replace with your Apple ID
-team_id("YOUR_TEAM_ID") # Replace with your Apple Developer Team ID
+app_identifier("{{PACKAGE_NAME}}") # Your bundle identifier
+apple_id("{{APPLE_ID}}") # Replace with your Apple ID
+team_id("{{TEAM_ID}}") # Replace with your Apple Developer Team ID
 
 # Optional: If you belong to multiple teams
-# itc_team_id("YOUR_TEAM_ID") # App Store Connect Team ID (if different from team_id)
+# itc_team_id("{{TEAM_ID}}") # App Store Connect Team ID (if different from team_id)

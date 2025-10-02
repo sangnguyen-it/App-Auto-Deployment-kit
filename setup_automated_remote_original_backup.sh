@@ -3721,17 +3721,12 @@ This guide helps you configure all necessary credentials for automated deploymen
 
 ## 📱 iOS App Store Connect Setup
 
-### 1. Apple Developer Account Requirements
-- Active Apple Developer Program membership (\$99/year)
-- Access to App Store Connect
-- Your app registered in App Store Connect
-
-### 2. Required Information
+### 1. Required Information
 - **Team ID**: YOUR_TEAM_ID
 - **Apple ID**: your-apple-id@email.com
 - **Bundle ID**: $BUNDLE_ID
 
-### 3. App Store Connect API Key Setup
+### 2. App Store Connect API Key Setup
 
 1. Log in to [App Store Connect](https://appstoreconnect.apple.com)
 2. Go to **Users and Access** > **Keys**
@@ -3740,7 +3735,7 @@ This guide helps you configure all necessary credentials for automated deploymen
 5. Download the \`.p8\` key file
 6. Note the **Key ID** and **Issuer ID**
 
-### 4. Place API Key File
+### 3. Place API Key File
 \`\`\`bash
 # Copy your API key to the correct location
 cp /path/to/AuthKey_YOUR_KEY_ID.p8 ios/fastlane/

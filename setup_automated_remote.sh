@@ -154,6 +154,212 @@ PACKAGE_NAME=""
 BUNDLE_ID=""
 APP_NAME=""
 TEAM_ID=""
+DEPLOYMENT_MODE=""
+
+# Function to prompt user for deployment mode
+prompt_deployment_mode() {
+    print_header "Deployment Mode Selection"
+    
+    echo -e "${CYAN}Please choose your deployment mode:${NC}"
+    echo ""
+    echo -e "${GREEN}1. Local Deployment${NC}"
+    echo -e "   • Deploy apps locally using Fastlane"
+    echo -e "   • No GitHub authentication required"
+    echo -e "   • Manual deployment process"
+    echo ""
+    echo -e "${BLUE}2. GitHub Actions Deployment${NC}"
+    echo -e "   • Automated deployment via GitHub Actions"
+    echo -e "   • Requires GitHub authentication"
+    echo -e "   • CI/CD pipeline setup"
+    echo ""
+    
+    local user_choice
+    while true; do
+        read_with_fallback "Enter your choice (1 for Local, 2 for GitHub): " "1" user_choice
+        
+        case "$user_choice" in
+            1|"local"|"Local"|"LOCAL")
+                DEPLOYMENT_MODE="local"
+                print_success "Selected: Local Deployment"
+                break
+                ;;
+            2|"github"|"GitHub"|"GITHUB")
+                DEPLOYMENT_MODE="github"
+                print_success "Selected: GitHub Actions Deployment"
+                break
+                ;;
+            *)
+                print_error "Invalid choice. Please enter 1 for Local or 2 for GitHub."
+                ;;
+        esac
+    done
+    
+    echo ""
+}
+
+# Check GitHub CLI authentication status
+check_github_auth() {
+    print_header "Checking GitHub Authentication"
+    
+    # Check if GitHub CLI is installed
+    if ! command -v gh >/dev/null 2>&1; then
+        print_error "GitHub CLI (gh) is not installed"
+        print_info "Please install GitHub CLI first:"
+        echo -e "  ${WHITE}• macOS:${NC} brew install gh"
+        echo -e "  ${WHITE}• Linux:${NC} https://github.com/cli/cli/blob/trunk/docs/install_linux.md"
+        echo -e "  ${WHITE}• Windows:${NC} https://github.com/cli/cli/releases"
+        echo ""
+        print_error "GitHub CLI is required to continue. Please install it and run the script again."
+        exit 1
+    fi
+    
+    print_step "Checking GitHub authentication status..."
+    
+    # Function to perform authentication with user interaction
+    perform_github_auth() {
+        local max_attempts=3
+        local attempt=1
+        
+        # Check and handle GITHUB_TOKEN environment variable
+        if [ -n "$GITHUB_TOKEN" ]; then
+            print_warning "GITHUB_TOKEN environment variable detected"
+            print_info "🧹 Clearing GITHUB_TOKEN to allow interactive authentication..."
+            unset GITHUB_TOKEN
+            export GITHUB_TOKEN=""
+        fi
+        
+        print_info "🌐 GitHub authentication is required to continue"
+        print_info "📋 This will open your web browser for authentication"
+        echo ""
+        
+        while [ $attempt -le $max_attempts ]; do
+            print_step "🔐 Starting GitHub authentication (attempt $attempt of $max_attempts)..."
+            
+            # Clear any existing authentication that might be corrupted
+            if [ $attempt -gt 1 ]; then
+                print_info "🧹 Clearing previous authentication attempt..."
+                env -u GITHUB_TOKEN gh auth logout >/dev/null 2>&1 || true
+                sleep 1
+            fi
+            
+            # Ensure GITHUB_TOKEN is still cleared
+            unset GITHUB_TOKEN
+            export GITHUB_TOKEN=""
+            
+            print_info "📱 Please follow these steps:"
+            echo -e "  ${WHITE}1.${NC} Your browser will open automatically"
+            echo -e "  ${WHITE}2.${NC} Login to GitHub if not already logged in"
+            echo -e "  ${WHITE}3.${NC} Authorize the GitHub CLI application"
+            echo -e "  ${WHITE}4.${NC} Return to this terminal after authorization"
+            echo ""
+            
+            # Start authentication process
+            print_step "🚀 Launching GitHub authentication..."
+            
+            # Run gh auth login in a clean environment without GITHUB_TOKEN
+            if env -u GITHUB_TOKEN gh auth login --web --git-protocol https; then
+                print_success "✅ GitHub authentication process completed!"
+                
+                # Wait a moment for authentication to settle
+                sleep 2
+                
+                # Verify authentication worked
+                print_step "🔍 Verifying authentication status..."
+                if env -u GITHUB_TOKEN gh auth status >/dev/null 2>&1; then
+                    # Get authenticated user info
+                    GITHUB_USER=$(env -u GITHUB_TOKEN gh api user --jq '.login' 2>/dev/null || echo "Unknown")
+                    print_success "🎉 Successfully authenticated as: $GITHUB_USER"
+                    
+                    # Double-check API access
+                    if env -u GITHUB_TOKEN gh api user >/dev/null 2>&1; then
+                        print_success "🔗 GitHub API access verified"
+                        return 0
+                    else
+                        print_warning "Authentication succeeded but API access failed"
+                        print_info "🔄 Retrying API verification..."
+                        sleep 3
+                        if env -u GITHUB_TOKEN gh api user >/dev/null 2>&1; then
+                            print_success "🔗 GitHub API access verified on retry"
+                            return 0
+                        fi
+                    fi
+                else
+                    print_error "❌ Authentication verification failed"
+                    print_info "🔍 Checking authentication status details..."
+                    env -u GITHUB_TOKEN gh auth status 2>&1 || true
+                fi
+            else
+                print_error "❌ GitHub authentication process failed (attempt $attempt)"
+                print_info "💡 This could happen if:"
+                echo -e "  ${WHITE}• ${NC}You cancelled the authentication in the browser"
+                echo -e "  ${WHITE}• ${NC}Network connection issues occurred"
+                echo -e "  ${WHITE}• ${NC}Browser didn't open properly"
+                echo ""
+            fi
+            
+            if [ $attempt -lt $max_attempts ]; then
+                echo ""
+                print_info "🔄 Would you like to try again? (Press Enter to retry, Ctrl+C to cancel)"
+                read -r
+                echo ""
+            fi
+            
+            ((attempt++))
+        done
+        
+        print_error "❌ GitHub authentication failed after $max_attempts attempts"
+        print_info "💡 Troubleshooting tips:"
+        echo -e "  ${WHITE}• ${NC}Ensure you have a stable internet connection"
+        echo -e "  ${WHITE}• ${NC}Check if GitHub.com is accessible in your browser"
+        echo -e "  ${WHITE}• ${NC}Try running 'gh auth login --web' manually first"
+        echo -e "  ${WHITE}• ${NC}Make sure you complete the browser authorization process"
+        echo -e "  ${WHITE}• ${NC}Check if your browser is blocking popups"
+        echo ""
+        print_error "🛑 Cannot continue without GitHub authentication"
+        exit 1
+    }
+    
+    # Check authentication status
+    if ! env -u GITHUB_TOKEN gh auth status >/dev/null 2>&1; then
+        print_error "❌ GitHub CLI is not authenticated"
+        print_info "🔑 GitHub authentication is REQUIRED to continue with the automated setup."
+        print_info "📝 This script needs GitHub access to:"
+        echo -e "  ${WHITE}• ${NC}Create and manage GitHub Actions workflows"
+        echo -e "  ${WHITE}• ${NC}Access repository information"
+        echo -e "  ${WHITE}• ${NC}Set up automated deployment pipelines"
+        echo ""
+        
+        print_step "🚀 Starting automatic GitHub authentication..."
+        perform_github_auth
+    else
+        # Already authenticated - get user info
+        GITHUB_USER=$(env -u GITHUB_TOKEN gh api user --jq '.login' 2>/dev/null || echo "Unknown")
+        print_success "✅ GitHub CLI is authenticated as: $GITHUB_USER"
+        
+        # Verify the authentication is still valid
+        if ! env -u GITHUB_TOKEN gh api user >/dev/null 2>&1; then
+            print_error "❌ GitHub authentication token is invalid or expired"
+            print_info "🔄 Re-authentication is REQUIRED to continue."
+            echo ""
+            
+            print_step "🔐 Starting automatic GitHub re-authentication..."
+            perform_github_auth
+        else
+            print_success "🔗 GitHub API access verified"
+        fi
+    fi
+    
+    # Final verification
+    if ! env -u GITHUB_TOKEN gh auth status >/dev/null 2>&1 || ! env -u GITHUB_TOKEN gh api user >/dev/null 2>&1; then
+        print_error "❌ GitHub authentication verification failed"
+        print_info "🛑 Cannot continue without valid GitHub authentication"
+        print_info "💡 Please run 'gh auth login' manually and try again"
+        exit 1
+    fi
+    
+    print_success "🎉 GitHub authentication verified successfully"
+    echo ""
+}
 
 # Function to detect project information
 detect_project_info() {
@@ -201,7 +407,7 @@ detect_project_info() {
 
 # Function to create directory structure
 create_directory_structure() {
-    print_header "Creating Directory Structure"
+    # print_header "Creating Directory Structure"
     
     local directories=(
         "android/fastlane"
@@ -216,14 +422,15 @@ create_directory_structure() {
             mkdir -p "$TARGET_DIR/$dir"
             print_success "Created directory: $dir"
         else
-            print_info "Directory already exists: $dir"
+            # print_info "Directory already exists: $dir"
+            continue
         fi
     done
 }
 
 # Function to copy scripts
 copy_scripts() {
-    print_header "Copying Scripts"
+    # print_header "Copying Scripts"
     
     local script_files=(
         "version_manager.dart"
@@ -232,13 +439,16 @@ copy_scripts() {
         "tag_generator.dart"
         "common_functions.sh"
         "setup.sh"
+        "dynamic_version_manager.dart"
+        "store_version_checker.rb"
+        "google_play_version_checker.rb"
     )
     
     for script in "${script_files[@]}"; do
         if [ -f "$SCRIPTS_DIR/$script" ]; then
             cp "$SCRIPTS_DIR/$script" "$TARGET_DIR/scripts/"
             chmod +x "$TARGET_DIR/scripts/$script" 2>/dev/null || true
-            print_success "Copied: $script"
+            # print_success "Copied: $script"
         else
             print_warning "Script not found: $script"
         fi
@@ -278,6 +488,12 @@ create_configuration_files_inline() {
         create_ios_fastfile_inline
     fi
     
+    # Create iOS Appfile
+    create_ios_appfile_inline
+    
+    # Create iOS ExportOptions.plist
+    create_ios_export_options_inline
+    
     # Create Makefile
     if [ ! -f "$TARGET_DIR/Makefile" ]; then
         create_makefile_inline
@@ -291,11 +507,6 @@ create_configuration_files_inline() {
     # Create Gemfile
     if [ ! -f "$TARGET_DIR/Gemfile" ]; then
         create_gemfile_inline
-    fi
-    
-    # Create key.properties template
-    if [ ! -f "$TARGET_DIR/android/key.properties.template" ]; then
-        create_key_properties_template_inline
     fi
 }
 
@@ -374,6 +585,55 @@ platform :ios do
 end
 EOF
     print_success "iOS Fastfile created (inline)"
+}
+
+create_ios_appfile_inline() {
+    if [ ! -f "$TARGET_DIR/ios/fastlane/Appfile" ]; then
+        cat > "$TARGET_DIR/ios/fastlane/Appfile" << EOF
+# Appfile for $PROJECT_NAME iOS
+# Configuration for App Store Connect and Apple Developer
+
+app_identifier("$BUNDLE_ID") # Your bundle identifier
+apple_id("your-apple-id@email.com") # Replace with your Apple ID
+team_id("YOUR_TEAM_ID") # Replace with your Apple Developer Team ID
+
+# Optional: If you belong to multiple teams
+# itc_team_id("YOUR_TEAM_ID") # App Store Connect Team ID (if different from team_id)
+
+EOF
+        print_success "iOS Appfile created (inline)"
+    else
+        print_info "iOS Appfile already exists, skipping creation"
+    fi
+}
+
+create_ios_export_options_inline() {
+    if [ ! -f "$TARGET_DIR/ios/fastlane/ExportOptions.plist" ]; then
+        mkdir -p "$TARGET_DIR/ios/fastlane"
+        cat > "$TARGET_DIR/ios/fastlane/ExportOptions.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store-connect</string>
+    <key>teamID</key>
+    <string>YOUR_TEAM_ID</string>
+    <key>uploadBitcode</key>
+    <false/>
+    <key>compileBitcode</key>
+    <false/>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>signingStyle</key>
+    <string>automatic</string>
+</dict>
+</plist>
+EOF
+        print_success "iOS ExportOptions.plist created (inline)"
+    else
+        print_info "iOS ExportOptions.plist already exists, skipping creation"
+    fi
 }
 
 create_makefile_inline() {
@@ -493,22 +753,7 @@ EOF
     print_success "Gemfile created (inline)"
 }
 
-create_key_properties_template_inline() {
-    cat > "$TARGET_DIR/android/key.properties.template" << EOF
-# Android signing configuration template for $PROJECT_NAME
-# Copy this to key.properties and update with your keystore information
 
-keyAlias=release
-keyPassword=YOUR_KEY_PASSWORD
-storeFile=../app/app.keystore
-storePassword=YOUR_STORE_PASSWORD
-
-# Project: $PROJECT_NAME
-# Package: $PACKAGE_NAME
-# Generated on: $(date)
-EOF
-    print_success "Android key.properties template created (inline)"
-}
 
 # Function to setup gitignore
 setup_gitignore() {
@@ -516,11 +761,10 @@ setup_gitignore() {
     
     local gitignore_entries=(
         "# CI/CD sensitive files"
-        "android/key.properties"
         "android/app/*.keystore"
         "android/fastlane/play_store_service_account.json"
         "ios/fastlane/AuthKey_*.p8"
-        "ios/ExportOptions.plist"
+        "ios/fastlane/ExportOptions.plist"
         ""
         "# Build artifacts"
         "builder/"
@@ -546,6 +790,113 @@ setup_gitignore() {
     print_success ".gitignore updated with CI/CD entries"
 }
 
+# Function to create project configuration with user confirmation
+create_project_config() {
+    print_header "Project Configuration Setup"
+    
+    # Check if config file already exists
+    if [ -f "$TARGET_DIR/project.config" ]; then
+        print_warning "project.config already exists!"
+        echo ""
+        echo "📄 Current config file found at: project.config"
+        echo ""
+        
+        # Show current config summary
+        if source "$TARGET_DIR/project.config" 2>/dev/null; then
+            echo "📋 Current configuration:"
+            echo "   Project: ${PROJECT_NAME:-'not set'}"
+            echo "   Package: ${PACKAGE_NAME:-'not set'}"
+            echo "   Bundle ID: ${BUNDLE_ID:-'not set'}"
+            echo "   Version: ${CURRENT_VERSION:-'not set'}"
+            echo "   Git Repo: ${GIT_REPO:-'not set'}"
+            echo ""
+            echo "   📱 iOS Settings:"
+            echo "      Team ID: ${TEAM_ID:-'not set'}"
+            echo "      Key ID: ${KEY_ID:-'not set'}"
+            echo "      Issuer ID: ${ISSUER_ID:-'not set'}"
+            echo "      Apple ID: ${APPLE_ID:-'not set'}"
+            echo ""
+            echo "   📦 Build Settings:"
+            echo "      Output Dir: ${OUTPUT_DIR:-'not set'}"
+            echo "      Changelog: ${CHANGELOG_FILE:-'not set'}"
+            echo "      Google Play Track: ${GOOGLE_PLAY_TRACK:-'not set'}"
+            echo "      TestFlight Groups: ${TESTFLIGHT_GROUPS:-'not set'}"
+            echo ""
+            echo "   ✅ Status:"
+            echo "      Credentials Complete: ${CREDENTIALS_COMPLETE:-'not set'}"
+            echo "      Android Ready: ${ANDROID_READY:-'not set'}"
+            echo "      iOS Ready: ${IOS_READY:-'not set'}"
+            echo ""
+            echo "   Last updated: $(stat -f "%Sm" "$TARGET_DIR/project.config" 2>/dev/null || echo 'unknown')"
+        fi
+        echo ""
+        
+        # Ask user what to do with existing config
+        echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
+        echo "  ${GREEN}y - Yes, create new (overwrite existing)"
+        echo "  ${RED}n - No, keep existing file"
+        echo ""
+        
+        local user_choice
+        read_with_fallback "Your choice (y/n): " "n" user_choice
+        user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
+            
+        if [[ "$user_choice" == "y" ]]; then
+            print_info "Creating new project.config file..."
+            create_new_project_config
+        else
+            print_success "✅ Keeping existing project.config file"
+            print_info "Using current configuration without changes"
+            echo ""
+            # Even when keeping existing config, we still need to ensure all deployment files are created
+            print_info "Ensuring all deployment files are created..."
+            return 0
+        fi
+    else
+        print_info "No existing project.config found - creating new one"
+        create_new_project_config
+    fi
+}
+
+# Function to create new project config file
+create_new_project_config() {
+    cat > "$TARGET_DIR/project.config" << EOF
+# Flutter CI/CD Project Configuration
+# Auto-generated for project: $PROJECT_NAME
+
+PROJECT_NAME="$PROJECT_NAME"
+PACKAGE_NAME="$PACKAGE_NAME"
+BUNDLE_ID="$BUNDLE_ID"
+APP_NAME="$APP_NAME"
+
+# Build Configuration
+BUILD_MODE="release"
+FLUTTER_BUILD_ARGS="--release --no-tree-shake-icons"
+
+# iOS Configuration
+IOS_SCHEME="Runner"
+IOS_WORKSPACE="ios/Runner.xcworkspace"
+IOS_EXPORT_METHOD="app-store"
+TEAM_ID="YOUR_TEAM_ID"
+KEY_ID="YOUR_KEY_ID"
+ISSUER_ID="YOUR_ISSUER_ID"
+APPLE_ID="your-apple-id@email.com"
+
+# Android Configuration
+ANDROID_BUILD_TYPE="appbundle"
+ANDROID_FLAVOR=""
+
+# Version Configuration
+VERSION_STRATEGY="auto"
+CHANGELOG_ENABLED="true"
+
+# Generated on: $(date)
+EOF
+    
+    print_success "✅ Created project.config file"
+    print_info "Please update the iOS credentials (TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID) in project.config"
+}
+
 # Function to display setup summary
 display_setup_summary() {
     print_header "Setup Summary"
@@ -557,23 +908,22 @@ display_setup_summary() {
     echo -e "  • Package Name: ${WHITE}$PACKAGE_NAME${NC}"
     echo -e "  • Bundle ID: ${WHITE}$BUNDLE_ID${NC}"
     echo -e "  • App Name: ${WHITE}$APP_NAME${NC}"
+    echo -e "  • Deployment Mode: ${WHITE}$DEPLOYMENT_MODE${NC}"
     echo ""
-    echo -e "${CYAN}📋 Next Steps:${NC}"
-    echo -e "  1. ${YELLOW}Configure Android keystore:${NC}"
-    echo -e "     • Copy ${WHITE}android/key.properties.template${NC} to ${WHITE}android/key.properties${NC}"
-    echo -e "     • Update with your keystore details"
-    echo ""
-    echo -e "  2. ${YELLOW}Configure iOS signing:${NC}"
-    echo -e "     • Update ${WHITE}ios/fastlane/Appfile${NC} with your Apple ID and Team ID"
-    echo -e "     • Add App Store Connect API key"
-    echo ""
-    echo -e "  3. ${YELLOW}Configure GitHub Secrets:${NC}"
-    echo -e "     • Add required secrets for automated deployment"
-    echo ""
-    echo -e "${CYAN}🚀 Usage:${NC}"
-    echo -e "  • Run ${WHITE}make help${NC} to see available commands"
-    echo -e "  • Run ${WHITE}make tester${NC} to build for testing"
-    echo -e "  • Run ${WHITE}make live${NC} to build for production"
+    
+    if [ "$DEPLOYMENT_MODE" = "local" ]; then
+        echo -e "${CYAN}📱 Local Deployment Setup:${NC}"
+        echo -e "  • Fastlane configured for manual deployment"
+        echo -e "  • Use 'make tester' for testing builds"
+        echo -e "  • Use 'make live' for production builds"
+        echo -e "  • No GitHub authentication required"
+    else
+        echo -e "${CYAN}🚀 GitHub Actions Setup:${NC}"
+        echo -e "  • Automated CI/CD pipeline configured"
+        echo -e "  • GitHub authentication verified"
+        echo -e "  • Push tags to trigger deployments"
+        echo -e "  • Workflow file: .github/workflows/deploy.yml"
+    fi
     echo ""
 }
 
@@ -623,11 +973,21 @@ main() {
     
     print_success "Flutter project detected: $TARGET_DIR"
     
+    # Prompt user for deployment mode
+    prompt_deployment_mode
+    
     # Execute setup steps
     detect_project_info
+    
+    # Check GitHub authentication if GitHub mode is selected
+    if [ "$DEPLOYMENT_MODE" = "github" ]; then
+        check_github_auth
+    fi
+    
     create_directory_structure
     copy_scripts
     create_configuration_files
+    create_project_config
     setup_gitignore
     display_setup_summary
     

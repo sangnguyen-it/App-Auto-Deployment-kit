@@ -9,6 +9,8 @@ process_template() {
     local project_name="${3:-}"
     local package_name="${4:-}"
     local app_name="${5:-}"
+    local team_id="${6:-YOUR_TEAM_ID}"
+    local apple_id="${7:-your-apple-id@email.com}"
     
     if [ ! -f "$template_file" ]; then
         echo "Error: Template file not found: $template_file" >&2
@@ -27,6 +29,8 @@ process_template() {
     temp_content="${temp_content//\{\{PROJECT_NAME\}\}/$project_name}"
     temp_content="${temp_content//\{\{PACKAGE_NAME\}\}/$package_name}"
     temp_content="${temp_content//\{\{APP_NAME\}\}/$app_name}"
+    temp_content="${temp_content//\{\{TEAM_ID\}\}/$team_id}"
+    temp_content="${temp_content//\{\{APPLE_ID\}\}/$apple_id}"
     temp_content="${temp_content//\{\{GENERATION_DATE\}\}/$(date)}"
     
     # Write processed content to output file
@@ -73,7 +77,47 @@ create_ios_fastfile_from_template() {
     fi
 }
 
-# Function to create Makefile from template
+# Function to create iOS Appfile from template
+create_ios_appfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local team_id="${4:-YOUR_TEAM_ID}"
+    local apple_id="${5:-your-apple-id@email.com}"
+    local template_dir="${6:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    
+    local template_file="$template_dir/ios_appfile.template"
+    local output_file="$target_dir/ios/fastlane/Appfile"
+    
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name" "$project_name" "$team_id" "$apple_id"; then
+        echo "✅ iOS Appfile created from template"
+        return 0
+    else
+        echo "❌ Failed to create iOS Appfile from template"
+        return 1
+    fi
+}
+
+# Function to create Android Appfile from template
+create_android_appfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local template_dir="${4:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    
+    local template_file="$template_dir/android_appfile.template"
+    local output_file="$target_dir/android/fastlane/Appfile"
+    
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name"; then
+        echo "✅ Android Appfile created from template"
+        return 0
+    else
+        echo "❌ Failed to create Android Appfile from template"
+        return 1
+    fi
+}
+
+
 create_makefile_from_template() {
     local target_dir="$1"
     local project_name="$2"
@@ -131,24 +175,6 @@ create_gemfile_from_template() {
     fi
 }
 
-# Function to create key.properties template from template
-create_key_properties_from_template() {
-    local target_dir="$1"
-    local project_name="$2"
-    local package_name="$3"
-    local template_dir="${4:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
-    
-    local template_file="$template_dir/key_properties.template"
-    local output_file="$target_dir/android/key.properties.template"
-    
-    if process_template "$template_file" "$output_file" "$project_name" "$package_name"; then
-        echo "✅ Android key.properties template created from template"
-        return 0
-    else
-        echo "❌ Failed to create key.properties template from template"
-        return 1
-    fi
-}
 
 # Function to create iOS ExportOptions.plist from template
 create_ios_export_options_from_template() {
@@ -157,7 +183,7 @@ create_ios_export_options_from_template() {
     local template_dir="${3:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
     
     local template_file="$template_dir/ios_export_options.template"
-    local output_file="$target_dir/ios/ExportOptions.plist"
+    local output_file="$target_dir/ios/fastlane/ExportOptions.plist"
     
     # Create temporary content with team ID substitution
     local temp_content
@@ -187,8 +213,8 @@ create_all_templates() {
     local app_name="$4"
     local team_id="${5:-YOUR_TEAM_ID}"
     local template_dir="${6:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
-    
-    echo "🔄 Creating all templates for project: $project_name"
+    local apple_id="${7:-your-apple-id@email.com}"
+
     
     # Create directory structure
     mkdir -p "$target_dir/android/fastlane"
@@ -202,7 +228,15 @@ create_all_templates() {
         success=false
     fi
     
+    if ! create_android_appfile_from_template "$target_dir" "$project_name" "$package_name" "$template_dir"; then
+        success=false
+    fi
+    
     if ! create_ios_fastfile_from_template "$target_dir" "$project_name" "$package_name" "$template_dir"; then
+        success=false
+    fi
+    
+    if ! create_ios_appfile_from_template "$target_dir" "$project_name" "$package_name" "$team_id" "$apple_id" "$template_dir"; then
         success=false
     fi
     
@@ -215,10 +249,6 @@ create_all_templates() {
     fi
     
     if ! create_gemfile_from_template "$target_dir" "$project_name" "$template_dir"; then
-        success=false
-    fi
-    
-    if ! create_key_properties_from_template "$target_dir" "$project_name" "$package_name" "$template_dir"; then
         success=false
     fi
     
@@ -238,10 +268,11 @@ create_all_templates() {
 # Export functions for use in other scripts
 export -f process_template
 export -f create_android_fastfile_from_template
+export -f create_android_appfile_from_template
 export -f create_ios_fastfile_from_template
+export -f create_ios_appfile_from_template
 export -f create_makefile_from_template
 export -f create_github_workflow_from_template
 export -f create_gemfile_from_template
-export -f create_key_properties_from_template
 export -f create_ios_export_options_from_template
 export -f create_all_templates

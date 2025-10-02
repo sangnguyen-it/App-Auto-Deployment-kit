@@ -93,354 +93,7 @@ menu: ## 🎯 Interactive Menu - Choose Your Build Pipeline
 	@printf "\n"
 	@printf "$(PURPLE)$(BOLD)🚀 Automated Build Pipelines:$(NC)\n"
 	@printf "\n"
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Running Tests"
-	@flutter test
-	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Test suite completed"
-	@printf "\n"
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ⚙️ MANUAL OPERATIONS & ADVANCED TOOLS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-manual-operations: ## ⚙️ Manual Operations & Advanced Tools Menu
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(WRENCH) $(WHITE)Manual Operations & Advanced Tools$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)🔧 Build Management:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  1)$(NC) $(WHITE)📦 Build Management Menu$(NC)    $(GRAY)# APK, AAB, iOS builds$(NC)\n"
-	@printf "$(CYAN)  2)$(NC) $(WHITE)🔢 Version Management Menu$(NC)  $(GRAY)# Version sync, bump, validate$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)🚀 Deployment & CI/CD:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  3)$(NC) $(WHITE)🚀 Trigger GitHub Actions$(NC)   $(GRAY)# Manual CI/CD trigger$(NC)\n"
-	@printf "$(CYAN)  4)$(NC) $(WHITE)🔍 System Check$(NC)            $(GRAY)# Environment verification$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)🛠️ Maintenance:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  5)$(NC) $(WHITE)📦 Install Dependencies$(NC)     $(GRAY)# Flutter, Ruby, iOS pods$(NC)\n"
-	@printf "$(CYAN)  6)$(NC) $(WHITE)🧹 Clean Project$(NC)           $(GRAY)# Remove build artifacts$(NC)\n"
-	@printf "$(CYAN)  7)$(NC) $(WHITE)🔬 Run Tests$(NC)               $(GRAY)# Execute test suite$(NC)\n"
-	@printf "$(CYAN)  8)$(NC) $(WHITE)🏠 Back to Main Menu$(NC)       $(GRAY)# Return to main menu$(NC)\n"
-	@printf "\n"
-	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
-	@printf "$(WHITE)Enter your choice [1-8]:$(NC) "
-	@read -p "" CHOICE; \
-	case $$CHOICE in \
-		1) $(MAKE) build-management-menu ;; \
-		2) $(MAKE) version-management-menu ;; \
-		3) $(MAKE) trigger-github-actions ;; \
-		4) $(MAKE) system-check ;; \
-		5) $(MAKE) deps ;; \
-		6) $(MAKE) clean ;; \
-		7) $(MAKE) test ;; \
-		8) $(MAKE) menu ;; \
-		*) printf "$(RED)Invalid choice. Please select 1-8.$(NC)\n" && $(MAKE) manual-operations ;; \
-	esac
-
-build-management-menu: ## 📦 Build Management Menu
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(PACKAGE) $(WHITE)Build Management Menu$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)📱 Android Builds:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  1)$(NC) $(WHITE)📦 Build Android APK$(NC)        $(GRAY)# Release APK for testing$(NC)\n"
-	@printf "$(CYAN)  2)$(NC) $(WHITE)📦 Build Android AAB$(NC)        $(GRAY)# App Bundle for Play Store$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)🍎 iOS Builds:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  3)$(NC) $(WHITE)🍎 Build iOS$(NC)               $(GRAY)# iOS build (macOS only)$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)🔙 Navigation:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  4)$(NC) $(WHITE)🔙 Back to Manual Operations$(NC) $(GRAY)# Return to previous menu$(NC)\n"
-	@printf "$(CYAN)  5)$(NC) $(WHITE)🏠 Main Menu$(NC)               $(GRAY)# Return to main menu$(NC)\n"
-	@printf "\n"
-	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
-	@printf "$(WHITE)Enter your choice [1-5]:$(NC) "
-	@read -p "" CHOICE; \
-	case $$CHOICE in \
-		1) $(MAKE) build-android-apk ;; \
-		2) $(MAKE) build-android-aab ;; \
-		3) $(MAKE) build-ios ;; \
-		4) $(MAKE) manual-operations ;; \
-		5) $(MAKE) menu ;; \
-		*) printf "$(RED)Invalid choice. Please select 1-5.$(NC)\n" && $(MAKE) build-management-menu ;; \
-	esac
-
-version-management-menu: ## 🔢 Version Management Menu
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(SPARKLES) $(WHITE)Version Management Menu$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)📊 Version Information:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  1)$(NC) $(WHITE)📊 Show Current Versions$(NC)    $(GRAY)# Display all platform versions$(NC)\n"
-	@printf "$(CYAN)  2)$(NC) $(WHITE)🔄 Sync Versions$(NC)           $(GRAY)# Synchronize across platforms$(NC)\n"
-	@printf "$(CYAN)  3)$(NC) $(WHITE)✅ Validate Versions$(NC)        $(GRAY)# Check against store versions$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)⬆️ Version Updates:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  4)$(NC) $(WHITE)⬆️ Bump Version$(NC)            $(GRAY)# Increment version numbers$(NC)\n"
-	@printf "$(CYAN)  5)$(NC) $(WHITE)🏷️ Generate Tag$(NC)            $(GRAY)# Create deployment tag$(NC)\n"
-	@printf "$(CYAN)  6)$(NC) $(WHITE)🔧 Auto-fix Conflicts$(NC)      $(GRAY)# Resolve version conflicts$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)🔙 Navigation:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  7)$(NC) $(WHITE)🔙 Back to Manual Operations$(NC) $(GRAY)# Return to previous menu$(NC)\n"
-	@printf "$(CYAN)  8)$(NC) $(WHITE)🏠 Main Menu$(NC)               $(GRAY)# Return to main menu$(NC)\n"
-	@printf "\n"
-	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
-	@printf "$(WHITE)Enter your choice [1-8]:$(NC) "
-	@read -p "" CHOICE; \
-	case $$CHOICE in \
-		1) $(MAKE) version-show ;; \
-		2) $(MAKE) version-sync ;; \
-		3) $(MAKE) version-validate ;; \
-		4) $(MAKE) version-bump ;; \
-		5) $(MAKE) version-tag ;; \
-		6) $(MAKE) version-autofix ;; \
-		7) $(MAKE) manual-operations ;; \
-		8) $(MAKE) menu ;; \
-		*) printf "$(RED)Invalid choice. Please select 1-8.$(NC)\n" && $(MAKE) version-management-menu ;; \
-	esac
-
-version-show: ## 📊 Show current versions across all platforms
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(SPARKLES) $(WHITE)Current Version Information$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@if command -v dart >/dev/null 2>&1; then \
-		dart scripts/version_manager.dart show 2>/dev/null || printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Version manager script not available"; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - showing basic version info"; \
-		printf "$(WHITE)Current Version:$(NC) $(CYAN)$(VERSION_FULL)$(NC)\n"; \
-	fi
-
-version-sync: ## 🔄 Synchronize versions across platforms
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(GEAR) $(WHITE)Version Synchronization$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@printf "$(YELLOW)$(WARNING) %s$(NC)\n" "This will synchronize versions across all platforms"
-	@printf "$(WHITE)Continue? [y/N]:$(NC) "
-	@read -p "" CONFIRM; \
-	if [ "$$CONFIRM" = "y" ] || [ "$$CONFIRM" = "Y" ]; then \
-		if command -v dart >/dev/null 2>&1; then \
-			dart scripts/version_sync.dart 2>/dev/null || printf "$(RED)$(CROSS) %s$(NC)\n" "Version sync failed"; \
-		else \
-			printf "$(RED)$(CROSS) %s$(NC)\n" "Dart not found - cannot sync versions"; \
-		fi; \
-	else \
-		printf "$(CYAN)$(INFO) %s$(NC)\n" "Version sync cancelled"; \
-	fi
-
-version-validate: ## ✅ Validate versions against store versions
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(SHIELD) $(WHITE)Version Validation$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@if command -v dart >/dev/null 2>&1; then \
-		dart scripts/version_manager.dart validate 2>/dev/null || printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Version validation script not available"; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - cannot validate versions"; \
-	fi
-
-version-bump: ## ⬆️ Bump version numbers (major, minor, patch, build)
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(SPARKLES) $(WHITE)Version Bump Options$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)Select bump type:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  1)$(NC) $(WHITE)Major$(NC)     $(GRAY)# 1.0.0 → 2.0.0$(NC)\n"
-	@printf "$(CYAN)  2)$(NC) $(WHITE)Minor$(NC)     $(GRAY)# 1.0.0 → 1.1.0$(NC)\n"
-	@printf "$(CYAN)  3)$(NC) $(WHITE)Patch$(NC)     $(GRAY)# 1.0.0 → 1.0.1$(NC)\n"
-	@printf "$(CYAN)  4)$(NC) $(WHITE)Build$(NC)     $(GRAY)# 1.0.0+1 → 1.0.0+2$(NC)\n"
-	@printf "$(CYAN)  5)$(NC) $(WHITE)Auto$(NC)      $(GRAY)# Smart bump based on store$(NC)\n"
-	@printf "\n"
-	@printf "$(WHITE)Enter your choice [1-5]:$(NC) "
-	@read -p "" CHOICE; \
-	case $$CHOICE in \
-		1) BUMP_TYPE="major" ;; \
-		2) BUMP_TYPE="minor" ;; \
-		3) BUMP_TYPE="patch" ;; \
-		4) BUMP_TYPE="build" ;; \
-		5) BUMP_TYPE="auto" ;; \
-		*) printf "$(RED)Invalid choice$(NC)\n" && exit 1 ;; \
-	esac; \
-	if command -v dart >/dev/null 2>&1; then \
-		dart scripts/version_manager.dart bump $$BUMP_TYPE 2>/dev/null || printf "$(RED)$(CROSS) %s$(NC)\n" "Version bump failed"; \
-	else \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Dart not found - cannot bump version"; \
-	fi
-
-version-tag: ## 🏷️ Generate deployment tag
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(STAR) $(WHITE)Generate Deployment Tag$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@if command -v dart >/dev/null 2>&1; then \
-		dart scripts/tag_generator.dart 2>/dev/null || printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Tag generator script not available"; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - cannot generate tag"; \
-	fi
-
-version-autofix: ## 🔧 Auto-fix version conflicts
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(WRENCH) $(WHITE)Auto-fix Version Conflicts$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@printf "$(YELLOW)$(WARNING) %s$(NC)\n" "This will automatically fix version conflicts"
-	@printf "$(WHITE)Continue? [y/N]:$(NC) "
-	@read -p "" CONFIRM; \
-	if [ "$$CONFIRM" = "y" ] || [ "$$CONFIRM" = "Y" ]; then \
-		if command -v dart >/dev/null 2>&1; then \
-			dart scripts/version_manager.dart autofix 2>/dev/null || printf "$(RED)$(CROSS) %s$(NC)\n" "Auto-fix failed"; \
-		else \
-			printf "$(RED)$(CROSS) %s$(NC)\n" "Dart not found - cannot auto-fix"; \
-		fi; \
-	else \
-		printf "$(CYAN)$(INFO) %s$(NC)\n" "Auto-fix cancelled"; \
-	fi
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 🔨 INDIVIDUAL BUILD TARGETS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-build-android-apk: ## 📦 Build Android APK
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(PACKAGE) $(WHITE)Building Android APK$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building Android APK..."
-	@flutter clean && flutter pub get
-	@flutter build apk --release
-	@if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then \
-		APK_SIZE=$$(du -h "build/app/outputs/flutter-apk/app-release.apk" | awk '{print $$1}'); \
-		printf "$(GREEN)$(CHECK) %s (Size: $$APK_SIZE)$(NC)\n" "Android APK built successfully"; \
-		printf "$(WHITE)  Location:$(NC) build/app/outputs/flutter-apk/app-release.apk\n"; \
-		mkdir -p $(OUTPUT_DIR); \
-		cp "build/app/outputs/flutter-apk/app-release.apk" "$(OUTPUT_DIR)/$(APK_NAME)"; \
-		printf "$(GREEN)$(CHECK) %s$(NC)\n" "APK copied to $(OUTPUT_DIR)/$(APK_NAME)"; \
-	else \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Android APK build failed"; \
-		printf "$(CYAN)$(INFO) %s$(NC)\n" "Check Flutter installation and project configuration"; \
-		exit 1; \
-	fi
-
-build-android-aab: ## 📦 Build Android App Bundle (AAB)
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(PACKAGE) $(WHITE)Building Android App Bundle$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building Android AAB..."
-	@flutter clean && flutter pub get
-	@flutter build appbundle --release
-	@if [ -f "build/app/outputs/bundle/release/app-release.aab" ]; then \
-		AAB_SIZE=$$(du -h "build/app/outputs/bundle/release/app-release.aab" | awk '{print $$1}'); \
-		printf "$(GREEN)$(CHECK) %s (Size: $$AAB_SIZE)$(NC)\n" "Android AAB built successfully"; \
-		printf "$(WHITE)  Location:$(NC) build/app/outputs/bundle/release/app-release.aab\n"; \
-		mkdir -p $(OUTPUT_DIR); \
-		cp "build/app/outputs/bundle/release/app-release.aab" "$(OUTPUT_DIR)/$(AAB_NAME)"; \
-		printf "$(GREEN)$(CHECK) %s$(NC)\n" "AAB copied to $(OUTPUT_DIR)/$(AAB_NAME)"; \
-	else \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Android AAB build failed"; \
-		printf "$(CYAN)$(INFO) %s$(NC)\n" "Check Flutter installation and project configuration"; \
-		exit 1; \
-	fi
-
-build-ios: ## 🍎 Build iOS application (macOS only)
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(PHONE) $(WHITE)Building iOS Application$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@if [ "$$(uname)" != "Darwin" ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "iOS builds require macOS"; \
-		exit 1; \
-	fi
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building iOS..."
-	@flutter clean && flutter pub get
-	@flutter build ios --release
-	@if [ $$? -eq 0 ]; then \
-		printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed successfully"; \
-		printf "$(WHITE)  Location:$(NC) build/ios/iphoneos/Runner.app\n"; \
-	else \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "iOS build failed"; \
-		printf "$(CYAN)$(INFO) %s$(NC)\n" "Check Xcode installation and iOS project configuration"; \
-		exit 1; \
-	fi
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 📚 HELP & DOCUMENTATION
-# ═══════════════════════════════════════════════════════════════════════════════
-
-help: ## 📋 Show detailed help and available commands
-	@printf "\n"
-	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(STAR) $(WHITE)$(PROJECT_NAME) - Available Commands$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)🚀 Automated Pipelines:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  make tester$(NC)              $(GRAY)# 🧪 Build APK + TestFlight for testing$(NC)\n"
-	@printf "$(CYAN)  make live$(NC)                $(GRAY)# 🚀 Full production pipeline (hybrid)$(NC)\n"
-	@printf "$(CYAN)  make live-local$(NC)          $(GRAY)# 🚀 Local build + upload to stores$(NC)\n"
-	@printf "$(CYAN)  make live-github$(NC)         $(GRAY)# ☁️ GitHub Actions deployment only$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)⚙️ Manual Operations:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  make manual-operations$(NC)   $(GRAY)# ⚙️ Advanced tools & configurations$(NC)\n"
-	@printf "$(CYAN)  make trigger-github-actions$(NC) $(GRAY)# 🚀 Trigger CI/CD manually$(NC)\n"
-	@printf "$(CYAN)  make system-check$(NC)        $(GRAY)# 🔍 Verify environment setup$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)🔨 Direct Commands:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  make build-android-apk$(NC)   $(GRAY)# 📦 Build Android APK$(NC)\n"
-	@printf "$(CYAN)  make build-android-aab$(NC)   $(GRAY)# 📦 Build Android App Bundle$(NC)\n"
-	@printf "$(CYAN)  make build-ios$(NC)           $(GRAY)# 🍎 Build iOS (macOS only)$(NC)\n"
-	@printf "$(CYAN)  make deps$(NC)                $(GRAY)# 📦 Install all dependencies$(NC)\n"
-	@printf "$(CYAN)  make clean$(NC)               $(GRAY)# 🧹 Clean build artifacts$(NC)\n"
-	@printf "$(CYAN)  make test$(NC)                $(GRAY)# 🔬 Run test suite$(NC)\n"
-	@printf "$(CYAN)  make setup$(NC)               $(GRAY)# ⚙️ Setup development environment$(NC)\n"
-	@printf "$(CYAN)  make doctor$(NC)              $(GRAY)# 🔍 Run health checks$(NC)\n"
-	@printf "\n"
-	@printf "$(PURPLE)$(BOLD)📊 Version Management:$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)  make version-show$(NC)        $(GRAY)# 📊 Show current versions$(NC)\n"
-	@printf "$(CYAN)  make version-sync$(NC)        $(GRAY)# 🔄 Sync versions across platforms$(NC)\n"
-	@printf "$(CYAN)  make version-bump$(NC)        $(GRAY)# ⬆️ Bump version numbers$(NC)\n"
-	@printf "$(CYAN)  make version-validate$(NC)    $(GRAY)# ✅ Validate against store versions$(NC)\n"
-	@printf "\n"
-	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
-	@printf "$(WHITE)💡 Tip:$(NC) Run $(CYAN)make$(NC) or $(CYAN)make menu$(NC) for interactive menu\n"
-	@printf "$(WHITE)📚 Docs:$(NC) Check docs/ directory for detailed setup guides\n"
-	@printf "\n"
-
-.PHONY: menu tester live live-local live-github auto-build-tester auto-build-live auto-build-live-local auto-build-live-github trigger-github-actions system-check system-tester deps setup doctor clean build test manual-operations build-management-menu version-management-menu version-show version-sync version-validate version-bump version-tag version-autofix build-android-apk build-android-aab build-ios help
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 📝 MAKEFILE METADATA
-# ═══════════════════════════════════════════════════════════════════════════════
-# Generated by: AppAutoDeploy v2.0.0
-# Template: makefile.template
-# Project: {{PROJECT_NAME}}
-# Generated: $(shell date)
-# ═══════════════════════════════════════════════════════════════════════════════  1)$(NC) $(WHITE)🧪 Tester Pipeline$(NC)         $(GRAY)# APK + TestFlight for testing$(NC)\n"
+	@printf "$(CYAN)  1)$(NC) $(WHITE)🧪 Tester Pipeline$(NC)         $(GRAY)# APK + TestFlight for testing$(NC)\n"
 	@printf "$(CYAN)  2)$(NC) $(WHITE)🚀 Live Local Pipeline$(NC)     $(GRAY)# AAB + App Store (Local upload)$(NC)\n"
 	@printf "$(CYAN)  3)$(NC) $(WHITE)☁️  Live GitHub Pipeline$(NC)    $(GRAY)# GitHub Actions deployment$(NC)\n"
 	@printf "$(CYAN)  4)$(NC) $(WHITE)🔄 Live Hybrid Pipeline$(NC)    $(GRAY)# Local build + GitHub upload$(NC)\n"
@@ -506,6 +159,22 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	@if [ $$? -ne 0 ]; then \
 		printf "$(RED)$(CROSS) %s$(NC)\n" "System configuration failed! Please fix issues above."; \
 		exit 1; \
+	fi
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
+	@if command -v dart >/dev/null 2>&1; then \
+		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
+			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
+			else \
+				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
+			fi; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
 	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
@@ -640,15 +309,20 @@ auto-build-live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 		exit 1; \
 	fi
 	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Syncing version with store..."
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
 	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/version_manager.dart smart-bump auto 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version synced with store"; \
+		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
 		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Version sync failed - continuing with current version"; \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
+			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
+			else \
+				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
+			fi; \
 		fi; \
 	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping version sync"; \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
 	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
@@ -779,15 +453,20 @@ auto-build-live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 		exit 1; \
 	fi
 	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Syncing version with store..."
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
 	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/version_manager.dart smart-bump auto 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version synced with store"; \
+		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
 		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Version sync failed - continuing with current version"; \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
+			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
+			else \
+				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
+			fi; \
 		fi; \
 	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping version sync"; \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
 	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
@@ -930,6 +609,23 @@ auto-build-live-github: ## ☁️ Automated Live Production Pipeline (GitHub Onl
 	@printf "\n"
 	@printf "$(CYAN)☁️ Triggering GitHub Actions for Production Build$(NC)\n"
 	@printf "\n"
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
+	@if command -v dart >/dev/null 2>&1; then \
+		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
+			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
+			else \
+				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
+			fi; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
+	fi
+	
 	@VERSION=$$(grep "version:" pubspec.yaml | cut -d' ' -f2 | tr -d ' '); \
 	if [ -z "$$VERSION" ]; then \
 		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract version from pubspec.yaml"; \

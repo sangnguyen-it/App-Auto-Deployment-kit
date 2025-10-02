@@ -1278,7 +1278,8 @@ ISSUER_ID = "YOUR_ISSUER_ID"
 TESTER_GROUPS = ["\#{PROJECT_NAME} Internal Testers", "\#{PROJECT_NAME} Beta Testers"]
 
 # File paths (relative to fastlane directory)
-KEY_PATH = "AuthKey_\#{KEY_ID}.p8"
+# Use File.expand_path to ensure absolute path resolution for AuthKey file
+KEY_PATH = File.expand_path("./AuthKey_\#{KEY_ID}.p8", __dir__)
 CHANGELOG_PATH = "../builder/changelog.txt"
 IPA_OUTPUT_DIR = "../build/ios/ipa"
 # Project-specific paths
@@ -3681,8 +3682,11 @@ sync_fastfile() {
         sed -i.bak "s/^ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
     fi
     
-    # Fix KEY_PATH to use correct relative path from fastlane directory
-    sed -i.bak 's|KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"|KEY_PATH = "./AuthKey_#{KEY_ID}.p8"|g' "$temp_fastfile"
+    # Fix KEY_PATH to use absolute path for reliable file access
+    # This prevents "Couldn't find key p8 file" errors in app_store_connect_api_key
+    # File.expand_path ensures the AuthKey file is found regardless of working directory
+    sed -i.bak 's|KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"|KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)|g' "$temp_fastfile"
+    sed -i.bak 's|KEY_PATH = "./AuthKey_#{KEY_ID}.p8"|KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)|g' "$temp_fastfile"
     
     # Update export_options to include proper signing certificate and bitcode settings
     # Fix build_and_upload_auto lane
@@ -3753,9 +3757,6 @@ sync_export_options() {
     
     # Only update if TEAM_ID is not empty and not a placeholder
     if [ -n "$TEAM_ID" ] && [ "$TEAM_ID" != "YOUR_TEAM_ID" ] && [ "$TEAM_ID" != "TEAM_ID" ]; then
-        # Create backup
-        cp "$export_options_path" "$export_options_path.bak"
-        
         # Update teamID in ExportOptions.plist
         sed -i.tmp "s/<string>YOUR_TEAM_ID<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"
         sed -i.tmp "s/<string>TEAM_ID<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"

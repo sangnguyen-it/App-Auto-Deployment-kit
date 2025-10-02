@@ -2049,23 +2049,25 @@ manual-operations: ## ⚙️ Manual Operations Menu
 	@printf "$(PURPLE)$(BOLD)Available Manual Operations:$(NC)\n"
 	@printf "\n"
 	@printf "$(CYAN)  1)$(NC) $(WHITE)🔨 Build Management$(NC)        $(GRAY)# Interactive builds$(NC)\n"
-	@printf "$(CYAN)  2)$(NC) $(WHITE)🚀 Trigger GitHub Actions$(NC)  $(GRAY)# Git tag + CI/CD trigger$(NC)\n"
-	@printf "$(CYAN)  3)$(NC) $(WHITE)⚙️  Environment Setup$(NC)       $(GRAY)# Configure development environment$(NC)\n"
-	@printf "$(CYAN)  4)$(NC) $(WHITE)🧹 Clean & Reset$(NC)           $(GRAY)# Clean build artifacts$(NC)\n"
-	@printf "$(CYAN)  5)$(NC) $(WHITE)🔍 System Check$(NC)            $(GRAY)# Verify configuration$(NC)\n"
-	@printf "$(CYAN)  6)$(NC) $(WHITE)⬅️  Back to Main Menu$(NC)       $(GRAY)# Return to automated pipelines$(NC)\n"
+	@printf "$(CYAN)  2)$(NC) $(WHITE)📋 Version Management$(NC)      $(GRAY)# Version sync, validation, tagging$(NC)\n"
+	@printf "$(CYAN)  3)$(NC) $(WHITE)🚀 Trigger GitHub Actions$(NC)  $(GRAY)# Git tag + CI/CD trigger$(NC)\n"
+	@printf "$(CYAN)  4)$(NC) $(WHITE)⚙️  Environment Setup$(NC)       $(GRAY)# Configure development environment$(NC)\n"
+	@printf "$(CYAN)  5)$(NC) $(WHITE)🧹 Clean & Reset$(NC)           $(GRAY)# Clean build artifacts$(NC)\n"
+	@printf "$(CYAN)  6)$(NC) $(WHITE)🔍 System Check$(NC)            $(GRAY)# Verify configuration$(NC)\n"
+	@printf "$(CYAN)  7)$(NC) $(WHITE)⬅️  Back to Main Menu$(NC)       $(GRAY)# Return to automated pipelines$(NC)\n"
 	@printf "\n"
 	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
-	@printf "$(WHITE)Enter your choice [1-6]:$(NC) "
+	@printf "$(WHITE)Enter your choice [1-7]:$(NC) "
 	@read -p "" CHOICE; \
 	case $$CHOICE in \
 		1) $(MAKE) build-management-menu ;; \
-		2) $(MAKE) trigger-github-actions ;; \
-		3) $(MAKE) setup ;; \
-		4) $(MAKE) clean ;; \
-		5) $(MAKE) system-check ;; \
-		6) $(MAKE) menu ;; \
-		*) printf "$(RED)Invalid choice. Please select 1-6.$(NC)\n" ;; \
+		2) $(MAKE) version-management-menu ;; \
+		3) $(MAKE) trigger-github-actions ;; \
+		4) $(MAKE) setup ;; \
+		5) $(MAKE) clean ;; \
+		6) $(MAKE) system-check ;; \
+		7) $(MAKE) menu ;; \
+		*) printf "$(RED)Invalid choice. Please select 1-7.$(NC)\n" ;; \
 	esac
 
 build-management-menu: ## 🔨 Build Management Menu
@@ -2091,6 +2093,145 @@ build-management-menu: ## 🔨 Build Management Menu
 		4) $(MAKE) manual-operations ;; \
 		*) printf "$(RED)Invalid choice. Please select 1-4.$(NC)\n" ;; \
 	esac
+
+version-management-menu: ## 📋 Version Management Menu
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(SPARKLES) $(WHITE)Version Management & Synchronization$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@printf "$(PURPLE)$(BOLD)Version Operations:$(NC)\n"
+	@printf "\n"
+	@printf "$(CYAN)  1)$(NC) $(WHITE)📊 Show Current Versions$(NC)    $(GRAY)# Display all platform versions$(NC)\n"
+	@printf "$(CYAN)  2)$(NC) $(WHITE)🔄 Sync Versions$(NC)           $(GRAY)# Synchronize across platforms$(NC)\n"
+	@printf "$(CYAN)  3)$(NC) $(WHITE)🔍 Validate Versions$(NC)       $(GRAY)# Check store conflicts$(NC)\n"
+	@printf "$(CYAN)  4)$(NC) $(WHITE)🚀 Bump Version$(NC)            $(GRAY)# Increment version numbers$(NC)\n"
+	@printf "$(CYAN)  5)$(NC) $(WHITE)🏷️  Generate Tag$(NC)            $(GRAY)# Create deployment tag$(NC)\n"
+	@printf "$(CYAN)  6)$(NC) $(WHITE)🔧 Auto-Fix Issues$(NC)         $(GRAY)# Automatically resolve conflicts$(NC)\n"
+	@printf "$(CYAN)  7)$(NC) $(WHITE)⬅️  Back to Manual Operations$(NC) $(GRAY)# Return to previous menu$(NC)\n"
+	@printf "\n"
+	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
+	@printf "$(WHITE)Enter your choice [1-7]:$(NC) "
+	@read -p "" CHOICE; \
+	case $$CHOICE in \
+		1) $(MAKE) version-show ;; \
+		2) $(MAKE) version-sync ;; \
+		3) $(MAKE) version-validate ;; \
+		4) $(MAKE) version-bump ;; \
+		5) $(MAKE) version-tag ;; \
+		6) $(MAKE) version-autofix ;; \
+		7) $(MAKE) manual-operations ;; \
+		*) printf "$(RED)Invalid choice. Please select 1-7.$(NC)\n" ;; \
+	esac
+
+version-show: ## 📊 Show current versions across all platforms
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(INFO) $(WHITE)Current Version Information$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/version_manager.dart" ]; then \
+		dart scripts/version_manager.dart show; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "version_manager.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
+
+version-sync: ## 🔄 Synchronize versions across platforms
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(GEAR) $(WHITE)Version Synchronization$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/version_sync.dart" ]; then \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Checking current synchronization status..."; \
+		dart scripts/version_sync.dart status; \
+		printf "\n$(YELLOW)$(WARNING) %s$(NC) " "Sync all platforms to pubspec.yaml version? [y/N]:"; \
+		read -p "" CONFIRM; \
+		if [ "$$CONFIRM" = "y" ] || [ "$$CONFIRM" = "Y" ]; then \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Synchronizing versions..."; \
+			dart scripts/version_sync.dart sync pubspec; \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version synchronization completed"; \
+		else \
+			printf "$(GRAY)$(INFO) %s$(NC)\n" "Synchronization cancelled"; \
+		fi; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "version_sync.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
+
+version-validate: ## 🔍 Validate versions against store versions
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(SHIELD) $(WHITE)Version Validation$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/version_manager.dart" ]; then \
+		dart scripts/version_manager.dart validate; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "version_manager.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
+
+version-bump: ## 🚀 Bump version numbers
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(ROCKET) $(WHITE)Version Bump$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/version_manager.dart" ]; then \
+		printf "$(PURPLE)$(BOLD)Bump Options:$(NC)\n"; \
+		printf "$(CYAN)  1)$(NC) $(WHITE)Major$(NC)   $(GRAY)# 1.0.0 → 2.0.0$(NC)\n"; \
+		printf "$(CYAN)  2)$(NC) $(WHITE)Minor$(NC)   $(GRAY)# 1.0.0 → 1.1.0$(NC)\n"; \
+		printf "$(CYAN)  3)$(NC) $(WHITE)Patch$(NC)   $(GRAY)# 1.0.0 → 1.0.1$(NC)\n"; \
+		printf "$(CYAN)  4)$(NC) $(WHITE)Build$(NC)   $(GRAY)# 1.0.0+1 → 1.0.0+2$(NC)\n"; \
+		printf "$(CYAN)  5)$(NC) $(WHITE)Auto$(NC)    $(GRAY)# Smart bump based on store$(NC)\n"; \
+		printf "\n$(WHITE)Select bump type [1-5]:$(NC) "; \
+		read -p "" BUMP_TYPE; \
+		case $$BUMP_TYPE in \
+			1) dart scripts/version_manager.dart bump major ;; \
+			2) dart scripts/version_manager.dart bump minor ;; \
+			3) dart scripts/version_manager.dart bump patch ;; \
+			4) dart scripts/version_manager.dart bump build ;; \
+			5) dart scripts/version_manager.dart bump auto ;; \
+			*) printf "$(RED)Invalid choice. Please select 1-5.$(NC)\n" ;; \
+		esac; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "version_manager.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
+
+version-tag: ## 🏷️ Generate deployment tag
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(STAR) $(WHITE)Generate Deployment Tag$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/tag_generator.dart" ]; then \
+		dart scripts/tag_generator.dart; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "tag_generator.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
+
+version-autofix: ## 🔧 Auto-fix version conflicts
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(WRENCH) $(WHITE)Auto-Fix Version Issues$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/version_manager.dart" ]; then \
+		printf "$(YELLOW)$(WARNING) %s$(NC) " "This will automatically fix version conflicts. Continue? [y/N]:"; \
+		read -p "" CONFIRM; \
+		if [ "$$CONFIRM" = "y" ] || [ "$$CONFIRM" = "Y" ]; then \
+			dart scripts/version_manager.dart auto-fix; \
+		else \
+			printf "$(GRAY)$(INFO) %s$(NC)\n" "Auto-fix cancelled"; \
+		fi; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "version_manager.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
 
 build-android-apk: ## Build Android APK for testing
 	@printf "\n"
@@ -2989,9 +3130,34 @@ copy_automation_scripts() {
                 if [[ "$script_name" != "setup_automated.sh" && "$script_name" != "setup.sh" ]]; then
                     cp "$script_file" "$TARGET_DIR/scripts/" 2>/dev/null || true
                     print_info "Copied: $script_name"
+                    
+                    # Set execute permissions for Dart scripts
+                    if [[ "$script_name" == *.dart ]]; then
+                        chmod +x "$TARGET_DIR/scripts/$script_name" 2>/dev/null || true
+                    fi
                 fi
             fi
         done
+        
+        # Ensure we have the latest version management tools
+        if [[ -f "$SOURCE_DIR/scripts/version_manager.dart" ]]; then
+            cp "$SOURCE_DIR/scripts/version_manager.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+            chmod +x "$TARGET_DIR/scripts/version_manager.dart" 2>/dev/null || true
+            print_info "Updated: version_manager.dart (with enhanced validation)"
+        fi
+        
+        if [[ -f "$SOURCE_DIR/scripts/tag_generator.dart" ]]; then
+            cp "$SOURCE_DIR/scripts/tag_generator.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+            chmod +x "$TARGET_DIR/scripts/tag_generator.dart" 2>/dev/null || true
+            print_info "Added: tag_generator.dart (deployment tagging)"
+        fi
+        
+        if [[ -f "$SOURCE_DIR/scripts/version_sync.dart" ]]; then
+            cp "$SOURCE_DIR/scripts/version_sync.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+            chmod +x "$TARGET_DIR/scripts/version_sync.dart" 2>/dev/null || true
+            print_info "Added: version_sync.dart (cross-platform sync)"
+        fi
+        
         print_success "Additional scripts copied"
     elif [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
         print_step "Copying additional automation scripts from local repository..."
@@ -3015,6 +3181,26 @@ copy_automation_scripts() {
                     fi
                 fi
             done
+            
+            # Ensure we have the latest version management tools from local repository
+            if [[ -f "$local_scripts_dir/version_manager.dart" ]]; then
+                cp "$local_scripts_dir/version_manager.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+                chmod +x "$TARGET_DIR/scripts/version_manager.dart" 2>/dev/null || true
+                print_info "Updated: version_manager.dart (with enhanced validation)"
+            fi
+            
+            if [[ -f "$local_scripts_dir/tag_generator.dart" ]]; then
+                cp "$local_scripts_dir/tag_generator.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+                chmod +x "$TARGET_DIR/scripts/tag_generator.dart" 2>/dev/null || true
+                print_info "Added: tag_generator.dart (deployment tagging)"
+            fi
+            
+            if [[ -f "$local_scripts_dir/version_sync.dart" ]]; then
+                cp "$local_scripts_dir/version_sync.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+                chmod +x "$TARGET_DIR/scripts/version_sync.dart" 2>/dev/null || true
+                print_info "Added: version_sync.dart (cross-platform sync)"
+            fi
+            
             print_success "Essential scripts copied from local repository"
         else
             print_warning "Local scripts directory not found, skipping additional scripts"

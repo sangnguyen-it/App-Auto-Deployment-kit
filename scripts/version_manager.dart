@@ -7,6 +7,7 @@ import 'dart:io';
 void main(List<String> args) async {
   final projectName = getProjectName();
   print('🔢 $projectName - Version Manager');
+  print('==================================');
   print('');
 
   if (args.isEmpty) {
@@ -37,13 +38,22 @@ void main(List<String> args) async {
     case 'compare-all':
       await compareWithAllStores();
       break;
+    case 'validate':
+      await validateVersions();
+      break;
+    case 'sync-check':
+      await checkVersionSync();
+      break;
+    case 'auto-fix':
+      await autoFixVersions();
+      break;
     default:
       showUsage();
   }
 }
 
 void showUsage() {
-  print('Usage:');
+  print('📖 Usage:');
   print('  dart scripts/version_manager.dart current          # Show current version');
   print('  dart scripts/version_manager.dart next [type]      # Show next version');
   print('  dart scripts/version_manager.dart bump [type]      # Bump version (local only)');
@@ -51,14 +61,20 @@ void showUsage() {
   print('  dart scripts/version_manager.dart compare          # Compare with App Store/TestFlight');
   print('  dart scripts/version_manager.dart compare-android  # Compare with Google Play Store');
   print('  dart scripts/version_manager.dart compare-all      # Compare with all stores');
+  print('  dart scripts/version_manager.dart validate         # Validate versions against stores');
+  print('  dart scripts/version_manager.dart sync-check       # Check version synchronization');
+  print('  dart scripts/version_manager.dart auto-fix         # Auto-fix version conflicts');
   print('');
-  print('Bump types: major, minor, patch, build, auto');
+  print('🔧 Bump Types: major, minor, patch, build, auto');
   print('');
-  print('🧠 Smart features:');
+  print('💡 Smart Features:');
   print('  - smartbump: Automatically checks ALL store versions and prevents conflicts');
   print('  - compare: Shows local vs iOS store version differences');
   print('  - compare-android: Shows local vs Android store version differences');
   print('  - compare-all: Shows local vs ALL store versions');
+  print('  - validate: Comprehensive validation with detailed recommendations');
+  print('  - sync-check: Checks if all platforms have synchronized versions');
+  print('  - auto-fix: Automatically fixes version conflicts and synchronization issues');
   print('  - Auto-fixes version conflicts in automated mode');
 }
 
@@ -566,5 +582,286 @@ String getProjectName() {
     return 'Flutter Project';
   } catch (e) {
     return 'Flutter Project';
+  }
+}
+
+// Enhanced validation function
+Future<void> validateVersions() async {
+  print('🔍 Comprehensive Version Validation');
+  print('===================================');
+  print('');
+
+  try {
+    // Get all versions
+    final pubspecVersion = getCurrentVersion();
+    final androidVersion = await getAndroidVersionDetailed();
+    final iosVersion = await getIOSVersionDetailed();
+    
+    print('📊 Current Versions:');
+    print('  📄 pubspec.yaml: $pubspecVersion');
+    print('  🤖 Android: $androidVersion');
+    print('  🍎 iOS: $iosVersion');
+    print('');
+
+    // Check synchronization
+    final versions = [pubspecVersion, androidVersion, iosVersion];
+    final uniqueVersions = versions.toSet();
+    
+    bool syncIssues = false;
+    if (uniqueVersions.length > 1) {
+      print('⚠️  SYNC ISSUE: Platforms have different versions');
+      syncIssues = true;
+    } else {
+      print('✅ SYNC OK: All platforms synchronized');
+    }
+    print('');
+
+    // Get store versions
+    print('🏪 Checking Store Versions...');
+    final appStoreVersion = await getStoreVersion();
+    final playStoreVersion = await getGooglePlayVersion();
+    
+    print('  🍎 App Store: ${appStoreVersion ?? 'Unable to fetch'}');
+    print('  🤖 Google Play: ${playStoreVersion ?? 'Unable to fetch'}');
+    print('');
+
+    // Validation results
+    bool hasIssues = syncIssues;
+    List<String> recommendations = [];
+
+    if (syncIssues) {
+      recommendations.add('Run: dart scripts/version_sync.dart sync pubspec');
+    }
+
+    // Check against store versions
+    if (appStoreVersion != null) {
+      final comparison = compareVersions(pubspecVersion, appStoreVersion);
+      switch (comparison) {
+        case VersionComparison.lower:
+          print('❌ CONFLICT: Local version is LOWER than App Store ($appStoreVersion)');
+          hasIssues = true;
+          recommendations.add('Increment version to be higher than $appStoreVersion');
+          break;
+        case VersionComparison.equal:
+          print('⚠️  WARNING: Local version EQUALS App Store version');
+          recommendations.add('Consider incrementing build number for next release');
+          break;
+        case VersionComparison.higher:
+          print('✅ OK: Local version is higher than App Store');
+          break;
+      }
+    }
+
+    if (playStoreVersion != null) {
+      final comparison = compareVersions(pubspecVersion, playStoreVersion);
+      switch (comparison) {
+        case VersionComparison.lower:
+          print('❌ CONFLICT: Local version is LOWER than Google Play ($playStoreVersion)');
+          hasIssues = true;
+          recommendations.add('Increment version to be higher than $playStoreVersion');
+          break;
+        case VersionComparison.equal:
+          print('⚠️  WARNING: Local version EQUALS Google Play version');
+          recommendations.add('Consider incrementing build number for next release');
+          break;
+        case VersionComparison.higher:
+          print('✅ OK: Local version is higher than Google Play');
+          break;
+      }
+    }
+
+    print('');
+    
+    // Summary
+    if (hasIssues) {
+      print('🚨 VALIDATION FAILED - Issues found!');
+      print('');
+      print('📋 Recommendations:');
+      for (int i = 0; i < recommendations.length; i++) {
+        print('  ${i + 1}. ${recommendations[i]}');
+      }
+      print('');
+      print('🔧 Quick fixes:');
+      print('  dart scripts/version_manager.dart auto-fix    # Auto-fix all issues');
+      print('  dart scripts/version_sync.dart sync pubspec   # Sync versions only');
+    } else {
+      print('✅ VALIDATION PASSED - All good!');
+      print('💡 Ready for deployment');
+    }
+
+  } catch (e) {
+    print('❌ Validation error: $e');
+  }
+}
+
+// Check version synchronization across platforms
+Future<void> checkVersionSync() async {
+  print('🔄 Version Synchronization Check');
+  print('================================');
+  print('');
+
+  try {
+    final pubspecVersion = getCurrentVersion();
+    final androidVersion = await getAndroidVersionDetailed();
+    final iosVersion = await getIOSVersionDetailed();
+
+    print('📊 Platform Versions:');
+    print('  📄 pubspec.yaml: $pubspecVersion');
+    print('  🤖 Android:     $androidVersion');
+    print('  🍎 iOS:         $iosVersion');
+    print('');
+
+    final versions = [pubspecVersion, androidVersion, iosVersion];
+    final uniqueVersions = versions.toSet();
+
+    if (uniqueVersions.length == 1) {
+      print('✅ All platforms are synchronized');
+      print('💡 Version: ${uniqueVersions.first}');
+    } else {
+      print('⚠️  Platforms are NOT synchronized');
+      print('');
+      print('🔧 To fix synchronization:');
+      print('  dart scripts/version_sync.dart sync pubspec    # Use pubspec as source');
+      print('  dart scripts/version_manager.dart auto-fix     # Auto-fix all issues');
+    }
+
+  } catch (e) {
+    print('❌ Sync check error: $e');
+  }
+}
+
+// Auto-fix version conflicts and synchronization issues
+Future<void> autoFixVersions() async {
+  print('🔧 Auto-Fix Version Issues');
+  print('==========================');
+  print('');
+
+  try {
+    // Step 1: Check synchronization
+    print('Step 1: Checking synchronization...');
+    final pubspecVersion = getCurrentVersion();
+    final androidVersion = await getAndroidVersionDetailed();
+    final iosVersion = await getIOSVersionDetailed();
+
+    final versions = [pubspecVersion, androidVersion, iosVersion];
+    final uniqueVersions = versions.toSet();
+
+    if (uniqueVersions.length > 1) {
+      print('🔄 Fixing synchronization issues...');
+      await Process.run('dart', ['scripts/version_sync.dart', 'sync', 'pubspec']);
+      print('✅ Versions synchronized');
+    } else {
+      print('✅ Versions already synchronized');
+    }
+
+    // Step 2: Check store conflicts
+    print('');
+    print('Step 2: Checking store conflicts...');
+    
+    final appStoreVersion = await getStoreVersion();
+    final playStoreVersion = await getGooglePlayVersion();
+    
+    final storeVersions = [appStoreVersion, playStoreVersion].whereType<String>().toList();
+    
+    if (storeVersions.isNotEmpty) {
+      final highestStoreVersion = storeVersions.reduce((a, b) {
+        final comparison = compareVersions(a, b);
+        return comparison == VersionComparison.higher ? a : b;
+      });
+
+      final currentVersion = getCurrentVersion();
+      final comparison = compareVersions(currentVersion, highestStoreVersion);
+
+      if (comparison == VersionComparison.lower || comparison == VersionComparison.equal) {
+        print('🚀 Fixing version conflicts...');
+        final nextVersion = calculateNextVersionFromStore(highestStoreVersion);
+        updatePubspecVersion(nextVersion);
+        await Process.run('dart', ['scripts/version_sync.dart', 'sync', 'pubspec']);
+        print('✅ Version updated to: $nextVersion');
+      } else {
+        print('✅ No store conflicts found');
+      }
+    } else {
+      print('⚠️  Could not check store versions');
+    }
+
+    print('');
+    print('🎉 Auto-fix completed!');
+    print('');
+    
+    // Show final status
+    await validateVersions();
+
+  } catch (e) {
+    print('❌ Auto-fix error: $e');
+  }
+}
+
+// Get detailed Android version (separate from existing function to avoid conflicts)
+Future<String> getAndroidVersionDetailed() async {
+  try {
+    // Try build.gradle.kts first
+    final buildGradleKts = File('android/app/build.gradle.kts');
+    if (buildGradleKts.existsSync()) {
+      final content = buildGradleKts.readAsStringSync();
+      
+      final versionNameMatch = RegExp(r'versionName\s*=\s*"([^"]+)"').firstMatch(content);
+      final versionCodeMatch = RegExp(r'versionCode\s*=\s*(\d+)').firstMatch(content);
+      
+      if (versionNameMatch != null && versionCodeMatch != null) {
+        final versionName = versionNameMatch.group(1)!;
+        final versionCode = versionCodeMatch.group(1)!;
+        return '$versionName+$versionCode';
+      }
+    }
+
+    // Fallback to build.gradle
+    final buildGradle = File('android/app/build.gradle');
+    if (buildGradle.existsSync()) {
+      final content = buildGradle.readAsStringSync();
+      
+      final versionNameMatch = RegExp(r'versionName\s*"([^"]+)"').firstMatch(content);
+      final versionCodeMatch = RegExp(r'versionCode\s*(\d+)').firstMatch(content);
+      
+      if (versionNameMatch != null && versionCodeMatch != null) {
+        final versionName = versionNameMatch.group(1)!;
+        final versionCode = versionCodeMatch.group(1)!;
+        return '$versionName+$versionCode';
+      }
+    }
+
+    // Fallback to pubspec
+    return getCurrentVersion();
+  } catch (e) {
+    return getCurrentVersion();
+  }
+}
+
+// Get detailed iOS version (separate from existing function to avoid conflicts)
+Future<String> getIOSVersionDetailed() async {
+  try {
+    // Try Info.plist first
+    final infoPlist = File('ios/Runner/Info.plist');
+    if (infoPlist.existsSync()) {
+      final content = infoPlist.readAsStringSync();
+      
+      final versionMatch = RegExp(r'<key>CFBundleShortVersionString</key>\s*<string>([^<]+)</string>').firstMatch(content);
+      final buildMatch = RegExp(r'<key>CFBundleVersion</key>\s*<string>([^<]+)</string>').firstMatch(content);
+      
+      if (versionMatch != null && buildMatch != null) {
+        final version = versionMatch.group(1)!.trim();
+        final build = buildMatch.group(1)!.trim();
+        
+        // Skip Flutter variables
+        if (!version.contains('\$(') && !build.contains('\$(')) {
+          return '$version+$build';
+        }
+      }
+    }
+
+    // Fallback to pubspec
+    return getCurrentVersion();
+  } catch (e) {
+    return getCurrentVersion();
   }
 }

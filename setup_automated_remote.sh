@@ -3661,6 +3661,21 @@ sync_fastfile() {
     local temp_fastfile=$(mktemp)
     cp "$fastfile_path" "$temp_fastfile"
     
+    # First, fix KEY_PATH to use absolute path for reliable file access
+    # This prevents "Couldn't find key p8 file" errors in app_store_connect_api_key
+    # File.expand_path ensures the AuthKey file is found regardless of working directory
+    sed -i.bak 's|KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"|KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)|g' "$temp_fastfile"
+    sed -i.bak 's|KEY_PATH = "./AuthKey_#{KEY_ID}.p8"|KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)|g' "$temp_fastfile"
+    
+    # Replace placeholders with actual values BEFORE updating variable definitions
+    if [[ -n "$KEY_ID" && "$KEY_ID" != "YOUR_KEY_ID" ]]; then
+        sed -i.bak "s|#{KEY_ID}|$KEY_ID|g" "$temp_fastfile"
+    fi
+    
+    if [[ -n "$PROJECT_NAME" && "$PROJECT_NAME" != "YOUR_PROJECT_NAME" ]]; then
+        sed -i.bak "s|#{PROJECT_NAME}|$PROJECT_NAME|g" "$temp_fastfile"
+    fi
+    
     # Update TEAM_ID
     if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
         sed -i.bak "s/TEAM_ID = \"YOUR_TEAM_ID\"/TEAM_ID = \"$TEAM_ID\"/g" "$temp_fastfile"
@@ -3681,12 +3696,6 @@ sync_fastfile() {
         # More specific pattern to avoid replacing other variables
         sed -i.bak "s/^ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
     fi
-    
-    # Fix KEY_PATH to use absolute path for reliable file access
-    # This prevents "Couldn't find key p8 file" errors in app_store_connect_api_key
-    # File.expand_path ensures the AuthKey file is found regardless of working directory
-    sed -i.bak 's|KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"|KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)|g' "$temp_fastfile"
-    sed -i.bak 's|KEY_PATH = "./AuthKey_#{KEY_ID}.p8"|KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)|g' "$temp_fastfile"
     
     # Update export_options to include proper signing certificate and bitcode settings
     # Fix build_and_upload_auto lane

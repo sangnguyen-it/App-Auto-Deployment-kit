@@ -1,0 +1,89 @@
+# Fastlane configuration for {{PROJECT_NAME}} Android
+# Package: {{PACKAGE_NAME}}
+# Generated on: $(date)
+# 
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:android)
+
+platform :android do
+  desc "Runs all the tests"
+  lane :test do
+    gradle(task: "test")
+  end
+
+  desc "Submit a new Beta Build to Google Play Internal Testing"
+  lane :beta do
+    gradle(task: "clean bundleRelease")
+    upload_to_play_store(
+      track: 'internal',
+      aab: '../build/app/outputs/bundle/release/app-release.aab',
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Promote a version from Internal Testing to Beta"
+  lane :promote_to_beta do
+    upload_to_play_store(
+      track: 'internal',
+      track_promote_to: 'beta',
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Upload AAB to Google Play Production"
+  lane :upload_aab_production do
+    gradle(task: "clean bundleRelease")
+    upload_to_play_store(
+      track: 'production',
+      aab: '../build/app/outputs/bundle/release/app-release.aab',
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Deploy a new version to the Google Play"
+  lane :deploy do
+    gradle(task: "clean assembleRelease")
+    upload_to_play_store
+  end
+
+  desc "Build release for {{PROJECT_NAME}}"
+  lane :build do
+    gradle(task: "clean bundleRelease")
+  end
+
+  desc "Setup Android environment for {{PROJECT_NAME}}"
+  lane :setup do
+    # Setup tasks for {{PROJECT_NAME}}
+    UI.message("Setting up Android environment for {{PROJECT_NAME}}")
+  end
+
+  desc "Clean Android build artifacts"
+  lane :clean do
+    gradle(task: "clean")
+    UI.message("Cleaned build artifacts for {{PROJECT_NAME}}")
+  end
+end

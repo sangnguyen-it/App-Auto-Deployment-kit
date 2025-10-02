@@ -1,0 +1,11 @@
+# Android signing configuration template for {{PROJECT_NAME}}
+# Copy this to key.properties and update with your keystore information
+
+keyAlias=release
+keyPassword=YOUR_KEY_PASSWORD
+storeFile=../app/app.keystore
+storePassword=YOUR_STORE_PASSWORD
+
+# Project: {{PROJECT_NAME}}
+# Package: {{PACKAGE_NAME}}
+# Generated on: {{GENERATION_DATE}}

@@ -1,0 +1,7 @@
+# Appfile for {{PROJECT_NAME}} Android
+# Configuration for Google Play Console
+
+package_name("{{PACKAGE_NAME}}") # Replace with your actual package name
+
+# Google Play service account JSON will be provided via environment variables:
+# FASTLANE_JSON_KEY_FILE or FASTLANE_JSON_KEY_DATA

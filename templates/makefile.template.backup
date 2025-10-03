@@ -124,187 +124,7 @@ menu: ## 🎯 Interactive Menu - Choose Your Build Pipeline
 # 🧪 TESTER PIPELINE - APK + TESTFLIGHT
 # ═══════════════════════════════════════════════════════════════════════════════
 
-tester: auto-build-tester-android ## 🧪 Alias for auto-build-tester-android (Android only)
-
-auto-build-tester-android: ## 🧪 Automated Android-only Tester Pipeline (APK only)
-
-auto-build-tester: ## 🧪 Automated Full Tester Pipeline (Android APK + iOS TestFlight)
-	@printf "\n"
-	@printf "$(CYAN)🧪 Building for Testing (Android + iOS)$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking dependencies..."
-	@if command -v ruby >/dev/null 2>&1 && command -v gem >/dev/null 2>&1; then \
-		if ! command -v bundle >/dev/null 2>&1; then \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
-			if gem install bundler 2>/dev/null; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Bundler installed successfully"; \
-			else \
-				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler install failed - continuing without gems"; \
-				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: gem install bundler"; \
-			fi; \
-		fi; \
-		if [ -f "Gemfile" ] && command -v bundle >/dev/null 2>&1; then \
-			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing Ruby gems..."; \
-			if bundle install 2>/dev/null; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Ruby gems installed"; \
-			else \
-				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundle install failed - continuing without gems"; \
-				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: bundle install"; \
-			fi; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Ruby/Gems not found - skipping gem dependencies"; \
-		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby if you need Fastlane functionality"; \
-	fi
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting system configuration check..."
-	@$(MAKE) system-check
-	@if [ $$? -ne 0 ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "System configuration failed! Please fix issues above."; \
-		exit 1; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
-	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
-		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
-			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
-			else \
-				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
-			fi; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
-	@mkdir -p $(OUTPUT_DIR)
-	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
-	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/build_info_generator.dart 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Build information generated"; \
-		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Build info generation failed - continuing"; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping build info generation"; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building Android APK for Testing"
-	@flutter clean && flutter pub get
-	@flutter build apk --release
-	@if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then \
-		APK_SIZE=$$(du -h "build/app/outputs/flutter-apk/app-release.apk" | awk '{print $$1}'); \
-		printf "$(GREEN)$(CHECK) %s ($$APK_SIZE)$(NC)\n" "Android APK built successfully"; \
-		cp "build/app/outputs/flutter-apk/app-release.apk" "$(OUTPUT_DIR)/$(APK_NAME)"; \
-		printf "$(GREEN)$(CHECK) %s$(NC)\n" "APK copied to $(OUTPUT_DIR)/$(APK_NAME)"; \
-	else \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Android APK build failed"; \
-		exit 1; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building iOS for TestFlight"
-	@if [ "$$(uname)" = "Darwin" ]; then \
-		if [ -f "ios/Podfile" ]; then \
-			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing iOS dependencies..."; \
-			cd ios && pod install --silent || { \
-				printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Trying fix..."; \
-				if [ -f "Podfile.fixed" ]; then \
-					cp Podfile.fixed Podfile && \
-					printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Applied Podfile fix, retrying..."; \
-					pod install --silent || \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install still failing. Run: ./apply_podfile_fix.sh"; \
-				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Run: ./apply_podfile_fix.sh"; \
-				fi; \
-			}; \
-			cd ..; \
-		fi; \
-		flutter build ios --release; \
-		if [ $$? -eq 0 ]; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
-			mkdir -p build/ios/archive build/ios/ipa; \
-			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building and exporting IPA using Fastlane..."; \
-			if command -v fastlane >/dev/null 2>&1 && [ -f "ios/fastlane/Fastfile" ]; then \
-				cd ios; \
-				if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
-					if bundle exec fastlane build_archive_beta 2>/dev/null; then \
-						printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and IPA created successfully via bundle"; \
-					elif fastlane build_archive_beta 2>/dev/null; then \
-						printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and IPA created successfully"; \
-					else \
-						printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane build failed"; \
-						exit 1; \
-					fi; \
-				elif fastlane build_archive_beta 2>/dev/null; then \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and IPA created successfully"; \
-				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane build failed"; \
-					exit 1; \
-				fi; \
-				cd ..; \
-				IPA_FILE=$$(find build/ios/ipa -name "*.ipa" | head -1); \
-				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA exported successfully"; \
-					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_NAME)"; \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
-				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "IPA export failed"; \
-				fi; \
-			else \
-				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - iOS build completed but IPA export skipped"; \
-			fi; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "iOS build skipped (requires macOS)"; \
-	fi
-	
-	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Tester build completed"
-	@printf "$(GREEN)🎉 Tester Build Pipeline Completed!$(NC)\n"
-	@printf "$(WHITE)📁 Builder Directory:$(NC) $(OUTPUT_DIR)/\n"
-	@printf "$(WHITE)📱 Android APK:$(NC) $(OUTPUT_DIR)/$(APK_NAME)\n"
-	@if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$(IPA_NAME)" ]; then \
-		printf "$(WHITE)🍎 iOS IPA:$(NC) $(OUTPUT_DIR)/$(IPA_NAME)\n"; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
-	@mkdir -p $(OUTPUT_DIR)
-	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
-	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/build_info_generator.dart 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Build information generated"; \
-		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Build info generation failed - continuing"; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping build info generation"; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building Android APK for Testing"
-	@flutter clean && flutter pub get
-	@flutter build apk --release
-	@if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then \
-		APK_SIZE=$$(du -h "build/app/outputs/flutter-apk/app-release.apk" | awk '{print $$1}'); \
-		printf "$(GREEN)$(CHECK) %s ($$APK_SIZE)$(NC)\n" "Android APK built successfully"; \
-		cp "build/app/outputs/flutter-apk/app-release.apk" "$(OUTPUT_DIR)/$(APK_NAME)"; \
-		printf "$(GREEN)$(CHECK) %s$(NC)\n" "APK copied to $(OUTPUT_DIR)/$(APK_NAME)"; \
-	else \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Android APK build failed"; \
-		exit 1; \
-	fi
-	
-	@printf "$(CYAN)$(INFO) %s$(NC)\n" "⏭️ Skipping iOS build for Android-only tester target"
-	@printf "$(CYAN)$(INFO) %s$(NC)\n" "📱 For iOS TestFlight build, use: make auto-build-tester"
-	@printf "\n"
-	@printf "$(GREEN)$(SPARKLES) %s$(NC)\n" "Android Tester Build Complete!"
-	@printf "$(CYAN)$(INFO) %s$(NC)\n" "APK Location: $(OUTPUT_DIR)/$(APK_NAME)"
-	@printf "\n"
+tester: auto-build-tester ## 🧪 Alias for auto-build-tester
 
 auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	@printf "\n"
@@ -387,21 +207,6 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building iOS for TestFlight"
 	@if [ "$$(uname)" = "Darwin" ]; then \
-		if [ -f "ios/Podfile" ]; then \
-			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing iOS dependencies..."; \
-			cd ios && pod install --silent || { \
-				printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Trying fix..."; \
-				if [ -f "Podfile.fixed" ]; then \
-					cp Podfile.fixed Podfile && \
-					printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Applied Podfile fix, retrying..."; \
-					pod install --silent || \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install still failing. Run: ./apply_podfile_fix.sh"; \
-				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Run: ./apply_podfile_fix.sh"; \
-				fi; \
-			}; \
-			cd ..; \
-		fi; \
 		flutter build ios --release; \
 		if [ $$? -eq 0 ]; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
@@ -494,148 +299,60 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 # 🚀 PRODUCTION PIPELINES
 # ═══════════════════════════════════════════════════════════════════════════════
 
-live: auto-build-live-android ## 🚀 Alias for auto-build-live-android (Android AAB only)
+live: auto-build-live ## 🚀 Alias for auto-build-live (Hybrid)
 live-local: auto-build-live-local ## 🚀 Alias for auto-build-live-local
 live-github: auto-build-live-github ## ☁️ Alias for auto-build-live-github
 
-auto-build-live-android: ## 🔄 Automated Android-only Production Pipeline (AAB only)
-	@printf "\n"
-	@printf "$(CYAN)🌟 Building Android for Production$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking dependencies..."
-	@if command -v ruby >/dev/null 2>&1 && command -v gem >/dev/null 2>&1; then \
-		if ! command -v bundle >/dev/null 2>&1; then \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
-			if gem install bundler 2>/dev/null; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Bundler installed successfully"; \
-			else \
-				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler install failed - continuing without gems"; \
-				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: gem install bundler"; \
-			fi; \
-		fi; \
-		if [ -f "Gemfile" ] && command -v bundle >/dev/null 2>&1; then \
-			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing Ruby gems..."; \
-			if bundle install 2>/dev/null; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Ruby gems installed"; \
-			else \
-				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundle install failed - continuing without gems"; \
-				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: bundle install"; \
-			fi; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Ruby/Gems not found - skipping gem dependencies"; \
-		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby if you need Fastlane functionality"; \
-	fi
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting system configuration check..."
-	@$(MAKE) system-check
-	@if [ $$? -ne 0 ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "System configuration failed! Please fix issues above."; \
-		exit 1; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
-	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
-		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
-			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
-			else \
-				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
-			fi; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
-	@mkdir -p $(OUTPUT_DIR)
-	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
-	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/build_info_generator.dart 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Build information generated"; \
-		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Build info generation failed - continuing"; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping build info generation"; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building Android AAB for Production"
-	@flutter clean && flutter pub get
-	@flutter build appbundle --release
-	@if [ -f "build/app/outputs/bundle/release/app-release.aab" ]; then \
-		AAB_SIZE=$$(du -h "build/app/outputs/bundle/release/app-release.aab" | awk '{print $$1}'); \
-		printf "$(GREEN)$(CHECK) %s ($$AAB_SIZE)$(NC)\n" "Android AAB built successfully"; \
-		cp "build/app/outputs/bundle/release/app-release.aab" "$(OUTPUT_DIR)/$(AAB_NAME)"; \
-		printf "$(GREEN)$(CHECK) %s$(NC)\n" "AAB copied to $(OUTPUT_DIR)/$(AAB_NAME)"; \
-	else \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Android AAB build failed"; \
-		exit 1; \
-	fi
-	
-	@printf "$(CYAN)$(INFO) %s$(NC)\n" "⏭️ Skipping iOS build for Android-only production target"
-	@printf "$(CYAN)$(INFO) %s$(NC)\n" "📱 For iOS App Store build, use: make auto-build-live"
-	@printf "\n"
-	@printf "$(GREEN)$(SPARKLES) %s$(NC)\n" "Android Production Build Complete!"
-	@printf "$(CYAN)$(INFO) %s$(NC)\n" "AAB Location: $(OUTPUT_DIR)/$(AAB_NAME)"
-	@printf "\n"
-
-auto-build-live: ## 🔄 Automated Live Production Pipeline (Android AAB + iOS App Store)
-	@printf "\n"
-	@printf "$(CYAN)🔄 Building for Production (Android + iOS)$(NC)\n"
-	@printf "\n"
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking dependencies..."
-	@if command -v ruby >/dev/null 2>&1 && command -v gem >/dev/null 2>&1; then \
-		if ! command -v bundle >/dev/null 2>&1; then \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
-			if gem install bundler 2>/dev/null; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Bundler installed successfully"; \
-			else \
-				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler install failed - continuing without gems"; \
-				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: gem install bundler"; \
-			fi; \
-		fi; \
-		if [ -f "Gemfile" ] && command -v bundle >/dev/null 2>&1; then \
-			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing Ruby gems..."; \
-			if bundle install 2>/dev/null; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Ruby gems installed"; \
-			else \
-				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundle install failed - continuing without gems"; \
-				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: bundle install"; \
-			fi; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Ruby/Gems not found - skipping gem dependencies"; \
-		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby if you need Fastlane functionality"; \
-	fi
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting system configuration check..."
-	@$(MAKE) system-check
-	@if [ $$? -ne 0 ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "System configuration failed! Please fix issues above."; \
-		exit 1; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
-	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
-		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
-			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
-			else \
-				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
-			fi; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
-	fi
+auto-build-live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 	@printf "\n"
 	@printf "$(CYAN)🌟 Building for Production$(NC)\n"
+	@printf "\n"
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking dependencies..."
+	@if command -v ruby >/dev/null 2>&1 && command -v gem >/dev/null 2>&1; then \
+		if ! command -v bundle >/dev/null 2>&1; then \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
+			if gem install bundler 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Bundler installed successfully"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler install failed - continuing without gems"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: gem install bundler"; \
+			fi; \
+		fi; \
+		if [ -f "Gemfile" ] && command -v bundle >/dev/null 2>&1; then \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing Ruby gems..."; \
+			if bundle install 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Ruby gems installed"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundle install failed - continuing without gems"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: bundle install"; \
+			fi; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Ruby/Gems not found - skipping gem dependencies"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby if you need Fastlane functionality"; \
+	fi
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting system configuration check..."
+	@$(MAKE) system-check
+	@if [ $$? -ne 0 ]; then \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "System configuration failed! Please fix issues above."; \
+		exit 1; \
+	fi
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
+	@if command -v dart >/dev/null 2>&1; then \
+		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
+			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
+			else \
+				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
+			fi; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
+	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
 	@mkdir -p $(OUTPUT_DIR)
@@ -650,83 +367,6 @@ auto-build-live: ## 🔄 Automated Live Production Pipeline (Android AAB + iOS A
 		fi; \
 	else \
 		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping build info generation"; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building Android AAB for Production"
-	@flutter clean && flutter pub get
-	@flutter build appbundle --release
-	@if [ -f "build/app/outputs/bundle/release/app-release.aab" ]; then \
-		AAB_SIZE=$$(du -h "build/app/outputs/bundle/release/app-release.aab" | awk '{print $$1}'); \
-		printf "$(GREEN)$(CHECK) %s ($$AAB_SIZE)$(NC)\n" "Android AAB built successfully"; \
-		cp "build/app/outputs/bundle/release/app-release.aab" "$(OUTPUT_DIR)/$(AAB_NAME)"; \
-		printf "$(GREEN)$(CHECK) %s$(NC)\n" "AAB copied to $(OUTPUT_DIR)/$(AAB_NAME)"; \
-	else \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Android AAB build failed"; \
-		exit 1; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building iOS for App Store"
-	@if [ "$$(uname)" = "Darwin" ]; then \
-		if [ -f "ios/Podfile" ]; then \
-			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing iOS dependencies..."; \
-			cd ios && pod install --silent || { \
-				printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Trying fix..."; \
-				if [ -f "Podfile.fixed" ]; then \
-					cp Podfile.fixed Podfile && \
-					printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Applied Podfile fix, retrying..."; \
-					pod install --silent || \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install still failing. Run: ./apply_podfile_fix.sh"; \
-				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Run: ./apply_podfile_fix.sh"; \
-				fi; \
-			}; \
-			cd ..; \
-		fi; \
-		flutter build ios --release; \
-		if [ $$? -eq 0 ]; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
-			mkdir -p build/ios/archive build/ios/ipa; \
-			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building and exporting IPA using Fastlane..."; \
-			if command -v fastlane >/dev/null 2>&1 && [ -f "ios/fastlane/Fastfile" ]; then \
-				cd ios; \
-				if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
-					if bundle exec fastlane build_archive_live 2>/dev/null; then \
-						printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and IPA created successfully via bundle"; \
-					elif fastlane build_archive_live 2>/dev/null; then \
-						printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and IPA created successfully"; \
-					else \
-						printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane build failed"; \
-						exit 1; \
-					fi; \
-				elif fastlane build_archive_live 2>/dev/null; then \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and IPA created successfully"; \
-				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane build failed"; \
-					exit 1; \
-				fi; \
-				cd ..; \
-				IPA_FILE=$$(find build/ios/ipa -name "*.ipa" | head -1); \
-				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "App Store IPA exported successfully"; \
-					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_NAME)"; \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "App Store IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
-				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "IPA export failed"; \
-				fi; \
-			else \
-				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - iOS build completed but IPA export skipped"; \
-			fi; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "iOS build skipped (requires macOS)"; \
-	fi
-	
-	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Live build completed"
-	@printf "$(GREEN)🎉 Live Build Pipeline Completed!$(NC)\n"
-	@printf "$(WHITE)📁 Builder Directory:$(NC) $(OUTPUT_DIR)/\n"
-	@printf "$(WHITE)📱 Android AAB:$(NC) $(OUTPUT_DIR)/$(AAB_NAME)\n"
-	@if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$(IPA_NAME)" ]; then \
-		printf "$(WHITE)🍎 iOS IPA:$(NC) $(OUTPUT_DIR)/$(IPA_NAME)\n"; \
 	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building Android AAB for Google Play Production"
@@ -744,21 +384,6 @@ auto-build-live: ## 🔄 Automated Live Production Pipeline (Android AAB + iOS A
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building iOS for App Store"
 	@if [ "$$(uname)" = "Darwin" ]; then \
-		if [ -f "ios/Podfile" ]; then \
-			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing iOS dependencies..."; \
-			cd ios && pod install --silent || { \
-				printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Trying fix..."; \
-				if [ -f "Podfile.fixed" ]; then \
-					cp Podfile.fixed Podfile && \
-					printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Applied Podfile fix, retrying..."; \
-					pod install --silent || \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install still failing. Run: ./apply_podfile_fix.sh"; \
-				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Run: ./apply_podfile_fix.sh"; \
-				fi; \
-			}; \
-			cd ..; \
-		fi; \
 		flutter build ios --release; \
 		if [ $$? -eq 0 ]; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
@@ -956,21 +581,6 @@ auto-build-live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building iOS for App Store"
 	@if [ "$$(uname)" = "Darwin" ]; then \
-		if [ -f "ios/Podfile" ]; then \
-			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing iOS dependencies..."; \
-			cd ios && pod install --silent || { \
-				printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Trying fix..."; \
-				if [ -f "Podfile.fixed" ]; then \
-					cp Podfile.fixed Podfile && \
-					printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Applied Podfile fix, retrying..."; \
-					pod install --silent || \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install still failing. Run: ./apply_podfile_fix.sh"; \
-				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Pod install failed. Run: ./apply_podfile_fix.sh"; \
-				fi; \
-			}; \
-			cd ..; \
-		fi; \
 		flutter build ios --release; \
 		if [ $$? -eq 0 ]; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \

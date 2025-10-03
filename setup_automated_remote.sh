@@ -1050,6 +1050,247 @@ EOF
     print_info "Please update the iOS credentials (TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID) in project.config"
 }
 
+# Auto-sync project.config with iOS fastlane files if config exists
+auto_sync_project_config() {
+    # Check if project.config exists
+    if [ ! -f "$TARGET_DIR/project.config" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: No project.config found, skipping auto-sync" >&2
+        fi
+        return 0
+    fi
+    
+    print_header "🔄 Auto-syncing project.config with iOS Fastlane files"
+    
+    # Load project.config values
+    print_step "Loading project.config..."
+    if source "$TARGET_DIR/project.config" 2>/dev/null; then
+        print_success "project.config loaded successfully"
+        
+        # Show current config values for key iOS fields
+        echo ""
+        print_info "Current iOS configuration:"
+        echo "   Team ID: ${TEAM_ID:-'not set'}"
+        echo "   Key ID: ${KEY_ID:-'not set'}"
+        echo "   Issuer ID: ${ISSUER_ID:-'not set'}"
+        echo "   Apple ID: ${APPLE_ID:-'not set'}"
+        echo ""
+        
+        # Check if we have valid iOS credentials to sync
+        local has_valid_credentials=false
+        
+        if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" && "$TEAM_ID" != "TEAM_ID" ]]; then
+            has_valid_credentials=true
+        fi
+        
+        if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" && "$APPLE_ID" != "APPLE_ID" && "$APPLE_ID" != "your-apple-id@email.com" ]]; then
+            has_valid_credentials=true
+        fi
+        
+        if [[ -n "$KEY_ID" && "$KEY_ID" != "YOUR_KEY_ID" && "$KEY_ID" != "KEY_ID" ]]; then
+            has_valid_credentials=true
+        fi
+        
+        if [[ -n "$ISSUER_ID" && "$ISSUER_ID" != "YOUR_ISSUER_ID" && "$ISSUER_ID" != "ISSUER_ID" ]]; then
+            has_valid_credentials=true
+        fi
+        
+        if [ "$has_valid_credentials" = true ]; then
+            print_step "Syncing iOS fastlane files with project.config values..."
+            
+            # Sync all iOS fastlane files
+            sync_appfile
+            sync_fastfile  
+            sync_export_options
+            
+            print_success "iOS fastlane files synchronized with project.config"
+        else
+            print_info "ℹ️  No valid iOS credentials found in project.config, skipping sync"
+            print_info "    Update project.config with your TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID to enable auto-sync"
+        fi
+    else
+        print_warning "Failed to load project.config, skipping auto-sync"
+    fi
+    
+    echo ""
+}
+
+# Sync project.config with iOS Fastlane Appfile
+sync_appfile() {
+    local appfile_path="$TARGET_DIR/ios/fastlane/Appfile"
+    
+    # Check if iOS Fastlane directory exists
+    if [ ! -d "$TARGET_DIR/ios/fastlane" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: iOS Fastlane directory not found at $TARGET_DIR/ios/fastlane" >&2
+        fi
+        return 0
+    fi
+    
+    # Check if Appfile exists
+    if [ ! -f "$appfile_path" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: Appfile not found at $appfile_path" >&2
+        fi
+        return 0
+    fi
+    
+    print_step "Syncing project.config with iOS Fastlane Appfile..."
+    
+    # Load current project config
+    if [ -f "$TARGET_DIR/project.config" ]; then
+        source "$TARGET_DIR/project.config" 2>/dev/null || true
+    else
+        print_warning "project.config not found, skipping Appfile sync"
+        return 0
+    fi
+    
+    # Update Appfile with values from project.config
+    local temp_appfile=$(mktemp)
+    
+    # Read existing Appfile and update values
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^[[:space:]]*app_identifier ]]; then
+            if [[ -n "$BUNDLE_ID" && "$BUNDLE_ID" != "YOUR_BUNDLE_ID" ]]; then
+                echo "app_identifier(\"$BUNDLE_ID\")"
+            else
+                echo "$line"
+            fi
+        elif [[ "$line" =~ ^[[:space:]]*apple_id ]]; then
+            if [[ -n "$APPLE_ID" && "$APPLE_ID" != "YOUR_APPLE_ID" && "$APPLE_ID" != "your-apple-id@email.com" ]]; then
+                echo "apple_id(\"$APPLE_ID\")"
+            else
+                echo "$line"
+            fi
+        elif [[ "$line" =~ ^[[:space:]]*team_id ]]; then
+            if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
+                echo "team_id(\"$TEAM_ID\")"
+            else
+                echo "$line"
+            fi
+        else
+            echo "$line"
+        fi
+    done < "$appfile_path" > "$temp_appfile"
+    
+    # Replace original Appfile with updated version
+    mv "$temp_appfile" "$appfile_path"
+    
+    print_success "iOS Fastlane Appfile updated with project.config values"
+    
+    if [[ "${DEBUG:-}" == "true" ]]; then
+        echo "🐛 DEBUG: Updated Appfile content:" >&2
+        cat "$appfile_path" >&2
+    fi
+}
+
+# Sync project.config with iOS Fastlane Fastfile
+sync_fastfile() {
+    local fastfile_path="$TARGET_DIR/ios/fastlane/Fastfile"
+    
+    # Check if iOS Fastlane directory exists
+    if [ ! -d "$TARGET_DIR/ios/fastlane" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: iOS Fastlane directory not found at $TARGET_DIR/ios/fastlane" >&2
+        fi
+        return 0
+    fi
+    
+    # Check if Fastfile exists
+    if [ ! -f "$fastfile_path" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: Fastfile not found at $fastfile_path" >&2
+        fi
+        return 0
+    fi
+    
+    print_step "Syncing project.config with iOS Fastlane Fastfile..."
+    
+    # Load current project config
+    if [ -f "$TARGET_DIR/project.config" ]; then
+        source "$TARGET_DIR/project.config" 2>/dev/null || true
+    else
+        print_warning "project.config not found, skipping Fastfile sync"
+        return 0
+    fi
+    
+    # Update Fastfile with values from project.config using sed
+    local temp_fastfile=$(mktemp)
+    cp "$fastfile_path" "$temp_fastfile"
+    
+    # Update TEAM_ID
+    if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
+        sed -i.bak "s/TEAM_ID = \"YOUR_TEAM_ID\"/TEAM_ID = \"$TEAM_ID\"/g" "$temp_fastfile"
+        sed -i.bak "s/^TEAM_ID = \"[^\"]*\"/TEAM_ID = \"$TEAM_ID\"/g" "$temp_fastfile"
+    fi
+    
+    # Update KEY_ID
+    if [[ -n "$KEY_ID" && "$KEY_ID" != "YOUR_KEY_ID" ]]; then
+        sed -i.bak "s/KEY_ID = \"YOUR_KEY_ID\"/KEY_ID = \"$KEY_ID\"/g" "$temp_fastfile"
+        sed -i.bak "s/^KEY_ID = \"[^\"]*\"/KEY_ID = \"$KEY_ID\"/g" "$temp_fastfile"
+    fi
+    
+    # Update ISSUER_ID
+    if [[ -n "$ISSUER_ID" && "$ISSUER_ID" != "YOUR_ISSUER_ID" ]]; then
+        sed -i.bak "s/ISSUER_ID = \"YOUR_ISSUER_ID\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
+        sed -i.bak "s/^ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
+    fi
+    
+    # Clean up backup files
+    rm -f "$temp_fastfile.bak"
+    
+    # Replace original Fastfile with updated version
+    mv "$temp_fastfile" "$fastfile_path"
+    
+    print_success "iOS Fastlane Fastfile updated with project.config values"
+    
+    if [[ "${DEBUG:-}" == "true" ]]; then
+        echo "🐛 DEBUG: Updated Fastfile variables:" >&2
+        grep -E "^(TEAM_ID|KEY_ID|ISSUER_ID) =" "$fastfile_path" >&2
+    fi
+}
+
+# Sync project.config with iOS ExportOptions.plist
+sync_export_options() {
+    local export_options_path="$TARGET_DIR/ios/fastlane/ExportOptions.plist"
+    
+    # Check if ExportOptions.plist exists
+    if [ ! -f "$export_options_path" ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: ExportOptions.plist not found at $export_options_path" >&2
+        fi
+        return 0
+    fi
+    
+    print_step "Syncing project.config with iOS ExportOptions.plist..."
+    
+    # Load project.config values
+    if [ -f "$TARGET_DIR/project.config" ]; then
+        source "$TARGET_DIR/project.config" 2>/dev/null || true
+    else
+        print_warning "project.config not found, skipping ExportOptions.plist sync"
+        return 0
+    fi
+    
+    # Only update if TEAM_ID is not empty and not a placeholder
+    if [ -n "$TEAM_ID" ] && [ "$TEAM_ID" != "YOUR_TEAM_ID" ] && [ "$TEAM_ID" != "TEAM_ID" ]; then
+        # Update teamID in ExportOptions.plist
+        sed -i.tmp "s/<string>YOUR_TEAM_ID<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"
+        sed -i.tmp "s/<string>TEAM_ID<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"
+        
+        # Clean up temporary file
+        rm -f "$export_options_path.tmp"
+        
+        print_success "✅ iOS ExportOptions.plist updated with project.config values"
+        
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: Updated ExportOptions.plist teamID to: $TEAM_ID" >&2
+        fi
+    else
+        print_info "Skipping ExportOptions.plist update (TEAM_ID not set or is placeholder)"
+    fi
+}
+
 # Function to display setup summary
 display_setup_summary() {
     print_header "Setup Summary"
@@ -1141,6 +1382,10 @@ main() {
     copy_scripts
     create_configuration_files
     create_project_config
+    
+    # Auto-sync project.config with iOS fastlane files if config exists
+    auto_sync_project_config
+    
     setup_gitignore
     display_setup_summary
     

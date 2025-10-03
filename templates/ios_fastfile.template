@@ -65,7 +65,7 @@ platform :ios do
     
     build_app(
       scheme: "Runner",
-      export_method: "app-store",
+      export_method: "app-store-connect",
       output_directory: IPA_OUTPUT_DIR,
       xcargs: "-allowProvisioningUpdates",
       export_options: {

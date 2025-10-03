@@ -44,8 +44,39 @@ TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Teste
 KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)
 CHANGELOG_PATH = "../builder/changelog.txt"
 IPA_OUTPUT_DIR = "../build/ios/ipa"
+PUBSPEC_PATH = "../pubspec.yaml"
 # Project-specific paths
 PROJECT_KEYSTORE_PATH = "../app/#{PROJECT_NAME.downcase.gsub(/[^a-z0-9]/, '_')}-release.keystore"
+
+# Function to read version from pubspec.yaml
+def read_pubspec_version
+  begin
+    pubspec_content = File.read(PUBSPEC_PATH)
+    version_line = pubspec_content.match(/^version:\s*(.+)$/)
+    
+    if version_line
+      version_string = version_line[1].strip
+      # Parse version string like "1.0.0+1"
+      if version_string.include?('+')
+        version_parts = version_string.split('+')
+        version_name = version_parts[0]
+        version_code = version_parts[1]
+      else
+        version_name = version_string
+        version_code = "1"
+      end
+      
+      UI.message("📱 Parsed version from pubspec.yaml: #{version_name} (#{version_code})")
+      return { version_name: version_name, version_code: version_code }
+    else
+      UI.error("❌ Could not find version in pubspec.yaml")
+      return { version_name: "1.0.0", version_code: "1" }
+    end
+  rescue => e
+    UI.error("❌ Error reading pubspec.yaml: #{e.message}")
+    return { version_name: "1.0.0", version_code: "1" }
+  end
+end
 
 platform :ios do
   desc "Setup iOS environment"
@@ -61,6 +92,18 @@ platform :ios do
   
   desc "Build iOS archive for TestFlight (Beta)"
   lane :build_archive_beta do
+    # Read version from pubspec.yaml
+    version_info = read_pubspec_version
+    UI.message("🔄 Using version: #{version_info[:version_name]} (#{version_info[:version_code]})")
+    
+    # Update version number and build number
+    increment_version_number(
+      version_number: version_info[:version_name]
+    )
+    increment_build_number(
+      build_number: version_info[:version_code]
+    )
+    
     setup_signing
     
     build_app(
@@ -80,6 +123,18 @@ platform :ios do
   
   desc "Build iOS archive for App Store (Production)"
   lane :build_archive_production do
+    # Read version from pubspec.yaml
+    version_info = read_pubspec_version
+    UI.message("🔄 Using version: #{version_info[:version_name]} (#{version_info[:version_code]})")
+    
+    # Update version number and build number
+    increment_version_number(
+      version_number: version_info[:version_name]
+    )
+    increment_build_number(
+      build_number: version_info[:version_code]
+    )
+    
     setup_signing
     
     build_app(

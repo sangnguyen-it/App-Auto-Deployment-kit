@@ -73,13 +73,7 @@ class DynamicVersionManager {
           exit(1);
         }
       case 'fallback_only':
-        final fallbackVersion = config['fallback_version'] ?? defaultVersion;
-        final fallbackBuildNumber = config['fallback_build_number'] ?? defaultBuildNumber;
-        return {
-          'version_name': fallbackVersion,
-          'version_code': fallbackBuildNumber,
-          'source': 'fallback'
-        };
+        return getDeviceVersionSilent();
       case 'store_or_fallback':
       default:
         final storeVersion = await fetchStoreVersionSilent();
@@ -92,13 +86,7 @@ class DynamicVersionManager {
             'original_store_version': storeVersion
           };
         } else {
-          final fallbackVersion = config['fallback_version'] ?? defaultVersion;
-          final fallbackBuildNumber = config['fallback_build_number'] ?? defaultBuildNumber;
-          return {
-            'version_name': fallbackVersion,
-            'version_code': fallbackBuildNumber,
-            'source': 'fallback'
-          };
+          return getDeviceVersionSilent();
         }
     }
   }
@@ -118,17 +106,111 @@ class DynamicVersionManager {
     }
   }
   
-  Map<String, dynamic> getFallbackVersionSilent() {
-    final fallbackVersion = config['fallback_version'] ?? defaultVersion;
-    final fallbackBuildNumber = config['fallback_build_number'] ?? defaultBuildNumber;
-    
+  Map<String, dynamic> getDeviceVersionSilent() {
+    // Try Android first
+    final androidVersion = getAndroidVersionSync();
+    if (androidVersion != null) {
+      final nextVersion = calculateNextVersionSilent(androidVersion);
+      return {
+        'version_name': nextVersion['version_name'],
+        'version_code': nextVersion['version_code'],
+        'source': 'android_device'
+      };
+    }
+
+    // Try iOS next
+    final iosVersion = getIOSVersionSync();
+    if (iosVersion != null) {
+      final nextVersion = calculateNextVersionSilent(iosVersion);
+      return {
+        'version_name': nextVersion['version_name'],
+        'version_code': nextVersion['version_code'],
+        'source': 'ios_device'
+      };
+    }
+
+    // Try pubspec.yaml
+    final pubspecVersion = getCurrentPubspecVersion();
+    if (pubspecVersion != null) {
+      final nextVersion = calculateNextVersionSilent(pubspecVersion);
+      return {
+        'version_name': nextVersion['version_name'],
+        'version_code': nextVersion['version_code'],
+        'source': 'pubspec'
+      };
+    }
+
+    // Final fallback to default
     return {
-      'version_name': fallbackVersion,
-      'version_code': fallbackBuildNumber,
-      'source': 'fallback'
+      'version_name': defaultVersion,
+      'version_code': defaultBuildNumber,
+      'source': 'default'
     };
   }
-  
+
+  String? getAndroidVersionSync() {
+    try {
+      // Try build.gradle.kts first
+      final buildGradleKts = File('android/app/build.gradle.kts');
+      if (buildGradleKts.existsSync()) {
+        final content = buildGradleKts.readAsStringSync();
+        
+        final versionNameMatch = RegExp(r'versionName\s*=\s*"([^"]+)"').firstMatch(content);
+        final versionCodeMatch = RegExp(r'versionCode\s*=\s*(\d+)').firstMatch(content);
+        
+        if (versionNameMatch != null && versionCodeMatch != null) {
+          final versionName = versionNameMatch.group(1)!;
+          final versionCode = versionCodeMatch.group(1)!;
+          return '$versionName+$versionCode';
+        }
+      }
+
+      // Fallback to build.gradle
+      final buildGradle = File('android/app/build.gradle');
+      if (buildGradle.existsSync()) {
+        final content = buildGradle.readAsStringSync();
+        
+        final versionNameMatch = RegExp(r'versionName\s*"([^"]+)"').firstMatch(content);
+        final versionCodeMatch = RegExp(r'versionCode\s*(\d+)').firstMatch(content);
+        
+        if (versionNameMatch != null && versionCodeMatch != null) {
+          final versionName = versionNameMatch.group(1)!;
+          final versionCode = versionCodeMatch.group(1)!;
+          return '$versionName+$versionCode';
+        }
+      }
+    } catch (e) {
+      // Silent error handling
+    }
+    return null;
+  }
+
+  String? getIOSVersionSync() {
+    try {
+      // Try Info.plist first
+      final infoPlist = File('ios/Runner/Info.plist');
+      if (infoPlist.existsSync()) {
+        final content = infoPlist.readAsStringSync();
+        
+        final versionMatch = RegExp(r'<key>CFBundleShortVersionString</key>\s*<string>([^<]+)</string>').firstMatch(content);
+        final buildMatch = RegExp(r'<key>CFBundleVersion</key>\s*<string>([^<]+)</string>').firstMatch(content);
+        
+        if (versionMatch != null && buildMatch != null) {
+          final version = versionMatch.group(1)!.trim();
+          final build = buildMatch.group(1)!.trim();
+          
+          // Skip Flutter variables
+          if (!version.contains('\$(') && !build.contains('\$(')) {
+            return '$version+$build';
+          }
+        }
+      }
+    } catch (e) {
+      // Silent error handling
+    }
+    return null;
+  }
+
   Future<Map<String, dynamic>> getStoreVersionWithFallbackSilent() async {
     final storeVersion = await fetchStoreVersionSilent();
     
@@ -141,7 +223,7 @@ class DynamicVersionManager {
         'original_store_version': storeVersion
       };
     } else {
-      return getFallbackVersionSilent();
+      return getDeviceVersionSilent();
     }
   }
   
@@ -224,7 +306,7 @@ class DynamicVersionManager {
       case 'store_only':
         return await getStoreVersionOnly();
       case 'fallback_only':
-        return getFallbackVersion();
+        return await getDeviceVersion();
       case 'store_or_fallback':
       default:
         return await getStoreVersionWithFallback();
@@ -249,19 +331,147 @@ class DynamicVersionManager {
     }
   }
   
-  Map<String, dynamic> getFallbackVersion() {
-    print('🔄 Using fallback version...');
+  Future<String?> getAndroidVersion() async {
+    try {
+      // Try build.gradle.kts first
+      final buildGradleKts = File('android/app/build.gradle.kts');
+      if (buildGradleKts.existsSync()) {
+        final content = buildGradleKts.readAsStringSync();
+        
+        final versionNameMatch = RegExp(r'versionName\s*=\s*"([^"]+)"').firstMatch(content);
+        final versionCodeMatch = RegExp(r'versionCode\s*=\s*(\d+)').firstMatch(content);
+        
+        if (versionNameMatch != null && versionCodeMatch != null) {
+          final versionName = versionNameMatch.group(1)!;
+          final versionCode = versionCodeMatch.group(1)!;
+          return '$versionName+$versionCode';
+        }
+      }
+
+      // Fallback to build.gradle
+      final buildGradle = File('android/app/build.gradle');
+      if (buildGradle.existsSync()) {
+        final content = buildGradle.readAsStringSync();
+        
+        final versionNameMatch = RegExp(r'versionName\s*"([^"]+)"').firstMatch(content);
+        final versionCodeMatch = RegExp(r'versionCode\s*(\d+)').firstMatch(content);
+        
+        if (versionNameMatch != null && versionCodeMatch != null) {
+          final versionName = versionNameMatch.group(1)!;
+          final versionCode = versionCodeMatch.group(1)!;
+          return '$versionName+$versionCode';
+        }
+      }
+    } catch (e) {
+      print('⚠️  Error reading Android version: $e');
+    }
+    return null;
+  }
+
+  Future<String?> getIOSVersion() async {
+    try {
+      // Try Info.plist first
+      final infoPlist = File('ios/Runner/Info.plist');
+      if (infoPlist.existsSync()) {
+        final content = infoPlist.readAsStringSync();
+        
+        final versionMatch = RegExp(r'<key>CFBundleShortVersionString</key>\s*<string>([^<]+)</string>').firstMatch(content);
+        final buildMatch = RegExp(r'<key>CFBundleVersion</key>\s*<string>([^<]+)</string>').firstMatch(content);
+        
+        if (versionMatch != null && buildMatch != null) {
+          final version = versionMatch.group(1)!.trim();
+          final build = buildMatch.group(1)!.trim();
+          
+          // Skip Flutter variables
+          if (!version.contains('\$(') && !build.contains('\$(')) {
+            return '$version+$build';
+          }
+        }
+      }
+    } catch (e) {
+      print('⚠️  Error reading iOS version: $e');
+    }
+    return null;
+  }
+
+  String? getCurrentPubspecVersion() {
+    try {
+      final pubspec = File('pubspec.yaml');
+      if (!pubspec.existsSync()) {
+        return null;
+      }
+
+      final content = pubspec.readAsStringSync();
+      final versionMatch = RegExp(r'version:\s*(.+)').firstMatch(content);
+
+      if (versionMatch != null) {
+        return versionMatch.group(1)!.trim();
+      }
+    } catch (e) {
+      print('⚠️  Error reading pubspec version: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>> getDeviceVersion() async {
+    print('📱 Getting current device version...');
     
+    try {
+      // Try to get version from Android first
+      final androidVersion = await getAndroidVersion();
+      if (androidVersion != null && androidVersion != '1.0.0+1') {
+        print('✅ Found Android version: $androidVersion');
+        final nextVersion = calculateNextVersion(androidVersion);
+        return {
+          'version_name': nextVersion['version_name'],
+          'version_code': nextVersion['version_code'],
+          'source': 'device_android',
+          'original_device_version': androidVersion
+        };
+      }
+      
+      // Try to get version from iOS
+      final iosVersion = await getIOSVersion();
+      if (iosVersion != null && iosVersion != '1.0.0+1') {
+        print('✅ Found iOS version: $iosVersion');
+        final nextVersion = calculateNextVersion(iosVersion);
+        return {
+          'version_name': nextVersion['version_name'],
+          'version_code': nextVersion['version_code'],
+          'source': 'device_ios',
+          'original_device_version': iosVersion
+        };
+      }
+      
+      // Try pubspec.yaml as last resort
+      final pubspecVersion = getCurrentPubspecVersion();
+      if (pubspecVersion != null && pubspecVersion != '1.0.0+1') {
+        print('✅ Found pubspec version: $pubspecVersion');
+        final nextVersion = calculateNextVersion(pubspecVersion);
+        return {
+          'version_name': nextVersion['version_name'],
+          'version_code': nextVersion['version_code'],
+          'source': 'device_pubspec',
+          'original_device_version': pubspecVersion
+        };
+      }
+      
+    } catch (e) {
+      print('⚠️  Error reading device version: $e');
+    }
+    
+    // Final fallback to default
+    print('🔄 Using default fallback version...');
     final fallbackVersion = config['fallback_version'] ?? defaultVersion;
     final fallbackBuildNumber = config['fallback_build_number'] ?? defaultBuildNumber;
     
     return {
       'version_name': fallbackVersion,
       'version_code': fallbackBuildNumber,
-      'source': 'fallback'
+      'source': 'fallback_default'
     };
   }
-  
+
   Future<Map<String, dynamic>> getStoreVersionWithFallback() async {
     print('🔍 Trying to fetch from stores with fallback...');
     
@@ -277,8 +487,8 @@ class DynamicVersionManager {
         'original_store_version': storeVersion
       };
     } else {
-      print('⚠️  No store version found, using fallback...');
-      return getFallbackVersion();
+      print('⚠️  No store version found, using device version fallback...');
+      return await getDeviceVersion();
     }
   }
   
@@ -553,17 +763,28 @@ class DynamicVersionManager {
   Future<Map<String, dynamic>> getManualVersion() async {
     print('✏️  Manual Version Input');
     print('');
+    print('📱 Android Version:');
+    stdout.write('Enter Android version name: ');
+    final androidVersionName = stdin.readLineSync() ?? defaultVersion;
     
-    stdout.write('Enter version name: ');
-    final versionName = stdin.readLineSync() ?? defaultVersion;
+    stdout.write('Enter Android build number: ');
+    final androidBuildInput = stdin.readLineSync() ?? defaultBuildNumber.toString();
+    final androidBuildNumber = int.tryParse(androidBuildInput) ?? defaultBuildNumber;
     
-    stdout.write('Enter build number: ');
-    final buildInput = stdin.readLineSync() ?? defaultBuildNumber.toString();
-    final buildNumber = int.tryParse(buildInput) ?? defaultBuildNumber;
+    print('');
+    print('🍎 iOS Version:');
+    stdout.write('Enter iOS version name: ');
+    final iosVersionName = stdin.readLineSync() ?? defaultVersion;
+    
+    stdout.write('Enter iOS build number: ');
+    final iosBuildInput = stdin.readLineSync() ?? defaultBuildNumber.toString();
+    final iosBuildNumber = int.tryParse(iosBuildInput) ?? defaultBuildNumber;
     
     return {
-      'version_name': versionName,
-      'version_code': buildNumber,
+      'android_version_name': androidVersionName,
+      'android_version_code': androidBuildNumber,
+      'ios_version_name': iosVersionName,
+      'ios_version_code': iosBuildNumber,
       'source': 'manual'
     };
   }
@@ -571,22 +792,48 @@ class DynamicVersionManager {
   Future<void> applyInteractiveVersion() async {
     final versionInfo = await getInteractiveVersion();
     
-    final versionName = versionInfo['version_name'];
-    final versionCode = versionInfo['version_code'];
-    final source = versionInfo['source'];
-    
-    print('🎯 Applying version: $versionName ($versionCode) from $source');
-    
-    // Update all platform files
-    await updatePubspecVersion(versionName, versionCode);
-    await updateAndroidVersion(versionName, versionCode);
-    await updateIOSVersion(versionName, versionCode);
-    
-    print('🎉 Interactive version update completed!');
-    print('📋 Summary:');
-    print('   Version Name: $versionName');
-    print('   Version Code: $versionCode');
-    print('   Source: $source');
+    if (versionInfo['source'] == 'manual') {
+      // Handle separate Android and iOS versions
+      final androidVersionName = versionInfo['android_version_name'];
+      final androidVersionCode = versionInfo['android_version_code'];
+      final iosVersionName = versionInfo['ios_version_name'];
+      final iosVersionCode = versionInfo['ios_version_code'];
+      final source = versionInfo['source'];
+      
+      print('🎯 Applying versions:');
+      print('   📱 Android: $androidVersionName ($androidVersionCode)');
+      print('   🍎 iOS: $iosVersionName ($iosVersionCode)');
+      print('   Source: $source');
+      
+      // Update platform files with separate versions
+      await updatePubspecVersion(androidVersionName, androidVersionCode); // Use Android version for pubspec
+      await updateAndroidVersion(androidVersionName, androidVersionCode);
+      await updateIOSVersion(iosVersionName, iosVersionCode);
+      
+      print('🎉 Interactive version update completed!');
+      print('📋 Summary:');
+      print('   📱 Android Version: $androidVersionName ($androidVersionCode)');
+      print('   🍎 iOS Version: $iosVersionName ($iosVersionCode)');
+      print('   Source: $source');
+    } else {
+      // Handle automatic version (same for both platforms)
+      final versionName = versionInfo['version_name'];
+      final versionCode = versionInfo['version_code'];
+      final source = versionInfo['source'];
+      
+      print('🎯 Applying version: $versionName ($versionCode) from $source');
+      
+      // Update all platform files
+      await updatePubspecVersion(versionName, versionCode);
+      await updateAndroidVersion(versionName, versionCode);
+      await updateIOSVersion(versionName, versionCode);
+      
+      print('🎉 Interactive version update completed!');
+      print('📋 Summary:');
+      print('   Version Name: $versionName');
+      print('   Version Code: $versionCode');
+      print('   Source: $source');
+    }
     
     if (versionInfo.containsKey('original_store_version')) {
       print('   Original Store Version: ${versionInfo['original_store_version']}');

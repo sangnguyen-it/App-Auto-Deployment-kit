@@ -6,15 +6,23 @@
 # Exit on error, but handle curl download gracefully
 set -e
 
+# Check for force interactive mode
+FORCE_INTERACTIVE=${FORCE_INTERACTIVE:-false}
+
 # Ensure we have a proper terminal for interactive operations
-if [ -t 0 ]; then
-    # Running interactively
+if [ -t 0 ] || [ "$FORCE_INTERACTIVE" = "true" ]; then
+    # Running interactively or forced interactive
     export TERM=${TERM:-xterm}
+    if [ "$FORCE_INTERACTIVE" = "true" ]; then
+        echo "🔄 Force interactive mode enabled"
+        export REMOTE_EXECUTION=false
+    fi
 else
     # Running non-interactively (e.g., via curl | bash)
     export TERM=dumb
     export REMOTE_EXECUTION=true
     echo "🔄 Detected non-interactive execution (pipe mode) - enabling auto-mode"
+    echo "💡 To enable interactive mode, run: FORCE_INTERACTIVE=true curl -fsSL ... | bash"
 fi
 
 # Set safe locale to prevent encoding issues
@@ -129,8 +137,8 @@ read_with_fallback() {
     local default_value="${2:-n}"
     local variable_name="$3"
     
-    # Check if we're in pipe mode (REMOTE_EXECUTION=true)
-    if [[ "${REMOTE_EXECUTION:-}" == "true" ]]; then
+    # Check if we're in pipe mode (REMOTE_EXECUTION=true) and not forced interactive
+    if [[ "${REMOTE_EXECUTION:-}" == "true" ]] && [[ "${FORCE_INTERACTIVE:-}" != "true" ]]; then
         # In pipe mode, automatically use default value
         echo "${prompt}${default_value} (auto-selected in pipe mode)"
         eval "$variable_name=\"$default_value\""
@@ -153,8 +161,8 @@ read_required_or_skip() {
     local variable_name="$2"
     local skip_message="${3:-Skipping input for non-interactive mode}"
     
-    # Check if we're in a remote/automated environment
-    if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
+    # Check if we're in a remote/automated environment and not forced interactive
+    if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || ([[ "${REMOTE_EXECUTION:-}" == "true" ]] && [[ "${FORCE_INTERACTIVE:-}" != "true" ]]) || ([[ ! -t 0 ]] && [[ "${FORCE_INTERACTIVE:-}" != "true" ]]); then
         # In automated/remote environment, return "skip" to indicate skipping
         echo "→ $prompt skip (auto-selected: $skip_message)"
         eval "$variable_name=\"skip\""

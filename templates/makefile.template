@@ -12,10 +12,10 @@ APP_NAME := {{PROJECT_NAME}}
 FLUTTER_VERSION := {{FLUTTER_VERSION}}
 PACKAGE_NAME := {{PACKAGE_NAME}}
 
-# Version Configuration
-VERSION_FULL := {{VERSION_FULL}}
-VERSION_NAME := {{VERSION_NAME}}
-VERSION_CODE := {{VERSION_CODE}}
+# Version Configuration - Dynamic (will be updated during build)
+VERSION_FULL := $(shell dart scripts/dynamic_version_manager.dart get-version 2>/dev/null || echo "{{VERSION_FULL}}")
+VERSION_NAME := $(shell dart scripts/dynamic_version_manager.dart get-version-name 2>/dev/null || echo "{{VERSION_NAME}}")
+VERSION_CODE := $(shell dart scripts/dynamic_version_manager.dart get-version-code 2>/dev/null || echo "{{VERSION_CODE}}")
 
 # Output Configuration
 OUTPUT_DIR := builder
@@ -211,47 +211,76 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 		if [ $$? -eq 0 ]; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
 			mkdir -p build/ios/archive build/ios/ipa; \
-			cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
-			if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
-				cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_NAME)"; \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_NAME)"; \
-				printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting TestFlight IPA from Archive..."; \
-				if [ -f "fastlane/ExportOptions.plist" ]; then \
-				xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building and exporting IPA using Fastlane..."; \
+			if command -v fastlane >/dev/null 2>&1 && [ -f "ios/fastlane/Fastfile" ]; then \
+				cd ios; \
+				if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+					if bundle exec fastlane build_archive_beta 2>/dev/null; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and IPA created successfully via bundle"; \
+					elif fastlane build_archive_beta 2>/dev/null; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and IPA created successfully"; \
+					else \
+						printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane build failed"; \
+						exit 1; \
+					fi; \
+				elif fastlane build_archive_beta 2>/dev/null; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and IPA created successfully"; \
 				else \
-					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+					printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane build failed"; \
+					exit 1; \
 				fi; \
-				IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+				cd ..; \
+				IPA_FILE=$$(find build/ios/ipa -name "*.ipa" | head -1); \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA exported successfully"; \
-					cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_NAME)"; \
+					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_NAME)"; \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to TestFlight..."; \
-					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
-						if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
-							if bundle exec fastlane ios beta 2>/dev/null; then \
-								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight via bundle"; \
-							elif fastlane ios beta 2>/dev/null; then \
-								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight"; \
-							else \
-								printf "$(YELLOW)$(WARNING) %s$(NC)\n" "TestFlight upload failed - check fastlane configuration"; \
-								printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && bundle exec fastlane ios beta"; \
-							fi; \
+					cd ios; \
+					if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+						if bundle exec fastlane ios beta 2>/dev/null; then \
+							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight via bundle"; \
 						elif fastlane ios beta 2>/dev/null; then \
 							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight"; \
 						else \
 							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "TestFlight upload failed - check fastlane configuration"; \
-							printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && fastlane ios beta"; \
+							printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && bundle exec fastlane ios beta"; \
 						fi; \
+					elif fastlane ios beta 2>/dev/null; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight"; \
 					else \
-						printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - manual TestFlight upload required"; \
-						printf "$(CYAN)$(INFO) %s$(NC)\n" "Upload manually: Use Xcode Organizer or Transporter app"; \
-						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$(IPA_NAME)"; \
+						printf "$(YELLOW)$(WARNING) %s$(NC)\n" "TestFlight upload failed - check fastlane configuration"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && fastlane ios beta"; \
 					fi; \
+					cd ..; \
 				else \
 					printf "$(RED)$(CROSS) %s$(NC)\n" "IPA export failed"; \
 				fi; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - falling back to xcodebuild"; \
+				cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
+				if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
+					cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_NAME)"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_NAME)"; \
+					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting TestFlight IPA from Archive..."; \
+					if [ -f "fastlane/ExportOptions.plist" ]; then \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
+					else \
+						xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+					fi; \
+					IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+					if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA exported successfully"; \
+						cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_NAME)"; \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual TestFlight upload required"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$(IPA_NAME)"; \
+					else \
+						printf "$(RED)$(CROSS) %s$(NC)\n" "IPA export failed"; \
+					fi; \
+				fi; \
+				cd ..; \
 			fi; \
 		fi; \
 	else \
@@ -359,47 +388,76 @@ auto-build-live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 		if [ $$? -eq 0 ]; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
 			mkdir -p build/ios/archive build/ios/ipa; \
-			cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
-			if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
-				cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
-				printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting Production IPA from Archive..."; \
-				if [ -f "fastlane/ExportOptions.plist" ]; then \
-				xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building and exporting Production IPA using Fastlane..."; \
+			if command -v fastlane >/dev/null 2>&1 && [ -f "ios/fastlane/Fastfile" ]; then \
+				cd ios; \
+				if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+					if bundle exec fastlane build_archive_production 2>/dev/null; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and Production IPA created successfully via bundle"; \
+					elif fastlane build_archive_production 2>/dev/null; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and Production IPA created successfully"; \
+					else \
+						printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane production build failed"; \
+						exit 1; \
+					fi; \
+				elif fastlane build_archive_production 2>/dev/null; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and Production IPA created successfully"; \
 				else \
-					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+					printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane production build failed"; \
+					exit 1; \
 				fi; \
-				IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+				cd ..; \
+				IPA_FILE=$$(find build/ios/ipa -name "*.ipa" | head -1); \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
-					cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
-					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
-						if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
-							if bundle exec fastlane ios release 2>/dev/null; then \
-								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store via bundle"; \
-							elif fastlane ios release 2>/dev/null; then \
-								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
-							else \
-								printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
-								printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && bundle exec fastlane ios release"; \
-							fi; \
+					cd ios; \
+					if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+						if bundle exec fastlane ios release 2>/dev/null; then \
+							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store via bundle"; \
 						elif fastlane ios release 2>/dev/null; then \
 							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
 						else \
 							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
-							printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && fastlane ios release"; \
+							printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && bundle exec fastlane ios release"; \
 						fi; \
+					elif fastlane ios release 2>/dev/null; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
 					else \
-						printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - manual App Store upload required"; \
-						printf "$(CYAN)$(INFO) %s$(NC)\n" "Upload manually: Use Xcode Organizer or Transporter app"; \
-						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+						printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && fastlane ios release"; \
 					fi; \
+					cd ..; \
 				else \
 					printf "$(RED)$(CROSS) %s$(NC)\n" "Production IPA export failed"; \
 				fi; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - falling back to xcodebuild"; \
+				cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
+				if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
+					cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
+					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting Production IPA from Archive..."; \
+					if [ -f "fastlane/ExportOptions.plist" ]; then \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
+					else \
+						xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+					fi; \
+					IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+					if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
+						cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual App Store upload required"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					else \
+						printf "$(RED)$(CROSS) %s$(NC)\n" "Production IPA export failed"; \
+					fi; \
+				fi; \
+				cd ..; \
 			fi; \
 		fi; \
 	else \
@@ -527,18 +585,65 @@ auto-build-live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 		if [ $$? -eq 0 ]; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
 			mkdir -p build/ios/archive build/ios/ipa; \
-			cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
-			if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
-				cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
-				printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting Production IPA from Archive..."; \
-				if [ -f "fastlane/ExportOptions.plist" ]; then \
-				xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building and exporting Production IPA using Fastlane..."; \
+			if command -v fastlane >/dev/null 2>&1 && [ -f "ios/fastlane/Fastfile" ]; then \
+				cd ios; \
+				if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+					if bundle exec fastlane build_archive_production 2>/dev/null; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and Production IPA created successfully via bundle"; \
+					elif fastlane build_archive_production 2>/dev/null; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and Production IPA created successfully"; \
+					else \
+						printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane production build failed"; \
+						exit 1; \
+					fi; \
+				elif fastlane build_archive_production 2>/dev/null; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and Production IPA created successfully"; \
 				else \
-					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+					printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane production build failed"; \
+					exit 1; \
 				fi; \
-				IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+				cd ..; \
+				IPA_FILE=$$(find build/ios/ipa -name "*.ipa" | head -1); \
+				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
+					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
+					cd ios; \
+					if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+						if bundle exec fastlane ios release 2>/dev/null; then \
+							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store via bundle"; \
+						elif fastlane ios release 2>/dev/null; then \
+							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
+						else \
+							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
+							printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && bundle exec fastlane ios release"; \
+						fi; \
+					elif fastlane ios release 2>/dev/null; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
+					else \
+						printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && fastlane ios release"; \
+					fi; \
+					cd ..; \
+				else \
+					printf "$(RED)$(CROSS) %s$(NC)\n" "Production IPA export failed"; \
+				fi; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - falling back to xcodebuild"; \
+				cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
+				if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
+					cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
+					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting Production IPA from Archive..."; \
+					if [ -f "fastlane/ExportOptions.plist" ]; then \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
+					else \
+						xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+					fi; \
+					IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
 					cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \

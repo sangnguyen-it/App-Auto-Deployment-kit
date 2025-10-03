@@ -11,8 +11,9 @@ class DynamicVersionManager {
   static const String configFile = "version_config.json";
   
   Map<String, dynamic> config = {};
+  bool silentMode = false;
   
-  DynamicVersionManager() {
+  DynamicVersionManager({this.silentMode = false}) {
     loadConfig();
   }
   
@@ -35,7 +36,7 @@ class DynamicVersionManager {
         saveConfig();
       }
     } catch (e) {
-      print('⚠️  Error loading config: $e');
+      if (!silentMode) print('⚠️  Error loading config: $e');
       config = {
         "fallback_version": defaultVersion,
         "fallback_build_number": defaultBuildNumber,
@@ -54,6 +55,166 @@ class DynamicVersionManager {
     }
   }
   
+  Future<Map<String, dynamic>> getDynamicVersionSilent() async {
+    final strategy = config['version_strategy'] ?? 'store_or_fallback';
+    
+    switch (strategy) {
+      case 'store_only':
+        final storeVersion = await fetchStoreVersionSilent();
+        if (storeVersion != null) {
+          final nextVersion = calculateNextVersionSilent(storeVersion);
+          return {
+            'version_name': nextVersion['version_name'],
+            'version_code': nextVersion['version_code'],
+            'source': 'store',
+            'original_store_version': storeVersion
+          };
+        } else {
+          exit(1);
+        }
+      case 'fallback_only':
+        final fallbackVersion = config['fallback_version'] ?? defaultVersion;
+        final fallbackBuildNumber = config['fallback_build_number'] ?? defaultBuildNumber;
+        return {
+          'version_name': fallbackVersion,
+          'version_code': fallbackBuildNumber,
+          'source': 'fallback'
+        };
+      case 'store_or_fallback':
+      default:
+        final storeVersion = await fetchStoreVersionSilent();
+        if (storeVersion != null) {
+          final nextVersion = calculateNextVersionSilent(storeVersion);
+          return {
+            'version_name': nextVersion['version_name'],
+            'version_code': nextVersion['version_code'],
+            'source': 'store',
+            'original_store_version': storeVersion
+          };
+        } else {
+          final fallbackVersion = config['fallback_version'] ?? defaultVersion;
+          final fallbackBuildNumber = config['fallback_build_number'] ?? defaultBuildNumber;
+          return {
+            'version_name': fallbackVersion,
+            'version_code': fallbackBuildNumber,
+            'source': 'fallback'
+          };
+        }
+    }
+  }
+  
+  Future<Map<String, dynamic>> getStoreVersionOnlySilent() async {
+    final storeVersion = await fetchStoreVersionSilent();
+    if (storeVersion != null) {
+      final nextVersion = calculateNextVersionSilent(storeVersion);
+      return {
+        'version_name': nextVersion['version_name'],
+        'version_code': nextVersion['version_code'],
+        'source': 'store',
+        'original_store_version': storeVersion
+      };
+    } else {
+      exit(1);
+    }
+  }
+  
+  Map<String, dynamic> getFallbackVersionSilent() {
+    final fallbackVersion = config['fallback_version'] ?? defaultVersion;
+    final fallbackBuildNumber = config['fallback_build_number'] ?? defaultBuildNumber;
+    
+    return {
+      'version_name': fallbackVersion,
+      'version_code': fallbackBuildNumber,
+      'source': 'fallback'
+    };
+  }
+  
+  Future<Map<String, dynamic>> getStoreVersionWithFallbackSilent() async {
+    final storeVersion = await fetchStoreVersionSilent();
+    
+    if (storeVersion != null) {
+      final nextVersion = calculateNextVersionSilent(storeVersion);
+      return {
+        'version_name': nextVersion['version_name'],
+        'version_code': nextVersion['version_code'],
+        'source': 'store',
+        'original_store_version': storeVersion
+      };
+    } else {
+      return getFallbackVersionSilent();
+    }
+  }
+  
+  Map<String, dynamic> calculateNextVersionSilent(String storeVersion) {
+    try {
+      // Parse store version (format: major.minor.patch+build)
+      final parts = storeVersion.split('+');
+      final versionPart = parts[0]; // major.minor.patch
+      final buildPart = parts.length > 1 ? int.tryParse(parts[1]) ?? 1 : 1;
+      
+      final autoIncrement = config['auto_increment'] ?? true;
+      
+      if (autoIncrement) {
+        // Increment build number
+        final nextBuildNumber = buildPart + 1;
+        return {
+          'version_name': versionPart,
+          'version_code': nextBuildNumber
+        };
+      } else {
+        return {
+          'version_name': versionPart,
+          'version_code': buildPart
+        };
+      }
+    } catch (e) {
+      // Return incremented fallback
+      final fallbackVersion = config['fallback_version'] ?? defaultVersion;
+      final fallbackBuildNumber = (config['fallback_build_number'] ?? defaultBuildNumber) + 1;
+      return {
+        'version_name': fallbackVersion,
+        'version_code': fallbackBuildNumber
+      };
+    }
+  }
+  
+  Future<String?> fetchStoreVersionSilent() async {
+    try {
+      // Check if Ruby script exists
+      final rubyScript = File('scripts/store_version_checker.rb');
+      if (!rubyScript.existsSync()) {
+        return null;
+      }
+      
+      // Set environment variables for package IDs
+      final env = Map<String, String>.from(Platform.environment);
+      if (config['android_package_id'] != null && config['android_package_id'].isNotEmpty) {
+        env['ANDROID_PACKAGE_ID'] = config['android_package_id'];
+      }
+      if (config['ios_bundle_id'] != null && config['ios_bundle_id'].isNotEmpty) {
+        env['IOS_BUNDLE_ID'] = config['ios_bundle_id'];
+      }
+      
+      final result = await Process.run(
+        'ruby', 
+        ['scripts/store_version_checker.rb', 'all'],
+        workingDirectory: Directory.current.path,
+        environment: env
+      );
+      
+      if (result.exitCode == 0) {
+        final output = result.stdout.toString().trim();
+        if (output.isNotEmpty && output != 'null') {
+          return output;
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> getDynamicVersion() async {
     print('🚀 Getting dynamic version information...');
     
@@ -434,6 +595,40 @@ class DynamicVersionManager {
 }
 
 void main(List<String> arguments) async {
+  // For get commands, handle them separately without any debug output
+  if (arguments.isNotEmpty && arguments[0].startsWith('get-')) {
+    final configFile = File("version_config.json");
+    Map<String, dynamic> config = {};
+    
+    if (configFile.existsSync()) {
+      try {
+        final content = configFile.readAsStringSync();
+        config = json.decode(content);
+      } catch (e) {
+        // Use defaults
+      }
+    }
+    
+    final fallbackVersion = config['fallback_version'] ?? "1.0.0";
+    final fallbackBuildNumber = config['fallback_build_number'] ?? 1;
+    
+    switch (arguments[0]) {
+      case 'get-version':
+        stdout.write('$fallbackVersion+$fallbackBuildNumber');
+        break;
+        
+      case 'get-version-name':
+        stdout.write('$fallbackVersion');
+        break;
+        
+      case 'get-version-code':
+        stdout.write('$fallbackBuildNumber');
+        break;
+    }
+    
+    return; // Exit without creating DynamicVersionManager
+  }
+  
   final manager = DynamicVersionManager();
   
   if (arguments.isEmpty) {
@@ -450,6 +645,9 @@ void main(List<String> arguments) async {
     print('  set-strategy <strategy>  - Set version strategy (store_or_fallback, fallback_only, store_only)');
     print('  test-store               - Test store version fetching');
     print('  interactive              - Interactive version selection');
+    print('  get-version              - Get full version (name+code)');
+    print('  get-version-name         - Get version name only');
+    print('  get-version-code         - Get version code only');
     return;
   }
   
@@ -528,6 +726,8 @@ void main(List<String> arguments) async {
     case 'interactive':
       await manager.applyInteractiveVersion();
       break;
+      
+
       
     default:
       print('❌ Unknown command: $command');

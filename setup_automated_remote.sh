@@ -553,34 +553,187 @@ create_ios_fastfile_inline() {
     cat > "$TARGET_DIR/ios/fastlane/Fastfile" << EOF
 # Fastlane configuration for $PROJECT_NAME iOS
 # Bundle ID: $BUNDLE_ID
+# Generated on: $(date)
 
+fastlane_version "2.228.0"
 default_platform(:ios)
 
+# Disable update checker to prevent initialization issues
+ENV["FASTLANE_SKIP_UPDATE_CHECK"] = "1"
+
+# Error handling for FastlaneCore issues
+begin
+  require 'fastlane'
+rescue LoadError => e
+  UI.error("Failed to load Fastlane: #{e.message}")
+  exit(1)
+end
+
+# Project Configuration
+PROJECT_NAME = "$PROJECT_NAME"
+BUNDLE_ID = "$BUNDLE_ID"
+TEAM_ID = "YOUR_TEAM_ID"
+KEY_ID = "YOUR_KEY_ID"
+ISSUER_ID = "YOUR_ISSUER_ID"
+TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"]
+
+# File paths (relative to fastlane directory)
+KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)
+CHANGELOG_PATH = "../builder/changelog.txt"
+IPA_OUTPUT_DIR = "../build/ios/ipa"
+
 platform :ios do
-  desc "Build and upload to TestFlight"
-  lane :beta do
+  desc "Setup iOS environment"
+  lane :setup do
+    UI.message("Setting up iOS environment for #{PROJECT_NAME}")
+  end
+
+  desc "Build iOS archive for TestFlight"
+  lane :build_archive do
+    build_archive_beta
+  end
+  
+  desc "Build iOS archive for TestFlight (Beta)"
+  lane :build_archive_beta do
+    setup_signing
+    
     build_app(
       scheme: "Runner",
       export_method: "app-store",
-      output_directory: "../build/ios/ipa"
+      output_directory: IPA_OUTPUT_DIR,
+      xcargs: "-allowProvisioningUpdates",
+      export_options: {
+        signingStyle: "automatic",
+        teamID: TEAM_ID,
+        compileBitcode: false,
+        uploadBitcode: false,
+        uploadSymbols: true
+      }
     )
-    upload_to_testflight(
-      skip_waiting_for_build_processing: true
+  end
+  
+  desc "Build iOS archive for App Store (Production)"
+  lane :build_archive_production do
+    setup_signing
+    
+    build_app(
+      scheme: "Runner",
+      export_method: "app-store-connect",
+      output_directory: IPA_OUTPUT_DIR,
+      xcargs: "-allowProvisioningUpdates"
     )
   end
 
-  desc "Upload to App Store"
+  desc "Submit a new Beta Build to TestFlight"
+  lane :beta do
+    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
+      upload_to_testflight(
+        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+        changelog: read_changelog,
+        skip_waiting_for_build_processing: false,
+        distribute_external: true,
+        groups: TESTER_GROUPS,
+        notify_external_testers: true
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive_beta
+      upload_to_testflight(
+        changelog: read_changelog,
+        skip_waiting_for_build_processing: false,
+        distribute_external: true,
+        groups: TESTER_GROUPS,
+        notify_external_testers: true
+      )
+    end
+  end
+
+  desc "Submit a new Production Build to App Store"
   lane :release do
-    build_app(
-      scheme: "Runner",
-      export_method: "app-store",
-      output_directory: "../build/ios/ipa"
+    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
+      upload_to_app_store(
+        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+        force: true,
+        reject_if_possible: true,
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive_production
+      upload_to_app_store(
+        force: true,
+        reject_if_possible: true,
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    end
+  end
+
+  desc "Upload existing IPA to TestFlight"
+  lane :upload_testflight do
+    setup_signing
+    
+    upload_to_testflight(
+      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+      changelog: read_changelog,
+      skip_waiting_for_build_processing: false,
+      distribute_external: true,
+      groups: TESTER_GROUPS,
+      notify_external_testers: true
     )
+  end
+
+  desc "Upload existing IPA to App Store"
+  lane :upload_appstore do
+    setup_signing
+    
     upload_to_app_store(
+      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
       force: true,
-      skip_metadata: true,
-      skip_screenshots: true
+      reject_if_possible: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: false,
+      automatic_release: false
     )
+  end
+
+  desc "Clean iOS build artifacts"
+  lane :clean do
+    clear_derived_data
+  end
+  
+  private_lane :setup_signing do
+    app_store_connect_api_key(
+      key_id: KEY_ID,
+      issuer_id: ISSUER_ID,
+      key_filepath: KEY_PATH,
+      duration: 1200,
+      in_house: false
+    )
+  end
+  
+  private_lane :read_changelog do |mode = "testing"|
+    changelog_content = ""
+    
+    if File.exist?(CHANGELOG_PATH)
+      changelog_content = File.read(CHANGELOG_PATH)
+    else
+      if mode == "production"
+        changelog_content = "🚀 #{PROJECT_NAME} Production Release\n\n• New features and improvements\n• Performance optimizations\n• Bug fixes and stability enhancements"
+      else
+        changelog_content = "🚀 #{PROJECT_NAME} Update\n\n• Performance improvements\n• Bug fixes and stability enhancements\n• Updated dependencies"
+      end
+    end
+    
+    changelog_content
   end
 end
 EOF
@@ -657,7 +810,7 @@ tester:
 	flutter clean
 	flutter pub get
 	flutter build apk --release
-	cd ios && fastlane beta
+	cd ios && fastlane build_archive_beta && fastlane beta
 
 live:
 	@echo "🚀 Building production version..."
@@ -665,7 +818,7 @@ live:
 	flutter pub get
 	flutter build appbundle --release
 	cd android && fastlane upload_aab_production
-	cd ios && fastlane release
+	cd ios && fastlane build_archive_production && fastlane release
 
 deps:
 	@echo "📦 Installing dependencies..."
@@ -732,7 +885,7 @@ jobs:
           flutter-version: '3.24.3'
       - run: flutter pub get
       - run: flutter build ios --release --no-codesign
-      - run: cd ios && fastlane release
+      - run: cd ios && fastlane build_archive_production && fastlane release
         env:
           APP_STORE_CONNECT_API_KEY_ID: \${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: \${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}

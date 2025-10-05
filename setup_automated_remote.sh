@@ -575,6 +575,9 @@ download_scripts_from_github() {
 download_templates_from_github() {
     print_header "Downloading Templates from GitHub"
     
+    # Ensure templates directory exists
+    mkdir -p "$TEMPLATES_DIR"
+    
     local github_base_url="https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/templates"
     local template_files=(
         "makefile.template"
@@ -586,11 +589,17 @@ download_templates_from_github() {
         local template_url="$github_base_url/$template"
         local template_path="$TEMPLATES_DIR/$template"
         
-        print_info "Downloading: $template"
+        print_info "Downloading: $template to $template_path"
         
         if curl -fsSL "$template_url" -o "$template_path"; then
             ((downloaded_count++))
             print_success "Downloaded: $template"
+            # Verify file was created
+            if [ -f "$template_path" ]; then
+                print_success "Verified: $template exists at $template_path"
+            else
+                print_warning "Warning: $template not found after download"
+            fi
         else
             print_warning "Failed to download: $template (will use inline version if available)"
             # Debug: show curl error

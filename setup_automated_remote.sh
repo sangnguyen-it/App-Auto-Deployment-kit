@@ -223,7 +223,11 @@ DEPLOYMENT_MODE=""
 
 # Interactive mode flag - detect based on terminal availability and environment
 # Check if we have access to /dev/tty for interactive input (even in pipe mode)
-if [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]]; then
+if [[ "${FORCE_REMOTE_EXECUTION:-}" == "true" ]]; then
+    # Don't override if FORCE_REMOTE_EXECUTION is set
+    INTERACTIVE_MODE=false
+    echo "🔄 Forced remote execution mode - keeping REMOTE_EXECUTION=$REMOTE_EXECUTION"
+elif [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]]; then
     # Override REMOTE_EXECUTION if we have tty access
     export REMOTE_EXECUTION=false
     INTERACTIVE_MODE=true

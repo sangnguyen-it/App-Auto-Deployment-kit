@@ -914,9 +914,52 @@ EOF
 }
 
 create_makefile_inline() {
-    cat > "$TARGET_DIR/Makefile" << 'EOF'
+    print_header "Creating Makefile from template"
+    
+    # Use template system like the old flow
+    local template_file="$SCRIPT_DIR/templates/makefile.template"
+    local output_file="$TARGET_DIR/Makefile"
+    
+    if [[ -f "$template_file" ]]; then
+        print_step "Using makefile template..."
+        
+        # Copy template and process placeholders
+        cp "$template_file" "$output_file"
+        
+        # Ensure we have valid values
+        if [[ -z "$PROJECT_NAME" ]]; then
+            PROJECT_NAME=$(basename "$TARGET_DIR")
+            print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+        fi
+        
+        if [[ -z "$PACKAGE_NAME" ]]; then
+            PACKAGE_NAME="com.flutter_app.app"
+            print_warning "Using fallback PACKAGE_NAME: $PACKAGE_NAME"
+        fi
+        
+        if [[ -z "$APP_NAME" ]]; then
+            APP_NAME="$PROJECT_NAME"
+        fi
+        
+        # Replace placeholders in Makefile
+        sed -i.bak "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$output_file"
+        sed -i.bak "s/{{PACKAGE_NAME}}/$PACKAGE_NAME/g" "$output_file"
+        sed -i.bak "s/{{APP_NAME}}/$APP_NAME/g" "$output_file"
+        sed -i.bak "s/{{TARGET_DIR}}/./g" "$output_file"
+        
+        # Clean up backup files
+        rm -f "$output_file.bak"
+        
+        chmod +x "$output_file"
+        print_success "Makefile created from template with OUTPUT_DIR=builder"
+    else
+        print_warning "Template not found, creating basic Makefile"
+        # Fallback to basic Makefile if template not found
+        cat > "$output_file" << 'EOF'
 # Makefile for Flutter CI/CD Pipeline
 # Project: {{PROJECT_NAME}}
+
+OUTPUT_DIR := builder
 
 .PHONY: help tester live deps clean build test
 
@@ -931,16 +974,26 @@ help:
 
 tester:
 	@echo "🚀 Building tester version..."
+	mkdir -p $(OUTPUT_DIR)
 	flutter clean
 	flutter pub get
 	flutter build apk --release
+	@if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then \
+		cp build/app/outputs/flutter-apk/app-release.apk $(OUTPUT_DIR)/; \
+		echo "✅ APK copied to $(OUTPUT_DIR)/"; \
+	fi
 	cd ios && fastlane build_archive_beta && fastlane beta
 
 live:
 	@echo "🚀 Building production version..."
+	mkdir -p $(OUTPUT_DIR)
 	flutter clean
 	flutter pub get
 	flutter build appbundle --release
+	@if [ -f "build/app/outputs/bundle/release/app-release.aab" ]; then \
+		cp build/app/outputs/bundle/release/app-release.aab $(OUTPUT_DIR)/; \
+		echo "✅ AAB copied to $(OUTPUT_DIR)/"; \
+	fi
 	cd android && fastlane upload_aab_production
 	cd ios && fastlane build_archive_production && fastlane release
 
@@ -953,9 +1006,11 @@ deps:
 clean:
 	@echo "🧹 Cleaning..."
 	flutter clean
+	rm -rf $(OUTPUT_DIR)
 
 build:
 	@echo "🔨 Building..."
+	mkdir -p $(OUTPUT_DIR)
 	flutter build apk --release
 	flutter build appbundle --release
 
@@ -963,11 +1018,12 @@ test:
 	@echo "🧪 Running tests..."
 	flutter test
 EOF
-    
-    # Replace placeholder with actual project name
-    sed -i.bak "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$TARGET_DIR/Makefile" && rm "$TARGET_DIR/Makefile.bak"
-    chmod +x "$TARGET_DIR/Makefile"
-    print_success "Makefile created (inline)"
+        
+        # Replace placeholder with actual project name
+        sed -i.bak "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$output_file" && rm "$output_file.bak"
+        chmod +x "$output_file"
+        print_success "Basic Makefile created with OUTPUT_DIR=builder"
+    fi
 }
 
 create_github_workflow_inline() {

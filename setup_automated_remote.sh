@@ -575,8 +575,21 @@ download_scripts_from_github() {
 download_templates_from_github() {
     print_header "Downloading Templates from GitHub"
     
+    # Debug: Show current directories
+    echo "Debug: TEMPLATES_DIR = $TEMPLATES_DIR"
+    echo "Debug: Current working directory = $(pwd)"
+    
     # Ensure templates directory exists
     mkdir -p "$TEMPLATES_DIR"
+    
+    # Verify directory was created
+    if [ -d "$TEMPLATES_DIR" ]; then
+        echo "Debug: Templates directory exists: $TEMPLATES_DIR"
+        ls -la "$TEMPLATES_DIR" || echo "Debug: Cannot list templates directory"
+    else
+        echo "Debug: Failed to create templates directory: $TEMPLATES_DIR"
+        return 1
+    fi
     
     local github_base_url="https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/templates"
     local template_files=(
@@ -591,12 +604,21 @@ download_templates_from_github() {
         
         print_info "Downloading: $template to $template_path"
         
+        # Test if we can write to the directory
+        if touch "$template_path.test" 2>/dev/null; then
+            rm -f "$template_path.test"
+            echo "Debug: Write permission OK for $TEMPLATES_DIR"
+        else
+            echo "Debug: No write permission for $TEMPLATES_DIR"
+        fi
+        
         if curl -fsSL "$template_url" -o "$template_path"; then
             ((downloaded_count++))
             print_success "Downloaded: $template"
             # Verify file was created
             if [ -f "$template_path" ]; then
                 print_success "Verified: $template exists at $template_path"
+                echo "Debug: File size: $(wc -c < "$template_path") bytes"
             else
                 print_warning "Warning: $template not found after download"
             fi

@@ -1052,8 +1052,13 @@ create_makefile_inline() {
     print_header "Creating Makefile from template"
     
     # Use template system like the old flow
-    local template_file="$SCRIPT_DIR/templates/makefile.template"
+    local template_file="$TEMPLATES_DIR/makefile.template"
     local output_file="$TARGET_DIR/Makefile"
+    
+    # Debug: Show template path
+    echo "Debug: Looking for template at: $template_file"
+    echo "Debug: TEMPLATES_DIR = $TEMPLATES_DIR"
+    echo "Debug: SCRIPT_DIR = $SCRIPT_DIR"
     
     if [[ -f "$template_file" ]]; then
         print_step "Using makefile template..."

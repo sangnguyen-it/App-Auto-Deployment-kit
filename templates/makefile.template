@@ -208,7 +208,7 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building iOS for TestFlight"
 	@if [ "$$(uname)" = "Darwin" ]; then \
 		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Cleaning iOS dependencies..."; \
-		cd ios && rm -rf Pods Podfile.lock && pod install && cd ..; \
+		cd ios && rm -rf Pods Podfile.lock Pods/Manifest.lock && pod install && cd ..; \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS dependencies cleaned and reinstalled"; \
 		flutter build ios --release; \
 		if [ $$? -eq 0 ]; then \
@@ -350,7 +350,7 @@ auto-build-live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building iOS for App Store"
 	@if [ "$$(uname)" = "Darwin" ]; then \
 		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Cleaning iOS dependencies..."; \
-		cd ios && rm -rf Pods Podfile.lock && pod install && cd ..; \
+		cd ios && rm -rf Pods Podfile.lock Pods/Manifest.lock && pod install && cd ..; \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS dependencies cleaned and reinstalled"; \
 		flutter build ios --release; \
 		if [ $$? -eq 0 ]; then \
@@ -550,7 +550,7 @@ auto-build-live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building iOS for App Store"
 	@if [ "$$(uname)" = "Darwin" ]; then \
 		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Cleaning iOS dependencies..."; \
-		cd ios && rm -rf Pods Podfile.lock && pod install && cd ..; \
+		cd ios && rm -rf Pods Podfile.lock Pods/Manifest.lock && pod install && cd ..; \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS dependencies cleaned and reinstalled"; \
 		flutter build ios --release; \
 		if [ $$? -eq 0 ]; then \
@@ -880,7 +880,7 @@ clean: ## Clean all build artifacts and temporary files
 	@rm -rf build/ && printf "$(GREEN)$(CHECK) %s$(NC)\n" "Build directory removed"
 	@if [ "$$(uname)" = "Darwin" ] && [ -d "ios" ]; then \
 		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Cleaning iOS Dependencies"; \
-		cd ios && rm -rf Pods Podfile.lock && cd ..; \
+		cd ios && rm -rf Pods Podfile.lock Pods/Manifest.lock && cd ..; \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS dependencies cleaned"; \
 	fi
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Cleanup completed successfully!"

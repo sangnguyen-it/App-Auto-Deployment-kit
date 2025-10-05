@@ -228,10 +228,18 @@ if [[ "${FORCE_REMOTE_EXECUTION:-}" == "true" ]]; then
     INTERACTIVE_MODE=false
     echo "🔄 Forced remote execution mode - keeping REMOTE_EXECUTION=$REMOTE_EXECUTION"
 elif [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]]; then
-    # Override REMOTE_EXECUTION if we have tty access
-    export REMOTE_EXECUTION=false
-    INTERACTIVE_MODE=true
-    echo "🔄 Interactive mode enabled (tty available)"
+    # Check if we're running via curl | bash (pipe mode) - auto-enable remote mode
+    if [[ ! -t 0 ]]; then
+        # Running via pipe (curl | bash) - enable remote mode to download all scripts
+        export REMOTE_EXECUTION=true
+        INTERACTIVE_MODE=true
+        echo "🔄 Pipe mode detected (curl | bash) - enabling remote execution to download all scripts"
+    else
+        # Override REMOTE_EXECUTION if we have tty access and not in pipe mode
+        export REMOTE_EXECUTION=false
+        INTERACTIVE_MODE=true
+        echo "🔄 Interactive mode enabled (tty available)"
+    fi
 elif [ -t 0 ] && [ -t 1 ] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]] && [[ "${REMOTE_EXECUTION:-}" != "true" ]]; then
     INTERACTIVE_MODE=true
     echo "🔄 Interactive mode enabled"

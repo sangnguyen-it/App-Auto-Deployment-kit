@@ -583,6 +583,7 @@ copy_scripts() {
         "dynamic_version_manager.dart"
         "store_version_checker.rb"
         "google_play_version_checker.rb"
+        "template_processor.sh"
     )
     
     local scripts_copied=0

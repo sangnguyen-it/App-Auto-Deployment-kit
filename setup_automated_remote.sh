@@ -6,17 +6,22 @@
 # Exit on error, but handle curl download gracefully
 set -e
 
-# Simple interactive detection - always interactive when run via terminal
-if [ -t 0 ]; then
+# Enhanced interactive detection - prioritize /dev/tty for curl | bash scenarios
+if [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]]; then
+    # Interactive mode available via /dev/tty (works with curl | bash)
+    export TERM=${TERM:-xterm}
+    export REMOTE_EXECUTION=false
+    echo "🔄 Interactive mode enabled (tty available)"
+elif [ -t 0 ]; then
     # Running interactively in terminal
     export TERM=${TERM:-xterm}
     export REMOTE_EXECUTION=false
-    echo "🔄 Interactive mode enabled"
+    echo "🔄 Terminal detected"
 else
-    # Running non-interactively (e.g., via curl | bash)
+    # Running non-interactively (e.g., via curl | bash without tty)
     export TERM=dumb
     export REMOTE_EXECUTION=true
-    echo "🔄 Auto-mode enabled (non-interactive execution)"
+    echo "🔄 Detected non-interactive execution (pipe mode)"
 fi
 
 # Set safe locale to prevent encoding issues
@@ -125,15 +130,26 @@ print_info() {
     echo -e "${CYAN}${INFO} $1${NC}"
 }
 
-# Helper function for remote-safe input reading
+# Helper function for remote-safe input reading with tty support
 read_with_fallback() {
     local prompt="$1"
     local default_value="${2:-n}"
     local variable_name="$3"
     
-    # Check if we're in pipe mode (REMOTE_EXECUTION=true)
-    if [[ "${REMOTE_EXECUTION:-}" == "true" ]]; then
-        # In pipe mode, automatically use default value
+    # Always try to use /dev/tty first if available
+    if [[ -r /dev/tty ]]; then
+        echo -n "$prompt" > /dev/tty
+        read "$variable_name" < /dev/tty
+        # Use default if no input provided
+        if [[ -z "${!variable_name}" ]]; then
+            eval "$variable_name=\"$default_value\""
+        fi
+        return 0
+    fi
+    
+    # Check if we're in non-interactive mode
+    if [[ "${INTERACTIVE_MODE:-}" == "false" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]]; then
+        # In non-interactive mode without tty, automatically use default value
         echo "${prompt}${default_value} (auto-selected in pipe mode)"
         eval "$variable_name=\"$default_value\""
         return 0
@@ -155,8 +171,20 @@ read_required_or_skip() {
     local variable_name="$2"
     local skip_message="${3:-Skipping input for non-interactive mode}"
     
+    # Always try to use /dev/tty first if available
+    if [[ -r /dev/tty ]]; then
+        echo -n "$prompt" > /dev/tty
+        read "$variable_name" < /dev/tty
+        # If no input provided, skip
+        if [[ -z "${!variable_name}" ]]; then
+            echo "→ $prompt skip (auto-selected: $skip_message)"
+            eval "$variable_name=\"skip\""
+        fi
+        return 0
+    fi
+    
     # Check if we're in a remote/automated environment
-    if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
+    if [[ "${INTERACTIVE_MODE:-}" == "false" ]] || [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
         # In automated/remote environment, return "skip" to indicate skipping
         echo "→ $prompt skip (auto-selected: $skip_message)"
         eval "$variable_name=\"skip\""
@@ -164,8 +192,13 @@ read_required_or_skip() {
     fi
     
     # Interactive environment - prompt for input
-    echo -n "$prompt"
-    read "$variable_name"
+    if [[ -t 0 ]]; then
+        read -p "$prompt" "$variable_name"
+    else
+        # Fallback: we're not in a terminal, skip this input
+        echo "→ $prompt skip (auto-selected: $skip_message)"
+        eval "$variable_name=\"skip\""
+    fi
 }
 
 # Global variables
@@ -176,6 +209,21 @@ BUNDLE_ID=""
 APP_NAME=""
 TEAM_ID=""
 DEPLOYMENT_MODE=""
+
+# Interactive mode flag - detect based on terminal availability and environment
+# Check if we have access to /dev/tty for interactive input (even in pipe mode)
+if [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]]; then
+    # Override REMOTE_EXECUTION if we have tty access
+    export REMOTE_EXECUTION=false
+    INTERACTIVE_MODE=true
+    echo "🔄 Interactive mode enabled (tty available)"
+elif [ -t 0 ] && [ -t 1 ] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]] && [[ "${REMOTE_EXECUTION:-}" != "true" ]]; then
+    INTERACTIVE_MODE=true
+    echo "🔄 Interactive mode enabled"
+else
+    INTERACTIVE_MODE=false
+    echo "🔄 Auto-mode enabled (non-interactive execution)"
+fi
 
 # Function to prompt user for deployment mode
 prompt_deployment_mode() {

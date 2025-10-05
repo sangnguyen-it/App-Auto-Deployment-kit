@@ -476,11 +476,11 @@ detect_project_info() {
 
 # Function to create directory structure
 create_directory_structure() {
-    # Skip creating directories in project when running remotely
-    if [ "$REMOTE_EXECUTION" = "true" ]; then
-        print_info "🔄 Running in remote mode - skipping directory creation in project"
-        return 0
-    fi
+    # Always create directories in project (both local and remote)
+    # if [ "$REMOTE_EXECUTION" = "true" ]; then
+    #     print_info "🔄 Running in remote mode - skipping directory creation in project"
+    #     return 0
+    # fi
     
     # print_header "Creating Directory Structure"
     
@@ -503,13 +503,54 @@ create_directory_structure() {
     done
 }
 
+# Function to download scripts from GitHub when running remotely
+download_scripts_from_github() {
+    print_header "Downloading Scripts from GitHub"
+    
+    local github_base_url="https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts"
+    local script_files=(
+        "version_manager.dart"
+        "version_sync.dart"
+        "build_info_generator.dart"
+        "tag_generator.dart"
+        "common_functions.sh"
+        "setup.sh"
+        "dynamic_version_manager.dart"
+        "store_version_checker.rb"
+        "google_play_version_checker.rb"
+    )
+    
+    local downloaded_count=0
+    
+    for script in "${script_files[@]}"; do
+        local script_url="$github_base_url/$script"
+        local script_path="$SCRIPTS_DIR/$script"
+        
+        print_info "Downloading: $script"
+        
+        if curl -fsSL "$script_url" -o "$script_path" 2>/dev/null; then
+            chmod +x "$script_path" 2>/dev/null || true
+            ((downloaded_count++))
+            print_success "Downloaded: $script"
+        else
+            print_warning "Failed to download: $script (will use inline version if available)"
+        fi
+    done
+    
+    if [ $downloaded_count -gt 0 ]; then
+        print_success "Downloaded $downloaded_count scripts from GitHub"
+    else
+        print_warning "No scripts downloaded, will use inline versions"
+    fi
+}
+
 # Function to copy scripts or create them inline
 copy_scripts() {
-    # Skip copying scripts to project directory when running remotely
-    if [ "$REMOTE_EXECUTION" = "true" ]; then
-        print_info "🔄 Running in remote mode - scripts will be created inline as needed"
-        return 0
-    fi
+    # Always copy scripts to project directory (both local and remote)
+    # if [ "$REMOTE_EXECUTION" = "true" ]; then
+    #     print_info "🔄 Running in remote mode - scripts will be created inline as needed"
+    #     return 0
+    # fi
     
     # print_header "Copying Scripts"
     
@@ -575,11 +616,11 @@ copy_scripts() {
 
 # Function to create all configuration files using templates
 create_configuration_files() {
-    # Skip creating configuration files in project when running remotely
-    if [ "$REMOTE_EXECUTION" = "true" ]; then
-        print_info "🔄 Running in remote mode - skipping configuration file creation in project"
-        return 0
-    fi
+    # Always create configuration files in project (both local and remote)
+    # if [ "$REMOTE_EXECUTION" = "true" ]; then
+    #     print_info "🔄 Running in remote mode - skipping configuration file creation in project"
+    #     return 0
+    # fi
     
     print_header "Creating Configuration Files"
     
@@ -1928,6 +1969,11 @@ main() {
     
     # Execute setup steps
     detect_project_info
+    
+    # Download scripts from GitHub if running remotely
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        download_scripts_from_github
+    fi
     
     # Check GitHub authentication if GitHub mode is selected
     if [ "$DEPLOYMENT_MODE" = "github" ]; then

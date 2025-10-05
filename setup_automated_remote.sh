@@ -7,8 +7,9 @@
 set -e
 
 # Enhanced interactive detection - detect curl | bash scenarios
-if [[ "${0}" == "bash" ]] || [[ "${0}" == "/bin/bash" ]] || [[ "${0}" == "/usr/bin/bash" ]] || [[ "${0}" == "sh" ]] || [[ "${0}" == "/bin/sh" ]]; then
-    # Script is being executed via curl | bash
+# Check if script is being piped from curl
+if [[ -n "${CURL_PIPE:-}" ]] || [[ "$(ps -o comm= -p $PPID 2>/dev/null)" == "curl" ]] || [[ ! -t 0 && -t 1 ]]; then
+    # Script is being executed via curl | bash or similar pipe
     export TERM=dumb
     export REMOTE_EXECUTION=true
     echo "🔄 Remote execution mode enabled (curl | bash detected)"

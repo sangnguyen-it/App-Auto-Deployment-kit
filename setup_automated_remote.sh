@@ -1970,17 +1970,18 @@ main() {
     # Execute setup steps
     detect_project_info
     
-    # Download scripts from GitHub if running remotely
-    if [ "$REMOTE_EXECUTION" = "true" ]; then
-        download_scripts_from_github
-    fi
-    
     # Check GitHub authentication if GitHub mode is selected
     if [ "$DEPLOYMENT_MODE" = "github" ]; then
         check_github_auth
     fi
     
     create_directory_structure
+    
+    # Download scripts from GitHub if running remotely
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        download_scripts_from_github
+    fi
+    
     copy_scripts
     create_configuration_files
     create_project_config

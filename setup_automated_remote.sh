@@ -1991,7 +1991,10 @@ main() {
     
     # Download scripts from GitHub if running remotely
     if [ "$REMOTE_EXECUTION" = "true" ]; then
+        echo "🔄 Downloading scripts from GitHub (REMOTE_EXECUTION=$REMOTE_EXECUTION)..."
         download_scripts_from_github
+    else
+        echo "🔄 Skipping GitHub download (REMOTE_EXECUTION=$REMOTE_EXECUTION)"
     fi
     
     copy_scripts

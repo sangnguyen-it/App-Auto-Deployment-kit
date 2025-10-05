@@ -6,10 +6,10 @@
 # Exit on error, but handle curl download gracefully
 set -e
 
-# Enhanced interactive detection - prioritize /dev/tty for curl | bash scenarios
-if [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]] && [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-    # Interactive mode available via /dev/tty but script is sourced (works with curl | bash)
-    export TERM=${TERM:-xterm}
+# Enhanced interactive detection - detect curl | bash scenarios
+if [[ "${0}" == "bash" ]] || [[ "${0}" == "/bin/bash" ]] || [[ "${0}" == "/usr/bin/bash" ]] || [[ "${0}" == "sh" ]] || [[ "${0}" == "/bin/sh" ]]; then
+    # Script is being executed via curl | bash
+    export TERM=dumb
     export REMOTE_EXECUTION=true
     echo "🔄 Remote execution mode enabled (curl | bash detected)"
 elif [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]]; then

@@ -550,6 +550,9 @@ download_scripts_from_github() {
             print_success "Downloaded: $script"
         else
             print_warning "Failed to download: $script (will use inline version if available)"
+            # Debug: show curl error
+            echo "Debug: curl error for $script_url" >&2
+            curl -fsSL "$script_url" -o "$script_path" || echo "Curl failed with exit code: $?" >&2
         fi
     done
     

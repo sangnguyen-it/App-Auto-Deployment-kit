@@ -7,8 +7,13 @@
 set -e
 
 # Enhanced interactive detection - prioritize /dev/tty for curl | bash scenarios
-if [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]]; then
-    # Interactive mode available via /dev/tty (works with curl | bash)
+if [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]] && [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    # Interactive mode available via /dev/tty but script is sourced (works with curl | bash)
+    export TERM=${TERM:-xterm}
+    export REMOTE_EXECUTION=true
+    echo "🔄 Remote execution mode enabled (curl | bash detected)"
+elif [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]]; then
+    # Interactive mode available via /dev/tty and script is executed directly
     export TERM=${TERM:-xterm}
     export REMOTE_EXECUTION=false
     echo "🔄 Interactive mode enabled (tty available)"

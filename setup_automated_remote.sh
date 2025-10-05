@@ -518,6 +518,7 @@ download_scripts_from_github() {
         "dynamic_version_manager.dart"
         "store_version_checker.rb"
         "google_play_version_checker.rb"
+        "template_processor.sh"
     )
     
     local downloaded_count=0

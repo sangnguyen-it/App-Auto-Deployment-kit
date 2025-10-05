@@ -595,11 +595,14 @@ download_templates_from_github() {
         
         print_info "Downloading: $template"
         
-        if curl -fsSL "$template_url" -o "$template_path" 2>/dev/null; then
+        if curl -fsSL "$template_url" -o "$template_path"; then
             ((downloaded_count++))
             print_success "Downloaded: $template"
         else
             print_warning "Failed to download: $template (will use inline version if available)"
+            # Debug: show curl error
+            echo "Debug: curl error for $template_url" >&2
+            curl -fsSL "$template_url" -o "$template_path" || echo "Curl failed with exit code: $?" >&2
         fi
     done
     

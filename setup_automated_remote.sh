@@ -571,6 +571,45 @@ download_scripts_from_github() {
     fi
 }
 
+# Function to download templates from GitHub when running remotely
+download_templates_from_github() {
+    print_header "Downloading Templates from GitHub"
+    
+    local github_base_url="https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/templates"
+    local template_files=(
+        "makefile.template"
+        "android_fastfile.template"
+        "ios_fastfile.template"
+        "ios_appfile.template"
+        "ios_exportoptions.template"
+        "github_workflow.template"
+        "gemfile.template"
+        "project_config.template"
+    )
+    
+    local downloaded_count=0
+    
+    for template in "${template_files[@]}"; do
+        local template_url="$github_base_url/$template"
+        local template_path="$TEMPLATES_DIR/$template"
+        
+        print_info "Downloading: $template"
+        
+        if curl -fsSL "$template_url" -o "$template_path" 2>/dev/null; then
+            ((downloaded_count++))
+            print_success "Downloaded: $template"
+        else
+            print_warning "Failed to download: $template (will use inline version if available)"
+        fi
+    done
+    
+    if [ $downloaded_count -gt 0 ]; then
+        print_success "Downloaded $downloaded_count templates from GitHub"
+    else
+        print_warning "No templates downloaded, will use inline versions"
+    fi
+}
+
 # Function to copy scripts or create them inline
 copy_scripts() {
     # Always copy scripts to project directory (both local and remote)
@@ -2009,6 +2048,8 @@ main() {
     if [ "$REMOTE_EXECUTION" = "true" ]; then
         echo "🔄 Downloading scripts from GitHub (REMOTE_EXECUTION=$REMOTE_EXECUTION)..."
         download_scripts_from_github
+        echo "🔄 Downloading templates from GitHub (REMOTE_EXECUTION=$REMOTE_EXECUTION)..."
+        download_templates_from_github
     else
         echo "🔄 Skipping GitHub download (REMOTE_EXECUTION=$REMOTE_EXECUTION)"
     fi

@@ -108,16 +108,10 @@ platform :ios do
     
     build_app(
       scheme: "Runner",
-      export_method: "app-store-connect",
+      export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
       xcargs: "-allowProvisioningUpdates",
-      export_options: {
-        signingStyle: "automatic",
-        teamID: TEAM_ID,
-        compileBitcode: false,
-        uploadBitcode: false,
-        uploadSymbols: true
-      }
+      export_options: "./ExportOptions.plist"
     )
   end
   
@@ -139,9 +133,10 @@ platform :ios do
     
     build_app(
       scheme: "Runner",
-      export_method: "app-store-connect",
+      export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
-      xcargs: "-allowProvisioningUpdates"
+      xcargs: "-allowProvisioningUpdates",
+      export_options: "./ExportOptions.plist"
     )
   end
   

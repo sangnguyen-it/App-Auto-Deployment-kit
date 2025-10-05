@@ -578,13 +578,6 @@ download_templates_from_github() {
     local github_base_url="https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/templates"
     local template_files=(
         "makefile.template"
-        "android_fastfile.template"
-        "ios_fastfile.template"
-        "ios_appfile.template"
-        "ios_exportoptions.template"
-        "github_workflow.template"
-        "gemfile.template"
-        "project_config.template"
     )
     
     local downloaded_count=0

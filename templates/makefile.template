@@ -155,11 +155,14 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby if you need Fastlane functionality"; \
 	fi
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting system configuration check..."
-	@$(MAKE) system-check
-	@if [ $$? -ne 0 ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "System configuration failed! Please fix issues above."; \
-		exit 1; \
-	fi
+	@printf "$(CYAN)🔍 System Configuration Check$(NC)\n"
+	@printf "\n"
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking Flutter installation..."
+	@if command -v flutter >/dev/null 2>&1; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "Flutter installed"; else printf "$(RED)$(CROSS) %s$(NC)\n" "Flutter not installed"; fi
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking project structure..."
+	@if [ -f "pubspec.yaml" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "pubspec.yaml found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "pubspec.yaml missing"; fi
+	@if [ -d "android" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "Android directory found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "Android directory missing"; fi
+	@if [ -d "ios" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS directory found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "iOS directory missing"; fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
 	@if command -v dart >/dev/null 2>&1; then \

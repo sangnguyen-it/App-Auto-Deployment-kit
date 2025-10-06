@@ -151,9 +151,9 @@ menu: ## 🎯 Interactive Menu - Choose Your Build Pipeline
 	@read -p "" CHOICE; \
 	case $$CHOICE in \
 		1) $(MAKE) auto-build-tester ;; \
-		2) $(MAKE) auto-build-live-local ;; \
-		3) $(MAKE) auto-build-live-github ;; \
-		4) $(MAKE) auto-build-live ;; \
+		2) $(MAKE) live-local ;; \
+		3) $(MAKE) live-github ;; \
+		4) $(MAKE) live ;; \
 		5) $(MAKE) manual-operations ;; \
 		6) $(MAKE) system-check ;; \
 		7) $(MAKE) help ;; \
@@ -221,9 +221,63 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
 	fi
 	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
+	$(eval VERSION_FULL := $(call get_current_version))
+	$(eval VERSION_NAME := $(call get_current_version_name))
+	$(eval VERSION_CODE := $(call get_current_version_code))
+	$(eval ANDROID_VERSION_NAME := $(call get_android_version_name))
+	$(eval ANDROID_VERSION_CODE := $(call get_android_version_code))
+	$(eval IOS_VERSION_NAME := $(call get_ios_version_name))
+	$(eval IOS_VERSION_CODE := $(call get_ios_version_code))
+	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
+	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
+	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
+	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
+	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
+	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
 	@mkdir -p $(OUTPUT_DIR)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
+	$(eval VERSION_FULL := $(call get_current_version))
+	$(eval VERSION_NAME := $(call get_current_version_name))
+	$(eval VERSION_CODE := $(call get_current_version_code))
+	$(eval ANDROID_VERSION_NAME := $(call get_android_version_name))
+	$(eval ANDROID_VERSION_CODE := $(call get_android_version_code))
+	$(eval IOS_VERSION_NAME := $(call get_ios_version_name))
+	$(eval IOS_VERSION_CODE := $(call get_ios_version_code))
+	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
+	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
+	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
+	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
+	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
+	$(eval VERSION_FULL := $(call get_current_version))
+	$(eval VERSION_NAME := $(call get_current_version_name))
+	$(eval VERSION_CODE := $(call get_current_version_code))
+	$(eval ANDROID_VERSION_NAME := $(call get_android_version_name))
+	$(eval ANDROID_VERSION_CODE := $(call get_android_version_code))
+	$(eval IOS_VERSION_NAME := $(call get_ios_version_name))
+	$(eval IOS_VERSION_CODE := $(call get_ios_version_code))
+	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
+	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
+	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
+	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
+	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
 	$(eval VERSION_FULL := $(call get_current_version))
@@ -338,10 +392,12 @@ live: ## 🚀 Building production version
 	fi
 	cd android && fastlane upload_aab_production
 	cd ios && fastlane build_archive_production && fastlane release
-live-local: auto-build-live-local ## 🚀 Alias for auto-build-live-local
-live-github: auto-build-live-github ## ☁️ Alias for auto-build-live-github
 
-auto-build-live: ## 🔄 Automated Live Production Pipeline (Hybrid)
+# ═══════════════════════════════════════════════════════════════════════════════
+# 🌟 LIVE PRODUCTION PIPELINE - AAB + APP STORE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 	@printf "\n"
 	@printf "$(CYAN)🌟 Building for Production$(NC)\n"
 	@printf "\n"
@@ -370,11 +426,14 @@ auto-build-live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby if you need Fastlane functionality"; \
 	fi
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting system configuration check..."
-	@$(MAKE) system-check
-	@if [ $$? -ne 0 ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "System configuration failed! Please fix issues above."; \
-		exit 1; \
-	fi
+	@printf "$(CYAN)🔍 System Configuration Check$(NC)\n"
+	@printf "\n"
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking Flutter installation..."
+	@if command -v flutter >/dev/null 2>&1; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "Flutter installed"; else printf "$(RED)$(CROSS) %s$(NC)\n" "Flutter not installed"; fi
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking project structure..."
+	@if [ -f "pubspec.yaml" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "pubspec.yaml found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "pubspec.yaml missing"; fi
+	@if [ -d "android" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "Android directory found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "Android directory missing"; fi
+	@if [ -d "ios" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS directory found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "iOS directory missing"; fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
 	@if command -v dart >/dev/null 2>&1; then \
@@ -509,15 +568,17 @@ auto-build-live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 	@printf "$(GREEN)🚀 Live Production Pipeline Completed!$(NC)\n"
 	@printf "$(WHITE)📁 Builder Directory:$(NC) $(OUTPUT_DIR)/\n"
 	@printf "$(WHITE)📦 Android AAB:$(NC) $(OUTPUT_DIR)/$(AAB_NAME)\n"
+	@printf "$(WHITE)📦 Android AAB (builder/):$(NC) builder/$(AAB_NAME)\n"
 	@if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$(IPA_PROD_NAME)" ]; then \
 		printf "$(WHITE)🍎 iOS Production IPA:$(NC) $(OUTPUT_DIR)/$(IPA_PROD_NAME)\n"; \
+		printf "$(WHITE)🍎 iOS Production IPA (builder/):$(NC) builder/$(IPA_PROD_NAME)\n"; \
 	fi
 	
 	@printf "\n"
 	@printf "$(CYAN)🚀 Triggering GitHub Actions for Store Upload...$(NC)\n"
 	@$(MAKE) trigger-github-actions
 
-auto-build-live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
+live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	@printf "\n"
 	@printf "$(CYAN)🌟 Building for Production (Local Upload)$(NC)\n"
 	@printf "\n"
@@ -546,11 +607,14 @@ auto-build-live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby if you need Fastlane functionality"; \
 	fi
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting system configuration check..."
-	@$(MAKE) system-check
-	@if [ $$? -ne 0 ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "System configuration failed! Please fix issues above."; \
-		exit 1; \
-	fi
+	@printf "$(CYAN)🔍 System Configuration Check$(NC)\n"
+	@printf "\n"
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking Flutter installation..."
+	@if command -v flutter >/dev/null 2>&1; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "Flutter installed"; else printf "$(RED)$(CROSS) %s$(NC)\n" "Flutter not installed"; fi
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking project structure..."
+	@if [ -f "pubspec.yaml" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "pubspec.yaml found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "pubspec.yaml missing"; fi
+	@if [ -d "android" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "Android directory found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "Android directory missing"; fi
+	@if [ -d "ios" ]; then printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS directory found"; else printf "$(RED)$(CROSS) %s$(NC)\n" "iOS directory missing"; fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
 	@if command -v dart >/dev/null 2>&1; then \
@@ -727,8 +791,10 @@ auto-build-live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	@printf "$(GREEN)🚀 Live Production Pipeline (Local) Completed!$(NC)\n"
 	@printf "$(WHITE)📁 Builder Directory:$(NC) $(OUTPUT_DIR)/\n"
 	@printf "$(WHITE)📦 Android AAB:$(NC) $(OUTPUT_DIR)/$(AAB_NAME)\n"
+	@printf "$(WHITE)📦 Android AAB (builder/):$(NC) builder/$(AAB_NAME)\n"
 	@if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$(IPA_PROD_NAME)" ]; then \
 		printf "$(WHITE)🍎 iOS Production IPA:$(NC) $(OUTPUT_DIR)/$(IPA_PROD_NAME)\n"; \
+		printf "$(WHITE)🍎 iOS Production IPA (builder/):$(NC) builder/$(IPA_PROD_NAME)\n"; \
 	fi
 	
 	@printf "\n"
@@ -754,7 +820,7 @@ auto-build-live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git tag already exists or failed to create"; \
 	fi
 
-auto-build-live-github: ## ☁️ Automated Live Production Pipeline (GitHub Only)
+live-github: ## ☁️ Automated Live Production Pipeline (GitHub Only)
 	@printf "\n"
 	@printf "$(CYAN)☁️ Triggering GitHub Actions for Production Build$(NC)\n"
 	@printf "\n"

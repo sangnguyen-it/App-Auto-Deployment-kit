@@ -21,6 +21,14 @@ VERSION_CODE_FALLBACK := {{VERSION_CODE}}
 # Output Configuration
 OUTPUT_DIR := builder
 
+# Initial filename definitions (will be updated during build)
+APK_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.apk
+AAB_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.aab
+IPA_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.ipa
+IPA_PROD_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}-production.ipa
+ARCHIVE_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.xcarchive
+ARCHIVE_PROD_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}-production.xcarchive
+
 # Function to get current version (will be called during build)
 define get_current_version
 $(shell dart scripts/dynamic_version_manager.dart get-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
@@ -191,30 +199,6 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
 	@mkdir -p $(OUTPUT_DIR)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
-	$(eval VERSION_FULL := $(call get_current_version))
-	$(eval VERSION_NAME := $(call get_current_version_name))
-	$(eval VERSION_CODE := $(call get_current_version_code))
-	$(eval APK_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).apk)
-	$(eval AAB_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).aab)
-	$(eval IPA_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE)-production.ipa)
-	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE)-production.xcarchive)
-	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed: $(VERSION_NAME)+$(VERSION_CODE)"
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
-	$(eval VERSION_FULL := $(call get_current_version))
-	$(eval VERSION_NAME := $(call get_current_version_name))
-	$(eval VERSION_CODE := $(call get_current_version_code))
-	$(eval APK_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).apk)
-	$(eval AAB_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).aab)
-	$(eval IPA_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE)-production.ipa)
-	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE)-production.xcarchive)
-	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed: $(VERSION_NAME)+$(VERSION_CODE)"
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
 	$(eval VERSION_FULL := $(call get_current_version))

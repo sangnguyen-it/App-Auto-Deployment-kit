@@ -79,29 +79,60 @@ Future<void> interactiveMode() async {
   print('   Version Code: ${getVersionCode()}');
   print('');
   
-  print('📱 ANDROID VERSION:');
-  stdout.write('Enter Android version name [current: ${getVersionName()}]: ');
-  final androidVersionNameInput = stdin.readLineSync()?.trim();
-  final androidVersionName = (androidVersionNameInput?.isEmpty ?? true) ? getVersionName() : androidVersionNameInput!;
-  
-  stdout.write('Enter Android version code [current: ${getVersionCode()}]: ');
-  final androidVersionCodeInput = stdin.readLineSync()?.trim();
-  final androidVersionCode = (androidVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : androidVersionCodeInput!;
-  
+  // Ask for mode selection first
+  print('⚙️  VERSION MODE SELECTION:');
+  print('   1. Auto - Keep current versions for both platforms');
+  print('   2. Manual - Enter custom versions for each platform');
   print('');
-  print('🍎 iOS VERSION:');
-  stdout.write('Enter iOS version name [current: ${getVersionName()}]: ');
-  final iosVersionNameInput = stdin.readLineSync()?.trim();
-  final iosVersionName = (iosVersionNameInput?.isEmpty ?? true) ? getVersionName() : iosVersionNameInput!;
+  stdout.write('Select mode (1=Auto, 2=Manual) [default: 1]: ');
+  final modeInput = stdin.readLineSync()?.trim();
+  final isAutoMode = (modeInput?.isEmpty ?? true) || modeInput == '1';
   
-  stdout.write('Enter iOS version code (e.g., 12) [current: ${getVersionCode()}]: ');
-  final iosVersionCodeInput = stdin.readLineSync()?.trim();
-  final iosVersionCode = (iosVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : iosVersionCodeInput!;
+  String androidVersionName, androidVersionCode;
+  String iosVersionName, iosVersionCode;
   
-  print('');
-  print('📝 Summary:');
-  print('   Android: $androidVersionName+$androidVersionCode');
-  print('   iOS: $iosVersionName+$iosVersionCode');
+  if (isAutoMode) {
+    // Auto mode - use current versions
+    androidVersionName = getVersionName();
+    androidVersionCode = getVersionCode();
+    iosVersionName = getVersionName();
+    iosVersionCode = getVersionCode();
+    
+    print('');
+    print('🤖 AUTO MODE - Using current versions:');
+    print('   Android: $androidVersionName+$androidVersionCode');
+    print('   iOS: $iosVersionName+$iosVersionCode');
+  } else {
+    // Manual mode - ask for custom versions
+    print('');
+    print('✏️  MANUAL MODE - Enter custom versions:');
+    print('');
+    
+    print('📱 ANDROID VERSION:');
+    stdout.write('Enter Android version name [current: ${getVersionName()}]: ');
+    final androidVersionNameInput = stdin.readLineSync()?.trim();
+    androidVersionName = (androidVersionNameInput?.isEmpty ?? true) ? getVersionName() : androidVersionNameInput!;
+    
+    stdout.write('Enter Android version code [current: ${getVersionCode()}]: ');
+    final androidVersionCodeInput = stdin.readLineSync()?.trim();
+    androidVersionCode = (androidVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : androidVersionCodeInput!;
+    
+    print('');
+    print('🍎 iOS VERSION:');
+    stdout.write('Enter iOS version name [current: ${getVersionName()}]: ');
+    final iosVersionNameInput = stdin.readLineSync()?.trim();
+    iosVersionName = (iosVersionNameInput?.isEmpty ?? true) ? getVersionName() : iosVersionNameInput!;
+    
+    stdout.write('Enter iOS version code [current: ${getVersionCode()}]: ');
+    final iosVersionCodeInput = stdin.readLineSync()?.trim();
+    iosVersionCode = (iosVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : iosVersionCodeInput!;
+    
+    print('');
+    print('📝 Summary:');
+    print('   Android: $androidVersionName+$androidVersionCode');
+    print('   iOS: $iosVersionName+$iosVersionCode');
+  }
+  
   print('');
   stdout.write('Apply these versions? (y/N): ');
   final confirm = stdin.readLineSync()?.trim().toLowerCase();

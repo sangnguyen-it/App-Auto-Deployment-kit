@@ -89,11 +89,10 @@ Future<void> interactiveMode() async {
   print('⚙️  VERSION MODE SELECTION:');
   print('   1. Auto - Keep current versions for both platforms');
   print('   2. Manual - Enter custom versions for each platform');
-  print('   3. Unified - Use same version for both Android and iOS');
   print('');
-  stdout.write('Select mode (1=Auto, 2=Manual, 3=Unified) [default: 3]: ');
+  stdout.write('Select mode (1=Auto, 2=Manual) [default: 1]: ');
   final modeInput = stdin.readLineSync()?.trim();
-  final mode = (modeInput?.isEmpty ?? true) ? '3' : modeInput!;
+  final mode = (modeInput?.isEmpty ?? true) ? '1' : modeInput!;
   
   String androidVersionName, androidVersionCode;
   String iosVersionName, iosVersionCode;
@@ -109,28 +108,6 @@ Future<void> interactiveMode() async {
     print('🤖 AUTO MODE - Using current versions:');
     print('   Android: $androidVersionName+$androidVersionCode');
     print('   iOS: $iosVersionName+$iosVersionCode');
-  } else if (mode == '3') {
-    // Unified mode - same version for both platforms
-    print('');
-    print('🔄 UNIFIED MODE - Enter version for both platforms:');
-    print('');
-    
-    stdout.write('Enter version name [current: ${getVersionName()}]: ');
-    final versionNameInput = stdin.readLineSync()?.trim();
-    final versionName = (versionNameInput?.isEmpty ?? true) ? getVersionName() : versionNameInput!;
-    
-    stdout.write('Enter version code [current: ${getVersionCode()}]: ');
-    final versionCodeInput = stdin.readLineSync()?.trim();
-    final versionCode = (versionCodeInput?.isEmpty ?? true) ? getVersionCode() : versionCodeInput!;
-    
-    androidVersionName = versionName;
-    androidVersionCode = versionCode;
-    iosVersionName = versionName;
-    iosVersionCode = versionCode;
-    
-    print('');
-    print('📝 Unified Version:');
-    print('   Both platforms: $versionName+$versionCode');
   } else {
     // Manual mode - ask for custom versions
     print('');

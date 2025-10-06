@@ -74,24 +74,31 @@ String getVersionCode() {
 
 Future<void> interactiveMode() async {
   print('🔧 Interactive Version Selection');
-  print('   Current Version: ${getFullVersion()}');
+  print('   Current pubspec.yaml: ${getFullVersion()}');
   print('   Version Name: ${getVersionName()}');
   print('   Version Code: ${getVersionCode()}');
+  
+  // Check iOS Info.plist current version
+  final iosCurrentVersion = _getIosCurrentVersion();
+  if (iosCurrentVersion != null) {
+    print('   iOS Info.plist: ${iosCurrentVersion['version']}+${iosCurrentVersion['build']}');
+  }
   print('');
   
   // Ask for mode selection first
   print('⚙️  VERSION MODE SELECTION:');
   print('   1. Auto - Keep current versions for both platforms');
   print('   2. Manual - Enter custom versions for each platform');
+  print('   3. Unified - Use same version for both Android and iOS');
   print('');
-  stdout.write('Select mode (1=Auto, 2=Manual) [default: 1]: ');
+  stdout.write('Select mode (1=Auto, 2=Manual, 3=Unified) [default: 3]: ');
   final modeInput = stdin.readLineSync()?.trim();
-  final isAutoMode = (modeInput?.isEmpty ?? true) || modeInput == '1';
+  final mode = (modeInput?.isEmpty ?? true) ? '3' : modeInput!;
   
   String androidVersionName, androidVersionCode;
   String iosVersionName, iosVersionCode;
   
-  if (isAutoMode) {
+  if (mode == '1') {
     // Auto mode - use current versions
     androidVersionName = getVersionName();
     androidVersionCode = getVersionCode();
@@ -102,6 +109,28 @@ Future<void> interactiveMode() async {
     print('🤖 AUTO MODE - Using current versions:');
     print('   Android: $androidVersionName+$androidVersionCode');
     print('   iOS: $iosVersionName+$iosVersionCode');
+  } else if (mode == '3') {
+    // Unified mode - same version for both platforms
+    print('');
+    print('🔄 UNIFIED MODE - Enter version for both platforms:');
+    print('');
+    
+    stdout.write('Enter version name [current: ${getVersionName()}]: ');
+    final versionNameInput = stdin.readLineSync()?.trim();
+    final versionName = (versionNameInput?.isEmpty ?? true) ? getVersionName() : versionNameInput!;
+    
+    stdout.write('Enter version code [current: ${getVersionCode()}]: ');
+    final versionCodeInput = stdin.readLineSync()?.trim();
+    final versionCode = (versionCodeInput?.isEmpty ?? true) ? getVersionCode() : versionCodeInput!;
+    
+    androidVersionName = versionName;
+    androidVersionCode = versionCode;
+    iosVersionName = versionName;
+    iosVersionCode = versionCode;
+    
+    print('');
+    print('📝 Unified Version:');
+    print('   Both platforms: $versionName+$versionCode');
   } else {
     // Manual mode - ask for custom versions
     print('');
@@ -138,11 +167,14 @@ Future<void> interactiveMode() async {
   final confirm = stdin.readLineSync()?.trim().toLowerCase();
   
   if (confirm == 'y' || confirm == 'yes') {
+    // Use unified version for pubspec.yaml (Android version)
     await _updatePubspecVersion('$androidVersionName+$androidVersionCode');
     await _updateIosVersion(iosVersionName, iosVersionCode);
+    await _updateXcodeProjectVersion(iosVersionName, iosVersionCode);
     print('✅ Versions updated successfully');
-    print('   Android: $androidVersionName+$androidVersionCode');
-    print('   iOS: $iosVersionName+$iosVersionCode');
+    print('   pubspec.yaml: $androidVersionName+$androidVersionCode');
+    print('   iOS Info.plist: $iosVersionName+$iosVersionCode');
+    print('   Xcode project: $iosVersionName+$iosVersionCode');
   } else {
     print('❌ Version update cancelled');
     exit(1);
@@ -201,5 +233,58 @@ Future<void> _updateIosVersion(String versionName, String versionCode) async {
   } catch (e) {
     print('❌ Error updating iOS Info.plist: $e');
     exit(1);
+  }
+}
+
+Future<void> _updateXcodeProjectVersion(String versionName, String versionCode) async {
+  try {
+    final projectFile = File('ios/Runner.xcodeproj/project.pbxproj');
+    if (!projectFile.existsSync()) {
+      print('❌ iOS project.pbxproj not found');
+      return;
+    }
+    
+    final content = projectFile.readAsStringSync();
+    var updatedContent = content;
+    
+    // Update MARKETING_VERSION (version name)
+    updatedContent = updatedContent.replaceAllMapped(
+      RegExp(r'(MARKETING_VERSION = )[^;]*;'),
+      (match) => '${match.group(1)}$versionName;',
+    );
+    
+    // Update CURRENT_PROJECT_VERSION (version code)
+    updatedContent = updatedContent.replaceAllMapped(
+      RegExp(r'(CURRENT_PROJECT_VERSION = )[^;]*;'),
+      (match) => '${match.group(1)}$versionCode;',
+    );
+    
+    await projectFile.writeAsString(updatedContent);
+  } catch (e) {
+    print('❌ Error updating iOS project.pbxproj: $e');
+    exit(1);
+  }
+}
+
+Map<String, String>? _getIosCurrentVersion() {
+  try {
+    final infoPlistFile = File('ios/Runner/Info.plist');
+    if (!infoPlistFile.existsSync()) {
+      return null;
+    }
+    
+    final content = infoPlistFile.readAsStringSync();
+    
+    // Extract CFBundleShortVersionString
+    final versionMatch = RegExp(r'<key>CFBundleShortVersionString</key>\s*<string>([^<]*)</string>').firstMatch(content);
+    final version = versionMatch?.group(1) ?? '1.0.0';
+    
+    // Extract CFBundleVersion
+    final buildMatch = RegExp(r'<key>CFBundleVersion</key>\s*<string>([^<]*)</string>').firstMatch(content);
+    final build = buildMatch?.group(1) ?? '1';
+    
+    return {'version': version, 'build': build};
+  } catch (e) {
+    return null;
   }
 }

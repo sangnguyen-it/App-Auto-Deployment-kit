@@ -181,22 +181,6 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
-	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
-		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
-			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
-				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
-			else \
-				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
-			fi; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
-	fi
-	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
 	@mkdir -p $(OUTPUT_DIR)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
 	

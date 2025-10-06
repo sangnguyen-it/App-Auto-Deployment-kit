@@ -18,6 +18,24 @@ void main(List<String> args) async {
     case 'get-version-code':
       print(getVersionCode());
       break;
+    case 'get-android-version':
+      print(getAndroidVersion());
+      break;
+    case 'get-android-version-name':
+      print(getAndroidVersionName());
+      break;
+    case 'get-android-version-code':
+      print(getAndroidVersionCode());
+      break;
+    case 'get-ios-version':
+      print(getIosVersion());
+      break;
+    case 'get-ios-version-name':
+      print(getIosVersionName());
+      break;
+    case 'get-ios-version-code':
+      print(getIosVersionCode());
+      break;
     case 'interactive':
       await interactiveMode();
       break;
@@ -69,6 +87,52 @@ String getVersionName() {
 String getVersionCode() {
   final fullVersion = getFullVersion();
   final parts = fullVersion.split('+');
+  return parts.length > 1 ? parts[1] : '1';
+}
+
+String getAndroidVersion() {
+  try {
+    final androidVersionFile = File('.android_version');
+    if (androidVersionFile.existsSync()) {
+      return androidVersionFile.readAsStringSync().trim();
+    }
+  } catch (e) {
+    // Fallback to pubspec.yaml
+  }
+  return getFullVersion();
+}
+
+String getAndroidVersionName() {
+  final androidVersion = getAndroidVersion();
+  return androidVersion.split('+')[0];
+}
+
+String getAndroidVersionCode() {
+  final androidVersion = getAndroidVersion();
+  final parts = androidVersion.split('+');
+  return parts.length > 1 ? parts[1] : '1';
+}
+
+String getIosVersion() {
+  try {
+    final iosVersionFile = File('.ios_version');
+    if (iosVersionFile.existsSync()) {
+      return iosVersionFile.readAsStringSync().trim();
+    }
+  } catch (e) {
+    // Fallback to pubspec.yaml
+  }
+  return getFullVersion();
+}
+
+String getIosVersionName() {
+  final iosVersion = getIosVersion();
+  return iosVersion.split('+')[0];
+}
+
+String getIosVersionCode() {
+  final iosVersion = getIosVersion();
+  final parts = iosVersion.split('+');
   return parts.length > 1 ? parts[1] : '1';
 }
 
@@ -144,10 +208,14 @@ Future<void> interactiveMode() async {
   final confirm = stdin.readLineSync()?.trim().toLowerCase();
   
   if (confirm == 'y' || confirm == 'yes') {
-    // Use unified version for pubspec.yaml (Android version)
+    // Update pubspec.yaml with Android version
     await _updatePubspecVersion('$androidVersionName+$androidVersionCode');
     await _updateIosVersion(iosVersionName, iosVersionCode);
     await _updateXcodeProjectVersion(iosVersionName, iosVersionCode);
+    
+    // Create version info files for Makefile to read separate versions
+    await _createVersionInfoFiles(androidVersionName, androidVersionCode, iosVersionName, iosVersionCode);
+    
     print('✅ Versions updated successfully');
     print('   pubspec.yaml: $androidVersionName+$androidVersionCode');
     print('   iOS Info.plist: $iosVersionName+$iosVersionCode');
@@ -263,5 +331,23 @@ Map<String, String>? _getIosCurrentVersion() {
     return {'version': version, 'build': build};
   } catch (e) {
     return null;
+  }
+}
+
+Future<void> _createVersionInfoFiles(String androidVersionName, String androidVersionCode, String iosVersionName, String iosVersionCode) async {
+  try {
+    // Create Android version info file
+    final androidVersionFile = File('.android_version');
+    await androidVersionFile.writeAsString('$androidVersionName+$androidVersionCode');
+    
+    // Create iOS version info file  
+    final iosVersionFile = File('.ios_version');
+    await iosVersionFile.writeAsString('$iosVersionName+$iosVersionCode');
+    
+    print('📝 Version info files created:');
+    print('   .android_version: $androidVersionName+$androidVersionCode');
+    print('   .ios_version: $iosVersionName+$iosVersionCode');
+  } catch (e) {
+    print('❌ Error creating version info files: $e');
   }
 }

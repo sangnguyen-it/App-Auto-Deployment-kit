@@ -42,6 +42,31 @@ define get_current_version_code
 $(shell dart scripts/dynamic_version_manager.dart get-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
 endef
 
+# Functions to get platform-specific versions
+define get_android_version
+$(shell dart scripts/dynamic_version_manager.dart get-android-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
+endef
+
+define get_android_version_name
+$(shell dart scripts/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "$(VERSION_NAME_FALLBACK)")
+endef
+
+define get_android_version_code
+$(shell dart scripts/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
+endef
+
+define get_ios_version
+$(shell dart scripts/dynamic_version_manager.dart get-ios-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
+endef
+
+define get_ios_version_name
+$(shell dart scripts/dynamic_version_manager.dart get-ios-version-name 2>/dev/null || echo "$(VERSION_NAME_FALLBACK)")
+endef
+
+define get_ios_version_code
+$(shell dart scripts/dynamic_version_manager.dart get-ios-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
+endef
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🎨 ENHANCED COLORS & STYLES
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -204,13 +229,19 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	$(eval VERSION_FULL := $(call get_current_version))
 	$(eval VERSION_NAME := $(call get_current_version_name))
 	$(eval VERSION_CODE := $(call get_current_version_code))
-	$(eval APK_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).apk)
-	$(eval AAB_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).aab)
-	$(eval IPA_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE)-production.ipa)
-	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(VERSION_NAME)-$(VERSION_CODE)-production.xcarchive)
-	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed: $(VERSION_NAME)+$(VERSION_CODE)"
+	$(eval ANDROID_VERSION_NAME := $(call get_android_version_name))
+	$(eval ANDROID_VERSION_CODE := $(call get_android_version_code))
+	$(eval IOS_VERSION_NAME := $(call get_ios_version_name))
+	$(eval IOS_VERSION_CODE := $(call get_ios_version_code))
+	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
+	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
+	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
+	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
+	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
 	@if command -v dart >/dev/null 2>&1; then \

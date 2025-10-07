@@ -2,6 +2,11 @@
 # Template Processing Functions for AppAutoDeploy
 # This script provides functions to process templates with variable substitution
 
+# Source common functions if available
+if [ -f "$(dirname "${BASH_SOURCE[0]}")/common_functions.sh" ]; then
+    source "$(dirname "${BASH_SOURCE[0]}")/common_functions.sh"
+fi
+
 # Function to get version information from dynamic_version_manager
 get_version_info() {
     local target_dir="$1"
@@ -148,14 +153,6 @@ create_all_templates() {
     fi
 }
 
-# Export functions for use in other scripts (commented out to avoid errors)
-# export -f process_template
-# export -f create_android_fastfile_from_template
-# export -f create_android_appfile_from_template
-# export -f create_ios_fastfile_from_template
-# export -f create_ios_appfile_from_template
-# export -f create_makefile_from_template
-# export -f create_github_workflow_from_template
-# export -f create_gemfile_from_template
-# export -f create_ios_export_options_from_template
+# Export functions for use in other scripts
+export -f process_template
 export -f create_all_templates

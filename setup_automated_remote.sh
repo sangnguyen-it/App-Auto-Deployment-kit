@@ -496,7 +496,6 @@ download_scripts_from_github() {
         "build_info_generator.dart"
         "tag_generator.dart"
         "common_functions.sh"
-        "setup.sh"
         "dynamic_version_manager.dart"
         "store_version_checker.rb"
         "google_play_version_checker.rb"
@@ -552,6 +551,13 @@ download_templates_from_github() {
     
     local github_base_url="https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/templates"
     local template_files=(
+        "android_appfile.template"
+        "android_fastfile.template"
+        "gemfile.template"
+        "github_deploy.template"
+        "ios_appfile.template"
+        "ios_export_options.template"
+        "ios_fastfile.template"
         "makefile.template"
     )
     
@@ -621,7 +627,6 @@ copy_scripts() {
         "build_info_generator.dart"
         "tag_generator.dart"
         "common_functions.sh"
-        "setup.sh"
         "dynamic_version_manager.dart"
         "store_version_checker.rb"
         "google_play_version_checker.rb"
@@ -655,11 +660,6 @@ copy_scripts() {
                 "dynamic_version_manager.dart")
                     mkdir -p "$TARGET_DIR/scripts"
                     create_dynamic_version_manager_inline
-                    ((scripts_created_inline++))
-                    ;;
-                "setup.sh")
-                    mkdir -p "$TARGET_DIR/scripts"
-                    create_setup_sh_inline
                     ((scripts_created_inline++))
                     ;;
                 "common_functions.sh")
@@ -1444,38 +1444,6 @@ EOF
     print_success "dynamic_version_manager.dart created (inline)"
 }
 
-# Inline creation function for setup.sh
-create_setup_sh_inline() {
-    cat > "$TARGET_DIR/scripts/setup.sh" << 'EOF'
-#!/bin/bash
-# Flutter CI/CD Setup Script - Simplified inline version
-set -e
-
-# Main setup function
-main() {
-    print_step "Flutter CI/CD Setup"
-    
-    if [ ! -f "pubspec.yaml" ]; then
-        print_error "Not a Flutter project. Run this script from your Flutter project root."
-        exit 1
-    fi
-    
-    print_success "Flutter project detected"
-    print_success "Setup completed successfully!"
-    
-    echo ""
-    echo "📖 Next steps:"
-    echo "   1. Configure your credentials in the generated files"
-    echo "   2. Run 'make help' to see available commands"
-    echo "   3. Test your setup with 'make test'"
-}
-
-main "$@"
-EOF
-    chmod +x "$TARGET_DIR/scripts/setup.sh"
-    print_success "setup.sh created (inline)"
-}
-
 # Inline creation function for common_functions.sh
 create_common_functions_inline() {
     cat > "$TARGET_DIR/scripts/common_functions.sh" << 'EOF'
@@ -1535,6 +1503,33 @@ copy_automation_files() {
         echo "✅ Copied documentation"
     fi
 }
+
+# Function to check if project.config values have changed
+check_project_config_changes() {
+    local target_dir="$1"
+    local project_name="$2"
+    local bundle_id="$3"
+    local package_name="$4"
+    local config_file="$target_dir/project.config"
+    
+    if [ ! -f "$config_file" ]; then
+        return 1  # File doesn't exist, need to create
+    fi
+    
+    # Load existing config
+    source "$config_file" 2>/dev/null || return 1
+    
+    # Check if key values have changed
+    if [ "$PROJECT_NAME" != "$project_name" ] || \
+       [ "$BUNDLE_ID" != "$bundle_id" ] || \
+       [ "$PACKAGE_NAME" != "$package_name" ]; then
+        return 0  # Values have changed
+    fi
+    
+    return 2  # Values are the same
+}
+
+# Function to prompt user about project.config (REMOVED - DUPLICATE)
 
 # Create project configuration
 create_project_config() {
@@ -1612,7 +1607,150 @@ print_info() {
     echo -e "${CYAN}ℹ️  $1${NC}"
 }
 
-# Additional duplicate functions removed - now sourced from common_functions.sh
+# Function to check if project.config values have changed
+check_project_config_changes() {
+    local target_dir="$1"
+    local project_name="$2"
+    local bundle_id="$3"
+    local package_name="$4"
+    
+    if [ ! -f "$target_dir/project.config" ]; then
+        echo "new"
+        return
+    fi
+    
+    # Load existing values
+    source "$target_dir/project.config"
+    
+    # Compare values
+    if [ "$PROJECT_NAME" != "$project_name" ] || \
+       [ "$BUNDLE_ID" != "$bundle_id" ] || \
+       [ "$PACKAGE_NAME" != "$package_name" ]; then
+        echo "changed"
+    else
+        echo "same"
+    fi
+}
+
+# Function to prompt user for project.config action
+prompt_project_config_action() {
+    local target_dir="$1"
+    local project_name="$2"
+    local bundle_id="$3"
+    local package_name="$4"
+    
+    local status=$(check_project_config_changes "$target_dir" "$project_name" "$bundle_id" "$package_name")
+    
+    if [ "$status" = "new" ]; then
+        print_info "Creating new project.config file..."
+        create_project_config "$target_dir" "$project_name" "$bundle_id" "$package_name"
+    elif [ "$status" = "changed" ]; then
+        print_warning "project.config exists but values have changed:"
+        echo "  Current PROJECT_NAME: $PROJECT_NAME"
+        echo "  New PROJECT_NAME: $project_name"
+        echo "  Current BUNDLE_ID: $BUNDLE_ID"
+        echo "  New BUNDLE_ID: $bundle_id"
+        echo "  Current PACKAGE_NAME: $PACKAGE_NAME"
+        echo "  New PACKAGE_NAME: $package_name"
+        echo ""
+        echo "What would you like to do?"
+        echo "1) Create new project.config with new values"
+        echo "2) Keep existing project.config"
+        read -p "Enter your choice (1-2): " choice
+        
+        case $choice in
+            1)
+                print_info "Creating new project.config with updated values..."
+                create_project_config "$target_dir" "$project_name" "$bundle_id" "$package_name"
+                ;;
+            2)
+                print_info "Keeping existing project.config"
+                ;;
+            *)
+                print_warning "Invalid choice. Keeping existing project.config"
+                ;;
+        esac
+    else
+        print_info "project.config exists with same values, keeping it"
+    fi
+}
+
+# Function to create project.config
+create_project_config() {
+    local target_dir="$1"
+    local project_name="$2"
+    local bundle_id="$3"
+    local package_name="$4"
+    
+    cat > "$target_dir/project.config" << 'CONFIGEOF'
+# Project Configuration
+PROJECT_NAME="$project_name"
+BUNDLE_ID="$bundle_id"
+PACKAGE_NAME="$package_name"
+
+# Build Configuration
+BUILD_MODE="release"
+FLUTTER_BUILD_ARGS="--release --no-tree-shake-icons"
+
+# iOS Configuration
+IOS_SCHEME="Runner"
+IOS_WORKSPACE="ios/Runner.xcworkspace"
+IOS_EXPORT_METHOD="app-store"
+
+# Android Configuration
+ANDROID_BUILD_TYPE="appbundle"
+ANDROID_FLAVOR=""
+
+# Version Configuration
+VERSION_STRATEGY="auto"
+CHANGELOG_ENABLED="true"
+CONFIGEOF
+    
+    print_success "project.config created successfully"
+}
+
+# Function to prompt user for project.config action
+prompt_project_config_action() {
+    local target_dir="$1"
+    local project_name="$2"
+    local bundle_id="$3"
+    local package_name="$4"
+    
+    local status=$(check_project_config_changes "$target_dir" "$project_name" "$bundle_id" "$package_name")
+    
+    if [ "$status" = "new" ]; then
+        print_info "Creating new project.config file..."
+        create_project_config "$target_dir" "$project_name" "$bundle_id" "$package_name"
+    elif [ "$status" = "changed" ]; then
+        print_warning "project.config exists but values have changed:"
+        echo "  Current PROJECT_NAME: $PROJECT_NAME"
+        echo "  New PROJECT_NAME: $project_name"
+        echo "  Current BUNDLE_ID: $BUNDLE_ID"
+        echo "  New BUNDLE_ID: $bundle_id"
+        echo "  Current PACKAGE_NAME: $PACKAGE_NAME"
+        echo "  New PACKAGE_NAME: $package_name"
+        echo ""
+        echo "What would you like to do?"
+        echo "1) Create new project.config with new values"
+        echo "2) Keep existing project.config"
+        read -p "Enter your choice (1-2): " choice
+        
+        case $choice in
+            1)
+                print_info "Creating new project.config with updated values..."
+                create_project_config "$target_dir" "$project_name" "$bundle_id" "$package_name"
+                ;;
+            2)
+                print_info "Keeping existing project.config"
+                ;;
+            *)
+                print_warning "Invalid choice. Keeping existing project.config"
+                ;;
+        esac
+    else
+        print_info "project.config exists with same values, keeping it"
+    fi
+}
 EOF
     chmod +x "$TARGET_DIR/scripts/common_functions.sh"
     print_success "common_functions.sh created (inline, optimized)"
@@ -1974,6 +2112,10 @@ main() {
     # Parse command line arguments
     FORCE_DEPLOYMENT_MODE=""
     TARGET_DIR_ARG=""
+    OVERRIDE_PROJECT_NAME=""
+    OVERRIDE_BUNDLE_ID=""
+    OVERRIDE_PACKAGE_NAME=""
+    NON_INTERACTIVE_MODE=""
     
     # Process arguments passed to the script
     while [[ $# -gt 0 ]]; do
@@ -1984,6 +2126,22 @@ main() {
                 ;;
             --github)
                 FORCE_DEPLOYMENT_MODE="github"
+                shift
+                ;;
+            --project-name)
+                OVERRIDE_PROJECT_NAME="$2"
+                shift 2
+                ;;
+            --bundle-id)
+                OVERRIDE_BUNDLE_ID="$2"
+                shift 2
+                ;;
+            --package-name)
+                OVERRIDE_PACKAGE_NAME="$2"
+                shift 2
+                ;;
+            --non-interactive)
+                NON_INTERACTIVE_MODE="true"
                 shift
                 ;;
             --help|-h)
@@ -2064,7 +2222,18 @@ main() {
     
     copy_scripts
     create_configuration_files
-    create_project_config "$TARGET_DIR" "$PROJECT_NAME" "$BUNDLE_ID" "$PACKAGE_NAME"
+    
+    # Use override values if provided, otherwise use detected values
+    FINAL_PROJECT_NAME="${OVERRIDE_PROJECT_NAME:-$PROJECT_NAME}"
+    FINAL_BUNDLE_ID="${OVERRIDE_BUNDLE_ID:-$BUNDLE_ID}"
+    FINAL_PACKAGE_NAME="${OVERRIDE_PACKAGE_NAME:-$PACKAGE_NAME}"
+    
+    # Call prompt function with final values and non-interactive mode
+    if [ "$NON_INTERACTIVE_MODE" = "true" ]; then
+        create_project_config "$TARGET_DIR" "$FINAL_PROJECT_NAME" "$FINAL_BUNDLE_ID" "$FINAL_PACKAGE_NAME"
+    else
+        prompt_project_config_action "$TARGET_DIR" "$FINAL_PROJECT_NAME" "$FINAL_BUNDLE_ID" "$FINAL_PACKAGE_NAME"
+    fi
     
     # Auto-sync project.config with iOS fastlane files if config exists
     auto_sync_project_config

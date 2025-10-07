@@ -248,43 +248,82 @@ else
     echo "🔄 Auto-mode enabled (non-interactive execution)"
 fi
 
+# Function to detect Git provider
+detect_git_provider() {
+    local git_remote_url=""
+    local git_provider="other"
+    
+    # Check if we're in a git repository
+    if git rev-parse --git-dir >/dev/null 2>&1; then
+        # Get the remote origin URL
+        git_remote_url=$(git remote get-url origin 2>/dev/null || echo "")
+        
+        if [[ -n "$git_remote_url" ]]; then
+            # Check if it's GitHub
+            if [[ "$git_remote_url" =~ github\.com ]]; then
+                git_provider="github"
+            else
+                git_provider="other"
+            fi
+        fi
+    fi
+    
+    echo "$git_provider"
+}
+
 # Function to prompt user for deployment mode
 prompt_deployment_mode() {
+    # Detect Git provider first
+    local git_provider=$(detect_git_provider)
+    
     print_header "Deployment Mode Selection"
     
-    echo -e "${CYAN}Please choose your deployment mode:${NC}"
-    echo ""
-    echo -e "${GREEN}1. Local Deployment${NC}"
-    echo -e "   • Deploy apps locally using Fastlane"
-    echo -e "   • No GitHub authentication required"
-    echo -e "   • Manual deployment process"
-    echo ""
-    echo -e "${BLUE}2. GitHub Actions Deployment${NC}"
-    echo -e "   • Automated deployment via GitHub Actions"
-    echo -e "   • Requires GitHub authentication"
-    echo -e "   • CI/CD pipeline setup"
-    echo ""
-    
-    local user_choice
-    while true; do
-        read_with_fallback "Enter your choice (1 for Local, 2 for GitHub): " "1" user_choice
+    if [[ "$git_provider" == "github" ]]; then
+        echo -e "${CYAN}GitHub repository detected! Please choose your deployment mode:${NC}"
+        echo ""
+        echo -e "${GREEN}1. Local Deployment${NC}"
+        echo -e "   • Deploy apps locally using Fastlane"
+        echo -e "   • No GitHub authentication required"
+        echo -e "   • Manual deployment process"
+        echo ""
+        echo -e "${BLUE}2. GitHub Actions Deployment${NC}"
+        echo -e "   • Automated deployment via GitHub Actions"
+        echo -e "   • Requires GitHub authentication"
+        echo -e "   • CI/CD pipeline setup"
+        echo ""
         
-        case "$user_choice" in
-            1|"local"|"Local"|"LOCAL")
-                DEPLOYMENT_MODE="local"
-                print_success "Selected: Local Deployment"
-                break
-                ;;
-            2|"github"|"GitHub"|"GITHUB")
-                DEPLOYMENT_MODE="github"
-                print_success "Selected: GitHub Actions Deployment"
-                break
-                ;;
-            *)
-                print_error "Invalid choice. Please enter 1 for Local or 2 for GitHub."
-                ;;
-        esac
-    done
+        local user_choice
+        while true; do
+            read_with_fallback "Enter your choice (1 for Local, 2 for GitHub): " "1" user_choice
+            
+            case "$user_choice" in
+                1|"local"|"Local"|"LOCAL")
+                    DEPLOYMENT_MODE="local"
+                    print_success "Selected: Local Deployment"
+                    break
+                    ;;
+                2|"github"|"GitHub"|"GITHUB")
+                    DEPLOYMENT_MODE="github"
+                    print_success "Selected: GitHub Actions Deployment"
+                    break
+                    ;;
+                *)
+                    print_error "Invalid choice. Please enter 1 for Local or 2 for GitHub."
+                    ;;
+            esac
+        done
+    else
+        echo -e "${CYAN}Non-GitHub repository detected. Using Local Deployment mode:${NC}"
+        echo ""
+        echo -e "${GREEN}Local Deployment${NC}"
+        echo -e "   • Deploy apps locally using Fastlane"
+        echo -e "   • No GitHub authentication required"
+        echo -e "   • Manual deployment process"
+        echo ""
+        
+        DEPLOYMENT_MODE="local"
+        print_success "Auto-selected: Local Deployment (GitHub Actions not available for non-GitHub repositories)"
+    fi
     
     echo ""
 }
@@ -2012,16 +2051,27 @@ display_setup_summary() {
     echo -e "  • Deployment Mode: ${WHITE}$DEPLOYMENT_MODE${NC}"
     echo ""
     
+    # Detect Git provider for usage instructions
+    local git_provider=$(detect_git_provider)
+    
     if [ "$DEPLOYMENT_MODE" = "local" ]; then
         echo -e "${CYAN}📱 Local Deployment Setup:${NC}"
         echo -e "  • Fastlane configured for manual deployment"
         echo -e "  • Use 'make tester' for testing builds"
-        echo -e "  • Use 'make live' for production builds"
+        
+        if [[ "$git_provider" == "github" ]]; then
+            echo -e "  • Use 'make live-local' for production builds (local deployment)"
+            echo -e "  • Use 'make live' for GitHub Actions deployment"
+        else
+            echo -e "  • Use 'make live-local' for production builds"
+        fi
+        
         echo -e "  • No GitHub authentication required"
     else
         echo -e "${CYAN}🚀 GitHub Actions Setup:${NC}"
         echo -e "  • Automated CI/CD pipeline configured"
         echo -e "  • GitHub authentication verified"
+        echo -e "  • Use 'make live' for GitHub Actions deployment"
         echo -e "  • Push tags to trigger deployments"
         echo -e "  • Workflow file: .github/workflows/deploy.yml"
     fi

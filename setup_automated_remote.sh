@@ -115,102 +115,10 @@ STAR="⭐"
 PACKAGE="📦"
 
 # Print functions
-print_header() {
-    echo ""
-    echo -e "${CYAN}${STAR} $1 ${STAR}${NC}"
-    echo -e "${GRAY}$(printf '=%.0s' {1..50})${NC}"
-}
-
-print_step() {
-    echo -e "${BLUE}${GEAR} $1${NC}"
-}
-
-print_success() {
-    echo -e "${GREEN}${CHECK} $1${NC}"
-}
-
-print_error() {
-    echo -e "${RED}${CROSS} $1${NC}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}${WARNING} $1${NC}"
-}
-
-print_info() {
-    echo -e "${CYAN}${INFO} $1${NC}"
-}
+# Print functions are now sourced from common_functions.sh
 
 # Helper function for remote-safe input reading with tty support
-read_with_fallback() {
-    local prompt="$1"
-    local default_value="${2:-n}"
-    local variable_name="$3"
-    
-    # Always try to use /dev/tty first if available
-    if [[ -r /dev/tty ]]; then
-        echo -n "$prompt" > /dev/tty
-        read "$variable_name" < /dev/tty
-        # Use default if no input provided
-        if [[ -z "${!variable_name}" ]]; then
-            eval "$variable_name=\"$default_value\""
-        fi
-        return 0
-    fi
-    
-    # Check if we're in non-interactive mode
-    if [[ "${INTERACTIVE_MODE:-}" == "false" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]]; then
-        # In non-interactive mode without tty, automatically use default value
-        echo "${prompt}${default_value} (auto-selected in pipe mode)"
-        eval "$variable_name=\"$default_value\""
-        return 0
-    fi
-    
-    # Interactive mode - prompt for user input
-    echo -n "$prompt"
-    read "$variable_name"
-    
-    # Use default if no input provided
-    if [[ -z "${!variable_name}" ]]; then
-        eval "$variable_name=\"$default_value\""
-    fi
-}
-
-# Helper function for required input (skips when remote)
-read_required_or_skip() {
-    local prompt="$1"
-    local variable_name="$2"
-    local skip_message="${3:-Skipping input for non-interactive mode}"
-    
-    # Always try to use /dev/tty first if available
-    if [[ -r /dev/tty ]]; then
-        echo -n "$prompt" > /dev/tty
-        read "$variable_name" < /dev/tty
-        # If no input provided, skip
-        if [[ -z "${!variable_name}" ]]; then
-            echo "→ $prompt skip (auto-selected: $skip_message)"
-            eval "$variable_name=\"skip\""
-        fi
-        return 0
-    fi
-    
-    # Check if we're in a remote/automated environment
-    if [[ "${INTERACTIVE_MODE:-}" == "false" ]] || [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
-        # In automated/remote environment, return "skip" to indicate skipping
-        echo "→ $prompt skip (auto-selected: $skip_message)"
-        eval "$variable_name=\"skip\""
-        return 0
-    fi
-    
-    # Interactive environment - prompt for input
-    if [[ -t 0 ]]; then
-        read -p "$prompt" "$variable_name"
-    else
-        # Fallback: we're not in a terminal, skip this input
-        echo "→ $prompt skip (auto-selected: $skip_message)"
-        eval "$variable_name=\"skip\""
-    fi
-}
+# Unused functions removed - read_with_fallback and read_required_or_skip
 
 # Global variables
 TARGET_DIR=""
@@ -521,13 +429,27 @@ create_directory_structure() {
     
     # print_header "Creating Directory Structure"
     
+    # Check if local_scripts is disabled in config
+    local skip_scripts=false
+    if [ -f "$TARGET_DIR/trackasia-config.yml" ]; then
+        local_scripts=$(grep "local_scripts:" "$TARGET_DIR/trackasia-config.yml" 2>/dev/null | awk '{print $2}' | tr -d ' ')
+        if [ "$local_scripts" = "false" ]; then
+            skip_scripts=true
+            print_info "🔄 local_scripts: false - Skipping scripts directory creation"
+        fi
+    fi
+    
     local directories=(
         "android/fastlane"
         "ios/fastlane"
         ".github/workflows"
-        "scripts"
         "builder"
     )
+    
+    # Add scripts directory only if local_scripts is not false
+    if [ "$skip_scripts" = "false" ]; then
+        directories+=("scripts")
+    fi
     
     for dir in "${directories[@]}"; do
         if [ ! -d "$TARGET_DIR/$dir" ]; then
@@ -653,6 +575,15 @@ download_templates_from_github() {
 
 # Function to copy scripts or create them inline
 copy_scripts() {
+    # Check if local_scripts is disabled in config
+    if [ -f "$TARGET_DIR/trackasia-config.yml" ]; then
+        local_scripts=$(grep "local_scripts:" "$TARGET_DIR/trackasia-config.yml" 2>/dev/null | awk '{print $2}' | tr -d ' ')
+        if [ "$local_scripts" = "false" ]; then
+            print_info "🔄 local_scripts: false - Skipping scripts creation"
+            return 0
+        fi
+    fi
+    
     # Always copy scripts to project directory (both local and remote)
     # if [ "$REMOTE_EXECUTION" = "true" ]; then
     #     print_info "🔄 Running in remote mode - scripts will be created inline as needed"
@@ -1547,84 +1478,7 @@ WRENCH="🔧"
 # This file contains only unique utility functions
 
 # Validation functions
-validate_flutter_project() {
-    local target_dir="$1"
-    
-    if [ ! -d "$target_dir" ]; then
-        echo "❌ Directory does not exist: $target_dir"
-        return 1
-    fi
-    
-    if [ ! -f "$target_dir/pubspec.yaml" ]; then
-        echo "❌ Not a Flutter project. pubspec.yaml not found."
-        return 1
-    fi
-    
-    if [ ! -d "$target_dir/android" ] || [ ! -d "$target_dir/ios" ]; then
-        echo "⚠️  Missing platform directories (android/ios)"
-    fi
-    
-    return 0
-}
-
-# Project info functions
-get_project_name() {
-    local target_dir="$1"
-    grep "^name:" "$target_dir/pubspec.yaml" | cut -d' ' -f2 | tr -d '"' | tr -d "'"
-}
-
-get_android_package() {
-    local target_dir="$1"
-    local gradle_file="$target_dir/android/app/build.gradle.kts"
-    
-    if [ -f "$gradle_file" ]; then
-        grep 'applicationId' "$gradle_file" | sed 's/.*applicationId = "\([^"]*\)".*/\1/' | head -1
-    else
-        gradle_file="$target_dir/android/app/build.gradle"
-        grep 'applicationId' "$gradle_file" | sed 's/.*applicationId "\([^"]*\)".*/\1/' | head -1
-    fi
-}
-
-get_ios_bundle_id() {
-    local target_dir="$1"
-    local info_plist="$target_dir/ios/Runner/Info.plist"
-    if [ -f "$info_plist" ]; then
-        /usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$info_plist" 2>/dev/null || echo ""
-    fi
-}
-
-# Check dependencies
-check_dependencies() {
-    local missing_deps=()
-    
-    if ! command -v flutter >/dev/null 2>&1; then
-        missing_deps+=("flutter")
-    fi
-    
-    if ! command -v git >/dev/null 2>&1; then
-        missing_deps+=("git")
-    fi
-    
-    if ! command -v ruby >/dev/null 2>&1; then
-        missing_deps+=("ruby")
-    fi
-    
-    if ! command -v bundle >/dev/null 2>&1; then
-        missing_deps+=("bundler")
-    fi
-    
-    if ! command -v dart >/dev/null 2>&1; then
-        missing_deps+=("dart")
-    fi
-    
-    if [ ${#missing_deps[@]} -gt 0 ]; then
-        echo "❌ Missing dependencies: ${missing_deps[*]}"
-        return 1
-    fi
-    
-    echo "✅ All dependencies are available"
-    return 0
-}
+# Project validation and info functions are now sourced from common_functions.sh
 
 # Copy automation files
 copy_automation_files() {
@@ -1728,49 +1582,7 @@ print_info() {
     echo -e "${CYAN}ℹ️  $1${NC}"
 }
 
-# Validate Flutter project
-validate_flutter_project() {
-    if [ ! -f "pubspec.yaml" ]; then
-        echo "❌ pubspec.yaml not found. This doesn't appear to be a Flutter project."
-        echo "💡 Please run this script from the root of your Flutter project."
-        exit 1
-    fi
-    
-    if [ ! -d "android" ] || [ ! -d "ios" ]; then
-        echo "⚠️  Android or iOS directory not found."
-        echo "💡 Make sure this is a complete Flutter project with both platforms."
-        exit 1
-    fi
-    
-    echo "✅ Flutter project structure validated"
-}
-
-# Get project information functions
-get_project_name() {
-    if [ -f "pubspec.yaml" ]; then
-        grep "^name:" pubspec.yaml | sed 's/name: *//' | tr -d '"' | tr -d "'"
-    else
-        basename "$(pwd)"
-    fi
-}
-
-get_android_package() {
-    if [ -f "android/app/build.gradle" ]; then
-        grep "applicationId" android/app/build.gradle | sed 's/.*applicationId *"//' | sed 's/".*//'
-    elif [ -f "android/app/build.gradle.kts" ]; then
-        grep "applicationId" android/app/build.gradle.kts | sed 's/.*applicationId.*= *"//' | sed 's/".*//'
-    else
-        echo "com.example.$(get_project_name)"
-    fi
-}
-
-get_ios_bundle_id() {
-    if [ -f "ios/Runner/Info.plist" ]; then
-        /usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" ios/Runner/Info.plist 2>/dev/null || echo "com.example.$(get_project_name)"
-    else
-        echo "com.example.$(get_project_name)"
-    fi
-}
+# Additional duplicate functions removed - now sourced from common_functions.sh
 EOF
     chmod +x "$TARGET_DIR/scripts/common_functions.sh"
     print_success "common_functions.sh created (inline, optimized)"
@@ -1812,111 +1624,7 @@ setup_gitignore() {
 }
 
 # Function to create project configuration with user confirmation
-create_project_config() {
-    print_header "Project Configuration Setup"
-    
-    # Check if config file already exists
-    if [ -f "$TARGET_DIR/project.config" ]; then
-        print_warning "project.config already exists!"
-        echo ""
-        echo "📄 Current config file found at: project.config"
-        echo ""
-        
-        # Show current config summary
-        if source "$TARGET_DIR/project.config" 2>/dev/null; then
-            echo "📋 Current configuration:"
-            echo "   Project: ${PROJECT_NAME:-'not set'}"
-            echo "   Package: ${PACKAGE_NAME:-'not set'}"
-            echo "   Bundle ID: ${BUNDLE_ID:-'not set'}"
-            echo "   Version: ${CURRENT_VERSION:-'not set'}"
-            echo "   Git Repo: ${GIT_REPO:-'not set'}"
-            echo ""
-            echo "   📱 iOS Settings:"
-            echo "      Team ID: ${TEAM_ID:-'not set'}"
-            echo "      Key ID: ${KEY_ID:-'not set'}"
-            echo "      Issuer ID: ${ISSUER_ID:-'not set'}"
-            echo "      Apple ID: ${APPLE_ID:-'not set'}"
-            echo ""
-            echo "   📦 Build Settings:"
-            echo "      Output Dir: ${OUTPUT_DIR:-'not set'}"
-            echo "      Changelog: ${CHANGELOG_FILE:-'not set'}"
-            echo "      Google Play Track: ${GOOGLE_PLAY_TRACK:-'not set'}"
-            echo "      TestFlight Groups: ${TESTFLIGHT_GROUPS:-'not set'}"
-            echo ""
-            echo "   ✅ Status:"
-            echo "      Credentials Complete: ${CREDENTIALS_COMPLETE:-'not set'}"
-            echo "      Android Ready: ${ANDROID_READY:-'not set'}"
-            echo "      iOS Ready: ${IOS_READY:-'not set'}"
-            echo ""
-            echo "   Last updated: $(stat -f "%Sm" "$TARGET_DIR/project.config" 2>/dev/null || echo 'unknown')"
-        fi
-        echo ""
-        
-        # Ask user what to do with existing config
-        echo -e "${YELLOW}Do you want to create a new project.config file?${NC}"
-        echo "  ${GREEN}y - Yes, create new (overwrite existing)"
-        echo "  ${RED}n - No, keep existing file"
-        echo ""
-        
-        local user_choice
-        read_with_fallback "Your choice (y/n): " "n" user_choice
-        user_choice=$(echo "$user_choice" | tr '[:upper:]' '[:lower:]')
-            
-        if [[ "$user_choice" == "y" ]]; then
-            print_info "Creating new project.config file..."
-            create_new_project_config
-        else
-            print_success "✅ Keeping existing project.config file"
-            print_info "Using current configuration without changes"
-            echo ""
-            # Even when keeping existing config, we still need to ensure all deployment files are created
-            print_info "Ensuring all deployment files are created..."
-            return 0
-        fi
-    else
-        print_info "No existing project.config found - creating new one"
-        create_new_project_config
-    fi
-}
-
-# Function to create new project config file
-create_new_project_config() {
-    cat > "$TARGET_DIR/project.config" << EOF
-# Flutter CI/CD Project Configuration
-# Auto-generated for project: $PROJECT_NAME
-
-PROJECT_NAME="$PROJECT_NAME"
-PACKAGE_NAME="$PACKAGE_NAME"
-BUNDLE_ID="$BUNDLE_ID"
-APP_NAME="$APP_NAME"
-
-# Build Configuration
-BUILD_MODE="release"
-FLUTTER_BUILD_ARGS="--release --no-tree-shake-icons"
-
-# iOS Configuration
-IOS_SCHEME="Runner"
-IOS_WORKSPACE="ios/Runner.xcworkspace"
-IOS_EXPORT_METHOD="app-store"
-TEAM_ID="YOUR_TEAM_ID"
-KEY_ID="YOUR_KEY_ID"
-ISSUER_ID="YOUR_ISSUER_ID"
-APPLE_ID="your-apple-id@email.com"
-
-# Android Configuration
-ANDROID_BUILD_TYPE="appbundle"
-ANDROID_FLAVOR=""
-
-# Version Configuration
-VERSION_STRATEGY="auto"
-CHANGELOG_ENABLED="true"
-
-# Generated on: $(date)
-EOF
-    
-    print_success "✅ Created project.config file"
-    print_info "Please update the iOS credentials (TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID) in project.config"
-}
+# create_project_config function is now sourced from common_functions.sh
 
 # Auto-sync project.config with iOS fastlane files if config exists
 auto_sync_project_config() {

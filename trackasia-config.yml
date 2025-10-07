@@ -1,0 +1,7 @@
+# TrackAsia - Project Configuration
+# Configuration to disable local scripts creation
+
+# Integration settings
+integration:
+  # Use external library approach
+  local_scripts: false

@@ -2115,21 +2115,15 @@ main() {
     FORCE_DEPLOYMENT_MODE=""
     TARGET_DIR_ARG=""
     
-    # Debug: Print all arguments
-    echo "🔍 Debug: Arguments received: $@"
-    echo "🔍 Debug: Number of arguments: $#"
-    
+    # Process arguments passed to the script
     while [[ $# -gt 0 ]]; do
-        echo "🔍 Debug: Processing argument: '$1'"
         case $1 in
             --local)
                 FORCE_DEPLOYMENT_MODE="local"
-                echo "🔍 Debug: Set FORCE_DEPLOYMENT_MODE to local"
                 shift
                 ;;
             --github)
                 FORCE_DEPLOYMENT_MODE="github"
-                echo "🔍 Debug: Set FORCE_DEPLOYMENT_MODE to github"
                 shift
                 ;;
             --help|-h)
@@ -2137,17 +2131,14 @@ main() {
                 shift
                 ;;
             *)
-                if [[ -z "$TARGET_DIR_ARG" && "$1" != "--local" && "$1" != "--github" ]]; then
+                # Only set TARGET_DIR_ARG if it's not a flag and not already set
+                if [[ -z "$TARGET_DIR_ARG" && "$1" != --* ]]; then
                     TARGET_DIR_ARG="$1"
-                    echo "🔍 Debug: Set TARGET_DIR_ARG to '$1'"
                 fi
                 shift
                 ;;
         esac
     done
-    
-    echo "🔍 Debug: Final FORCE_DEPLOYMENT_MODE: '$FORCE_DEPLOYMENT_MODE'"
-    echo "🔍 Debug: Final TARGET_DIR_ARG: '$TARGET_DIR_ARG'"
     
     # Determine target directory
     if [ -n "$TARGET_DIR_ARG" ]; then

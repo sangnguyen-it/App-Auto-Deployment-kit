@@ -137,32 +137,6 @@ check_dependencies() {
     return 0
 }
 
-# Copy automation files
-copy_automation_files() {
-    local source_dir="$1"
-    local target_dir="$2"
-    
-    print_step "Copying automation files..."
-    
-    # Copy Makefile
-    if [ -f "$source_dir/Makefile" ]; then
-        cp "$source_dir/Makefile" "$target_dir/"
-        print_success "Copied Makefile"
-    fi
-    
-    # Copy scripts directory
-    if [ -d "$source_dir/scripts" ]; then
-        cp -r "$source_dir/scripts" "$target_dir/"
-        print_success "Copied scripts directory"
-    fi
-    
-    # Copy documentation
-    if [ -d "$source_dir/docs" ]; then
-        cp -r "$source_dir/docs" "$target_dir/"
-        print_success "Copied documentation"
-    fi
-}
-
 # Create project configuration
 create_project_config() {
     local target_dir="$1"

@@ -1490,19 +1490,6 @@ create_setup_sh_inline() {
 # Flutter CI/CD Setup Script - Simplified inline version
 set -e
 
-# Basic print functions
-print_success() {
-    echo "✅ $1"
-}
-
-print_error() {
-    echo "❌ $1"
-}
-
-print_step() {
-    echo "🔄 $1"
-}
-
 # Main setup function
 main() {
     print_step "Flutter CI/CD Setup"
@@ -1544,51 +1531,37 @@ CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 NC='\033[0m'
 
-# Print functions
-print_header() {
-    echo ""
-    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC} ${WHITE}$1${NC} ${BLUE}║${NC}"
-    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
-    echo ""
-}
+# Unicode symbols
+CHECK="✅"
+CROSS="❌"
+WARNING="⚠️"
+INFO="💡"
+ROCKET="🚀"
+GEAR="⚙️"
+FOLDER="📁"
+MOBILE="📱"
+KEY="🔑"
+WRENCH="🔧"
 
-print_step() {
-    echo -e "${YELLOW}🔄 $1${NC}"
-}
-
-print_success() {
-    echo -e "${GREEN}✅ $1${NC}"
-}
-
-print_error() {
-    echo -e "${RED}❌ $1${NC}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
-}
-
-print_info() {
-    echo -e "${CYAN}💡 $1${NC}"
-}
+# Note: Print functions are defined in the main script to avoid duplication
+# This file contains only unique utility functions
 
 # Validation functions
 validate_flutter_project() {
     local target_dir="$1"
     
     if [ ! -d "$target_dir" ]; then
-        print_error "Directory does not exist: $target_dir"
+        echo "❌ Directory does not exist: $target_dir"
         return 1
     fi
     
     if [ ! -f "$target_dir/pubspec.yaml" ]; then
-        print_error "Not a Flutter project. pubspec.yaml not found."
+        echo "❌ Not a Flutter project. pubspec.yaml not found."
         return 1
     fi
     
     if [ ! -d "$target_dir/android" ] || [ ! -d "$target_dir/ios" ]; then
-        print_warning "Missing platform directories (android/ios)"
+        echo "⚠️  Missing platform directories (android/ios)"
     fi
     
     return 0
@@ -1615,19 +1588,107 @@ get_android_package() {
 get_ios_bundle_id() {
     local target_dir="$1"
     local info_plist="$target_dir/ios/Runner/Info.plist"
-    
     if [ -f "$info_plist" ]; then
-        grep -A1 'CFBundleIdentifier' "$info_plist" | tail -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/'
-    else
-        echo "com.example.app"
+        /usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$info_plist" 2>/dev/null || echo ""
     fi
+}
+
+# Check dependencies
+check_dependencies() {
+    local missing_deps=()
+    
+    if ! command -v flutter >/dev/null 2>&1; then
+        missing_deps+=("flutter")
+    fi
+    
+    if ! command -v git >/dev/null 2>&1; then
+        missing_deps+=("git")
+    fi
+    
+    if ! command -v ruby >/dev/null 2>&1; then
+        missing_deps+=("ruby")
+    fi
+    
+    if ! command -v bundle >/dev/null 2>&1; then
+        missing_deps+=("bundler")
+    fi
+    
+    if ! command -v dart >/dev/null 2>&1; then
+        missing_deps+=("dart")
+    fi
+    
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        echo "❌ Missing dependencies: ${missing_deps[*]}"
+        return 1
+    fi
+    
+    echo "✅ All dependencies are available"
+    return 0
+}
+
+# Copy automation files
+copy_automation_files() {
+    local source_dir="$1"
+    local target_dir="$2"
+    
+    echo "🔄 Copying automation files..."
+    
+    # Copy Makefile
+    if [ -f "$source_dir/Makefile" ]; then
+        cp "$source_dir/Makefile" "$target_dir/"
+        echo "✅ Copied Makefile"
+    fi
+    
+    # Copy scripts directory
+    if [ -d "$source_dir/scripts" ]; then
+        cp -r "$source_dir/scripts" "$target_dir/"
+        echo "✅ Copied scripts directory"
+    fi
+    
+    # Copy documentation
+    if [ -d "$source_dir/docs" ]; then
+        cp -r "$source_dir/docs" "$target_dir/"
+        echo "✅ Copied documentation"
+    fi
+}
+
+# Create project configuration
+create_project_config() {
+    local target_dir="$1"
+    local project_name="$2"
+    local bundle_id="$3"
+    local package_name="$4"
+    
+    cat > "$target_dir/project.config" << EOF
+# Project Configuration
+PROJECT_NAME="$project_name"
+BUNDLE_ID="$bundle_id"
+PACKAGE_NAME="$package_name"
+
+# Build Configuration
+BUILD_MODE="release"
+FLUTTER_BUILD_ARGS="--release --no-tree-shake-icons"
+
+# iOS Configuration
+IOS_SCHEME="Runner"
+IOS_WORKSPACE="ios/Runner.xcworkspace"
+IOS_EXPORT_METHOD="app-store"
+
+# Android Configuration
+ANDROID_BUILD_TYPE="appbundle"
+ANDROID_FLAVOR=""
+
+# Version Configuration
+VERSION_STRATEGY="auto"
+CHANGELOG_ENABLED="true"
+EOF
+    
+    echo "✅ Created project.config"
 }
 EOF
     chmod +x "$TARGET_DIR/scripts/common_functions.sh"
-    print_success "common_functions.sh created (inline)"
+    print_success "common_functions.sh created (inline, optimized)"
 }
-
-
 
 # Function to setup gitignore
 setup_gitignore() {

@@ -280,14 +280,14 @@ auto_select_deployment_mode() {
     
     if [[ "$git_provider" == "github" ]]; then
         echo -e "${CYAN}GitHub repository detected!${NC}"
-        echo -e "${GREEN}Auto-selecting: Local Deployment${NC}"
-        echo -e "   • Deploy apps locally using Fastlane"
-        echo -e "   • No GitHub authentication required"
-        echo -e "   • Manual deployment process"
+        echo -e "${GREEN}Auto-selecting: GitHub Actions Deployment${NC}"
+        echo -e "   • Deploy apps using GitHub Actions"
+        echo -e "   • Automated CI/CD pipeline"
+        echo -e "   • Requires GitHub authentication"
         echo ""
         
-        DEPLOYMENT_MODE="local"
-        print_success "Auto-selected: Local Deployment"
+        DEPLOYMENT_MODE="github"
+        print_success "Auto-selected: GitHub Actions Deployment"
     else
         echo -e "${CYAN}Non-GitHub repository detected!${NC}"
         echo -e "${GREEN}Auto-selecting: Local Deployment${NC}"

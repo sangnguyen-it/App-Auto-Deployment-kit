@@ -41,7 +41,8 @@ export LANG=C
 
 # Validate script integrity (basic check)
 if [ ! -f "$0" ] && [ -z "${BASH_SOURCE[0]}" ]; then
-    echo "Warning: Script integrity check failed. Continuing anyway..."
+    # This is expected when running via curl | bash, so just log it as info
+    echo "ℹ️  Running in pipe mode (curl | bash) - script integrity check skipped"
 fi
 
 # Ensure we have required commands
@@ -2045,13 +2046,19 @@ main() {
         download_scripts_from_github
         echo "🔄 Downloading templates from GitHub (REMOTE_EXECUTION=$REMOTE_EXECUTION)..."
         download_templates_from_github
+        
+        # Source the downloaded template processor if available
+        if [ -f "$SCRIPT_DIR/template_processor.sh" ]; then
+            source "$SCRIPT_DIR/template_processor.sh"
+            print_info "✅ Template processor loaded from downloaded scripts"
+        fi
     else
         echo "🔄 Skipping GitHub download (REMOTE_EXECUTION=$REMOTE_EXECUTION)"
     fi
     
     copy_scripts
     create_configuration_files
-    create_project_config
+    create_project_config "$TARGET_DIR" "$PROJECT_NAME" "$BUNDLE_ID" "$PACKAGE_NAME"
     
     # Auto-sync project.config with iOS fastlane files if config exists
     auto_sync_project_config

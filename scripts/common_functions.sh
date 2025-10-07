@@ -2,6 +2,11 @@
 # Common Functions Library
 # Shared utilities for all setup scripts
 
+# Source template processor functions if available
+if [ -f "$(dirname "${BASH_SOURCE[0]}")/template_processor.sh" ]; then
+    source "$(dirname "${BASH_SOURCE[0]}")/template_processor.sh"
+fi
+
 # Colors and styling
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -169,4 +174,150 @@ CHANGELOG_ENABLED="true"
 EOF
     
     print_success "Created project.config"
+}
+
+# Template creation functions
+create_android_fastfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local template_dir="$4"
+    
+    local template_file="$template_dir/android_fastfile.template"
+    local output_file="$target_dir/android/fastlane/Fastfile"
+    
+    if [ -f "$template_file" ]; then
+        process_template "$template_file" "$output_file" "$project_name" "$package_name"
+        return $?
+    else
+        print_warning "Android Fastfile template not found, using inline creation"
+        return 1
+    fi
+}
+
+create_android_appfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local template_dir="$4"
+    
+    local template_file="$template_dir/android_appfile.template"
+    local output_file="$target_dir/android/fastlane/Appfile"
+    
+    if [ -f "$template_file" ]; then
+        process_template "$template_file" "$output_file" "$project_name" "$package_name"
+        return $?
+    else
+        print_warning "Android Appfile template not found, using inline creation"
+        return 1
+    fi
+}
+
+create_ios_fastfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local template_dir="$4"
+    
+    local template_file="$template_dir/ios_fastfile.template"
+    local output_file="$target_dir/ios/fastlane/Fastfile"
+    
+    if [ -f "$template_file" ]; then
+        process_template "$template_file" "$output_file" "$project_name" "$package_name"
+        return $?
+    else
+        print_warning "iOS Fastfile template not found, using inline creation"
+        return 1
+    fi
+}
+
+create_ios_appfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local team_id="$4"
+    local apple_id="$5"
+    local template_dir="$6"
+    
+    local template_file="$template_dir/ios_appfile.template"
+    local output_file="$target_dir/ios/fastlane/Appfile"
+    
+    if [ -f "$template_file" ]; then
+        process_template "$template_file" "$output_file" "$project_name" "$package_name" "" "$team_id" "$apple_id"
+        return $?
+    else
+        print_warning "iOS Appfile template not found, using inline creation"
+        return 1
+    fi
+}
+
+create_makefile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local app_name="$4"
+    local template_dir="$5"
+    
+    local template_file="$template_dir/makefile.template"
+    local output_file="$target_dir/Makefile"
+    
+    if [ -f "$template_file" ]; then
+        process_template "$template_file" "$output_file" "$project_name" "$package_name" "$app_name"
+        return $?
+    else
+        print_warning "Makefile template not found, using inline creation"
+        return 1
+    fi
+}
+
+create_github_workflow_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local template_dir="$4"
+    
+    local template_file="$template_dir/github_workflow.template"
+    local output_file="$target_dir/.github/workflows/deploy.yml"
+    
+    if [ -f "$template_file" ]; then
+        process_template "$template_file" "$output_file" "$project_name" "$package_name"
+        return $?
+    else
+        print_warning "GitHub workflow template not found, using inline creation"
+        return 1
+    fi
+}
+
+create_gemfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local template_dir="$3"
+    
+    local template_file="$template_dir/gemfile.template"
+    local output_file="$target_dir/Gemfile"
+    
+    if [ -f "$template_file" ]; then
+        process_template "$template_file" "$output_file" "$project_name"
+        return $?
+    else
+        print_warning "Gemfile template not found, using inline creation"
+        return 1
+    fi
+}
+
+create_ios_export_options_from_template() {
+    local target_dir="$1"
+    local team_id="$2"
+    local template_dir="$3"
+    
+    local template_file="$template_dir/ios_export_options.template"
+    local output_file="$target_dir/ios/ExportOptions.plist"
+    
+    if [ -f "$template_file" ]; then
+        process_template "$template_file" "$output_file" "" "" "" "$team_id"
+        return $?
+    else
+        print_warning "iOS ExportOptions template not found, using inline creation"
+        return 1
+    fi
 }

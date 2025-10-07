@@ -695,6 +695,7 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 		if command -v fastlane >/dev/null 2>&1 && [ -f "android/fastlane/Fastfile" ]; then \
 			cd android; \
 			if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+				export FASTLANE_JSON_KEY_FILE="play_store_service_account.json"; \
 				if bundle exec fastlane android release 2>/dev/null; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to Google Play via bundle"; \
 				elif fastlane android release 2>/dev/null; then \
@@ -704,6 +705,7 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 					printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: cd android && bundle exec fastlane android release"; \
 				fi; \
 			elif fastlane android release 2>/dev/null; then \
+				export FASTLANE_JSON_KEY_FILE="play_store_service_account.json"; \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to Google Play"; \
 			else \
 				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Google Play upload failed - check fastlane configuration"; \

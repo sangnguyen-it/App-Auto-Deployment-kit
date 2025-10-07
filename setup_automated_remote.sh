@@ -115,7 +115,29 @@ STAR="⭐"
 PACKAGE="📦"
 
 # Print functions
-# Print functions are now sourced from common_functions.sh
+print_header() {
+    echo -e "\n${PURPLE}=== $1 ===${NC}\n"
+}
+
+print_step() {
+    echo -e "${BLUE}➤ $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+print_info() {
+    echo -e "${CYAN}ℹ️  $1${NC}"
+}
 
 # Helper function for remote-safe input reading with tty support
 # Unused functions removed - read_with_fallback and read_required_or_skip
@@ -610,6 +632,8 @@ copy_scripts() {
     
     for script in "${script_files[@]}"; do
         if [ -f "$SCRIPTS_DIR/$script" ]; then
+            # Ensure scripts directory exists before copying
+            mkdir -p "$TARGET_DIR/scripts"
             cp "$SCRIPTS_DIR/$script" "$TARGET_DIR/scripts/"
             chmod +x "$TARGET_DIR/scripts/$script" 2>/dev/null || true
             ((scripts_copied++))
@@ -618,22 +642,27 @@ copy_scripts() {
             # Create essential scripts inline if not found
             case "$script" in
                 "version_manager.dart")
+                    mkdir -p "$TARGET_DIR/scripts"
                     create_version_manager_inline
                     ((scripts_created_inline++))
                     ;;
                 "build_info_generator.dart")
+                    mkdir -p "$TARGET_DIR/scripts"
                     create_build_info_generator_inline
                     ((scripts_created_inline++))
                     ;;
                 "dynamic_version_manager.dart")
+                    mkdir -p "$TARGET_DIR/scripts"
                     create_dynamic_version_manager_inline
                     ((scripts_created_inline++))
                     ;;
                 "setup.sh")
+                    mkdir -p "$TARGET_DIR/scripts"
                     create_setup_sh_inline
                     ((scripts_created_inline++))
                     ;;
                 "common_functions.sh")
+                    mkdir -p "$TARGET_DIR/scripts"
                     create_common_functions_inline
                     ((scripts_created_inline++))
                     ;;

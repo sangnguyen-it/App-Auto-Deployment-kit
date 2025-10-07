@@ -158,10 +158,18 @@ Future<void> interactiveMode() async {
   
   String? modeInput;
   try {
-    modeInput = stdin.readLineSync()?.trim();
+    // Check if stdin is available and not piped
+    if (stdin.hasTerminal) {
+      modeInput = stdin.readLineSync()?.trim();
+    } else {
+      // Auto-select mode 1 when stdin is not available (piped input)
+      modeInput = '1';
+      print('1 (auto-selected)');
+    }
   } catch (e) {
     // Handle case when stdin is not available (piped input)
     modeInput = '1';
+    print('1 (auto-selected)');
   }
   final mode = (modeInput?.isEmpty ?? true) ? '1' : modeInput!;
   
@@ -189,18 +197,30 @@ Future<void> interactiveMode() async {
     stdout.write('Enter Android version name [current: ${getVersionName()}]: ');
     String? androidVersionNameInput;
     try {
-      androidVersionNameInput = stdin.readLineSync()?.trim();
+      if (stdin.hasTerminal) {
+        androidVersionNameInput = stdin.readLineSync()?.trim();
+      } else {
+        androidVersionNameInput = '';
+        print('${getVersionName()} (auto-selected)');
+      }
     } catch (e) {
       androidVersionNameInput = '';
+      print('${getVersionName()} (auto-selected)');
     }
     androidVersionName = (androidVersionNameInput?.isEmpty ?? true) ? getVersionName() : androidVersionNameInput!;
     
     stdout.write('Enter Android version code [current: ${getVersionCode()}]: ');
     String? androidVersionCodeInput;
     try {
-      androidVersionCodeInput = stdin.readLineSync()?.trim();
+      if (stdin.hasTerminal) {
+        androidVersionCodeInput = stdin.readLineSync()?.trim();
+      } else {
+        androidVersionCodeInput = '';
+        print('${getVersionCode()} (auto-selected)');
+      }
     } catch (e) {
       androidVersionCodeInput = '';
+      print('${getVersionCode()} (auto-selected)');
     }
     androidVersionCode = (androidVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : androidVersionCodeInput!;
     
@@ -209,18 +229,30 @@ Future<void> interactiveMode() async {
     stdout.write('Enter iOS version name [current: ${getVersionName()}]: ');
     String? iosVersionNameInput;
     try {
-      iosVersionNameInput = stdin.readLineSync()?.trim();
+      if (stdin.hasTerminal) {
+        iosVersionNameInput = stdin.readLineSync()?.trim();
+      } else {
+        iosVersionNameInput = '';
+        print('${getVersionName()} (auto-selected)');
+      }
     } catch (e) {
       iosVersionNameInput = '';
+      print('${getVersionName()} (auto-selected)');
     }
     iosVersionName = (iosVersionNameInput?.isEmpty ?? true) ? getVersionName() : iosVersionNameInput!;
     
     stdout.write('Enter iOS version code [current: ${getVersionCode()}]: ');
     String? iosVersionCodeInput;
     try {
-      iosVersionCodeInput = stdin.readLineSync()?.trim();
+      if (stdin.hasTerminal) {
+        iosVersionCodeInput = stdin.readLineSync()?.trim();
+      } else {
+        iosVersionCodeInput = '';
+        print('${getVersionCode()} (auto-selected)');
+      }
     } catch (e) {
       iosVersionCodeInput = '';
+      print('${getVersionCode()} (auto-selected)');
     }
     iosVersionCode = (iosVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : iosVersionCodeInput!;
     
@@ -234,11 +266,17 @@ Future<void> interactiveMode() async {
   String? confirm;
   try {
     stdout.write('Apply these versions? (y/N): ');
-    confirm = stdin.readLineSync()?.trim().toLowerCase();
+    if (stdin.hasTerminal) {
+      confirm = stdin.readLineSync()?.trim().toLowerCase();
+    } else {
+      confirm = 'y';
+      print('y (auto-selected)');
+    }
   } catch (e) {
     // Handle case when stdin is not available (piped input)
     // Default to 'y' for automated builds
     confirm = 'y';
+    print('y (auto-selected)');
   }
   
   if (confirm == 'y' || confirm == 'yes') {

@@ -1881,6 +1881,12 @@ create_project_config() {
 
 # Function to create new project config file
 create_new_project_config() {
+    # Initialize with default values first
+    TEAM_ID="YOUR_TEAM_ID"
+    KEY_ID="YOUR_KEY_ID"
+    ISSUER_ID="YOUR_ISSUER_ID"
+    APPLE_ID="your-apple-id@email.com"
+    
     cat > "$TARGET_DIR/project.config" << EOF
 # Flutter CI/CD Project Configuration
 # Auto-generated for project: $PROJECT_NAME
@@ -1898,10 +1904,10 @@ FLUTTER_BUILD_ARGS="--release --no-tree-shake-icons"
 IOS_SCHEME="Runner"
 IOS_WORKSPACE="ios/Runner.xcworkspace"
 IOS_EXPORT_METHOD="app-store"
-TEAM_ID="YOUR_TEAM_ID"
-KEY_ID="YOUR_KEY_ID"
-ISSUER_ID="YOUR_ISSUER_ID"
-APPLE_ID="your-apple-id@email.com"
+TEAM_ID="$TEAM_ID"
+KEY_ID="$KEY_ID"
+ISSUER_ID="$ISSUER_ID"
+APPLE_ID="$APPLE_ID"
 
 # Android Configuration
 ANDROID_BUILD_TYPE="appbundle"
@@ -1915,7 +1921,25 @@ CHANGELOG_ENABLED="true"
 EOF
     
     print_success "✅ Created project.config file"
-    print_info "Please update the iOS credentials (TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID) in project.config"
+    
+    # Ask user if they want to set up iOS credentials interactively
+    echo ""
+    echo -e "${YELLOW}Do you want to set up iOS credentials now?${NC}"
+    echo "  ${GREEN}y - Yes, set up credentials interactively"
+    echo "  ${RED}n - No, I'll configure them later"
+    echo ""
+    
+    local setup_credentials
+    read_with_fallback "Your choice (y/n): " "n" setup_credentials
+    setup_credentials=$(echo "$setup_credentials" | tr '[:upper:]' '[:lower:]')
+    
+    if [[ "$setup_credentials" == "y" ]]; then
+        print_info "Starting interactive iOS credentials setup..."
+        collect_ios_credentials
+    else
+        print_info "Skipping iOS credentials setup"
+        print_info "You can manually update the iOS credentials (TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID) in project.config later"
+    fi
 }
 
 # Auto-sync project.config with iOS fastlane files if config exists
@@ -2323,6 +2347,178 @@ main() {
     display_setup_summary
     
     print_success "Setup completed successfully!"
+}
+
+# Function to update project config file
+update_project_config() {
+    print_step "Saving configuration to project.config..."
+    
+    # Check if user approved config updates
+    if [[ "$PROJECT_CONFIG_USER_APPROVED" == "false" ]]; then
+        print_info "Skipping project.config update (user chose to keep existing file)"
+        return 0
+    fi
+    
+    # Get current timestamp
+    local timestamp=$(date)
+    
+    # Create updated config file
+    cat > "$TARGET_DIR/project.config" << EOF
+# Flutter CI/CD Project Configuration
+# Auto-generated for project: $PROJECT_NAME
+
+PROJECT_NAME="$PROJECT_NAME"
+PACKAGE_NAME="$PACKAGE_NAME"
+BUNDLE_ID="$BUNDLE_ID"
+CURRENT_VERSION="$CURRENT_VERSION"
+GIT_REPO="$GIT_REPO"
+
+# iOS/Apple Credentials
+TEAM_ID="$TEAM_ID"
+KEY_ID="$KEY_ID"
+ISSUER_ID="$ISSUER_ID"
+APPLE_ID="$APPLE_ID"
+
+# Output settings
+OUTPUT_DIR="$OUTPUT_DIR"
+CHANGELOG_FILE="$CHANGELOG_FILE"
+
+# Store settings
+GOOGLE_PLAY_TRACK="$GOOGLE_PLAY_TRACK"
+TESTFLIGHT_GROUPS="$TESTFLIGHT_GROUPS"
+
+# Last updated: $timestamp
+EOF
+    
+    print_success "Configuration saved to project.config"
+    
+    # Sync with iOS Fastlane Appfile if sync_appfile function exists
+    if command -v sync_appfile >/dev/null 2>&1; then
+        sync_appfile
+    fi
+}
+
+# Function to collect iOS credentials interactively
+collect_ios_credentials() {
+    print_header "📱 iOS Credential Setup"
+    
+    print_info "We need to collect your iOS/Apple Developer credentials."
+    echo ""
+    
+    # Load existing config if available
+    if [ -f "$TARGET_DIR/project.config" ]; then
+        source "$TARGET_DIR/project.config" 2>/dev/null || true
+    fi
+    
+    # Collect Team ID
+    while [[ "$TEAM_ID" == "YOUR_TEAM_ID" || -z "$TEAM_ID" ]]; do
+        echo -e "${CYAN}Enter your Apple Developer Team ID:${NC}"
+        echo -e "${GRAY}(Find this in App Store Connect → Membership → Team ID)${NC}"
+        local input_team_id
+        read_required_or_skip "Team ID: " input_team_id
+        if [[ "$input_team_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Team ID setup for remote execution"
+            break
+        elif [[ -n "$input_team_id" && "$input_team_id" != "YOUR_TEAM_ID" ]]; then
+            TEAM_ID="$input_team_id"
+            # Save immediately after successful input
+            update_project_config
+            print_success "✅ Team ID saved: $TEAM_ID"
+        else
+            print_error "Please enter a valid Team ID"
+        fi
+    done
+    
+    # Collect Key ID
+    while [[ "$KEY_ID" == "YOUR_KEY_ID" || -z "$KEY_ID" ]]; do
+        echo -e "${CYAN}Enter your App Store Connect API Key ID:${NC}"
+        echo -e "${GRAY}(Find this in App Store Connect → Users and Access → Keys)${NC}"
+        local input_key_id
+        read_required_or_skip "Key ID: " input_key_id
+        if [[ "$input_key_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Key ID setup for remote execution"
+            break
+        elif [[ -n "$input_key_id" && "$input_key_id" != "YOUR_KEY_ID" ]]; then
+            KEY_ID="$input_key_id"
+            # Save immediately after successful input
+            update_project_config
+            print_success "✅ Key ID saved: $KEY_ID"
+        else
+            print_error "Please enter a valid Key ID"
+        fi
+    done
+    
+    # Collect Issuer ID
+    while [[ "$ISSUER_ID" == "YOUR_ISSUER_ID" || -z "$ISSUER_ID" ]]; do
+        echo -e "${CYAN}Enter your App Store Connect Issuer ID:${NC}"
+        echo -e "${GRAY}(Find this in App Store Connect → Users and Access → Keys)${NC}"
+        local input_issuer_id
+        read_required_or_skip "Issuer ID: " input_issuer_id
+        if [[ "$input_issuer_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Issuer ID setup for remote execution"
+            break
+        elif [[ -n "$input_issuer_id" && "$input_issuer_id" != "YOUR_ISSUER_ID" ]]; then
+            ISSUER_ID="$input_issuer_id"
+            # Save immediately after successful input
+            update_project_config
+            print_success "✅ Issuer ID saved: $ISSUER_ID"
+        else
+            print_error "Please enter a valid Issuer ID"
+        fi
+    done
+    
+    # Collect Apple ID
+    while [[ "$APPLE_ID" == "your-apple-id@email.com" || -z "$APPLE_ID" ]]; do
+        echo -e "${CYAN}Enter your Apple ID (email):${NC}"
+        local input_apple_id
+        read_required_or_skip "Apple ID: " input_apple_id
+        if [[ "$input_apple_id" == "skip" ]]; then
+            print_warning "⚠️ Skipping Apple ID setup for remote execution"
+            break
+        elif [[ "$input_apple_id" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+            APPLE_ID="$input_apple_id"
+            # Save immediately after successful input
+            update_project_config
+            print_success "✅ Apple ID saved: $APPLE_ID"
+        else
+            print_error "Please enter a valid email address"
+        fi
+    done
+    
+    # Check for private key file
+    local key_file="$TARGET_DIR/ios/fastlane/AuthKey_${KEY_ID}.p8"
+    
+    # First check if file already exists
+    if [ -f "$key_file" ]; then
+        print_success "✅ iOS private key file already exists: AuthKey_${KEY_ID}.p8"
+        print_info "Location: ios/fastlane/AuthKey_${KEY_ID}.p8"
+        IOS_READY=true
+    else
+        # File doesn't exist - ask user to place it
+        print_warning "Private key file not found: AuthKey_${KEY_ID}.p8"
+        echo -e "${YELLOW}Please place your private key file in: ios/fastlane/${NC}"
+        echo -e "${GRAY}Download from: App Store Connect → Users and Access → Keys${NC}"
+        echo -e "${CYAN}${INFO} Copy the downloaded .p8 file to: ios/fastlane/AuthKey_${KEY_ID}.p8${NC}"
+        echo ""
+        
+        # Only ask if file doesn't exist
+        while [ ! -f "$key_file" ]; do
+            read_with_fallback "Press Enter when you've placed the key file, or 'skip' to continue: " "skip" "user_input"
+            if [[ "$user_input" == "skip" ]]; then
+                print_warning "Skipping key file validation - iOS deployment may not work"
+                break
+            fi
+        done
+        
+        # Re-check after user action
+        if [ -f "$key_file" ]; then
+            print_success "✅ iOS private key file found!"
+            IOS_READY=true
+        fi
+    fi
+    
+    print_success "iOS credentials collection completed!"
+    echo ""
 }
 
 # Execute main function with all arguments

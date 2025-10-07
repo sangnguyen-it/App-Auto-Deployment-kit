@@ -2,11 +2,6 @@
 # Template Processing Functions for AppAutoDeploy
 # This script provides functions to process templates with variable substitution
 
-# Source common functions if available
-if [ -f "$(dirname "${BASH_SOURCE[0]}")/common_functions.sh" ]; then
-    source "$(dirname "${BASH_SOURCE[0]}")/common_functions.sh"
-fi
-
 # Function to get version information from dynamic_version_manager
 get_version_info() {
     local target_dir="$1"
@@ -90,8 +85,171 @@ process_template() {
     return 0
 }
 
-# Individual template functions removed - only create_all_templates is used
-# These functions were not called individually in the main script
+# Function to create Android Fastfile from template
+create_android_fastfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local template_dir="${4:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    
+    local template_file="$template_dir/android_fastfile.template"
+    local output_file="$target_dir/android/fastlane/Fastfile"
+    
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name"; then
+        echo "✅ Android Fastfile created from template"
+        return 0
+    else
+        echo "❌ Failed to create Android Fastfile from template"
+        return 1
+    fi
+}
+
+# Function to create iOS Fastfile from template
+create_ios_fastfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local template_dir="${4:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    
+    local template_file="$template_dir/ios_fastfile.template"
+    local output_file="$target_dir/ios/fastlane/Fastfile"
+    
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name"; then
+        echo "✅ iOS Fastfile created from template"
+        return 0
+    else
+        echo "❌ Failed to create iOS Fastfile from template"
+        return 1
+    fi
+}
+
+# Function to create iOS Appfile from template
+create_ios_appfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local team_id="${4:-YOUR_TEAM_ID}"
+    local apple_id="${5:-your-apple-id@email.com}"
+    local template_dir="${6:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    
+    local template_file="$template_dir/ios_appfile.template"
+    local output_file="$target_dir/ios/fastlane/Appfile"
+    
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name" "$project_name" "$team_id" "$apple_id"; then
+        echo "✅ iOS Appfile created from template"
+        return 0
+    else
+        echo "❌ Failed to create iOS Appfile from template"
+        return 1
+    fi
+}
+
+# Function to create Android Appfile from template
+create_android_appfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local template_dir="${4:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    
+    local template_file="$template_dir/android_appfile.template"
+    local output_file="$target_dir/android/fastlane/Appfile"
+    
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name"; then
+        echo "✅ Android Appfile created from template"
+        return 0
+    else
+        echo "❌ Failed to create Android Appfile from template"
+        return 1
+    fi
+}
+
+
+create_makefile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local app_name="$4"
+    local template_dir="${5:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    
+    local template_file="$template_dir/makefile.template"
+    local output_file="$target_dir/Makefile"
+    
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name" "$app_name" "YOUR_TEAM_ID" "your-apple-id@email.com" "$target_dir"; then
+        chmod +x "$output_file"
+        echo "✅ Makefile created from template"
+        return 0
+    else
+        echo "❌ Failed to create Makefile from template"
+        return 1
+    fi
+}
+
+# Function to create GitHub Actions workflow from template
+create_github_workflow_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local package_name="$3"
+    local template_dir="${4:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    
+    local template_file="$template_dir/github_deploy.template"
+    local output_file="$target_dir/.github/workflows/deploy.yml"
+    
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name"; then
+        echo "✅ GitHub Actions workflow created from template"
+        return 0
+    else
+        echo "❌ Failed to create GitHub Actions workflow from template"
+        return 1
+    fi
+}
+
+# Function to create Gemfile from template
+create_gemfile_from_template() {
+    local target_dir="$1"
+    local project_name="$2"
+    local template_dir="${3:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    
+    local template_file="$template_dir/gemfile.template"
+    local output_file="$target_dir/Gemfile"
+    
+    if process_template "$template_file" "$output_file" "$project_name"; then
+        echo "✅ Gemfile created from template"
+        return 0
+    else
+        echo "❌ Failed to create Gemfile from template"
+        return 1
+    fi
+}
+
+
+# Function to create iOS ExportOptions.plist from template
+create_ios_export_options_from_template() {
+    local target_dir="$1"
+    local team_id="$2"
+    local template_dir="${3:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    
+    local template_file="$template_dir/ios_export_options.template"
+    local output_file="$target_dir/ios/fastlane/ExportOptions.plist"
+    
+    # Create temporary content with team ID substitution
+    local temp_content
+    temp_content=$(cat "$template_file")
+    temp_content="${temp_content//\{\{TEAM_ID\}\}/$team_id}"
+    
+    # Create output directory if it doesn't exist
+    mkdir -p "$(dirname "$output_file")"
+    
+    # Write processed content to output file
+    echo "$temp_content" > "$output_file"
+    
+    if [ -f "$output_file" ]; then
+        echo "✅ iOS ExportOptions.plist created from template"
+        return 0
+    else
+        echo "❌ Failed to create iOS ExportOptions.plist from template"
+        return 1
+    fi
+}
 
 # Function to create all templates for a project
 create_all_templates() {
@@ -155,4 +313,12 @@ create_all_templates() {
 
 # Export functions for use in other scripts
 export -f process_template
+export -f create_android_fastfile_from_template
+export -f create_android_appfile_from_template
+export -f create_ios_fastfile_from_template
+export -f create_ios_appfile_from_template
+export -f create_makefile_from_template
+export -f create_github_workflow_from_template
+export -f create_gemfile_from_template
+export -f create_ios_export_options_from_template
 export -f create_all_templates

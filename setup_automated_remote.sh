@@ -2140,7 +2140,12 @@ main() {
     
     # Determine target directory
     if [ -n "$TARGET_DIR_ARG" ]; then
-        TARGET_DIR="$(cd "$TARGET_DIR_ARG" && pwd)"
+        if [ -d "$TARGET_DIR_ARG" ]; then
+            TARGET_DIR="$(cd "$TARGET_DIR_ARG" && pwd)"
+        else
+            print_error "Directory not found: $TARGET_DIR_ARG"
+            exit 1
+        fi
     else
         TARGET_DIR="$(pwd)"
     fi

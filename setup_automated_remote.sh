@@ -2048,14 +2048,14 @@ main() {
         download_templates_from_github
         
         # Source the downloaded common functions if available
-        if [ -f "$SCRIPT_DIR/common_functions.sh" ]; then
-            source "$SCRIPT_DIR/common_functions.sh"
+        if [ -f "$SCRIPTS_DIR/common_functions.sh" ]; then
+            source "$SCRIPTS_DIR/common_functions.sh"
             print_info "✅ Common functions loaded from downloaded scripts"
         fi
         
         # Source the downloaded template processor if available
-        if [ -f "$SCRIPT_DIR/template_processor.sh" ]; then
-            source "$SCRIPT_DIR/template_processor.sh"
+        if [ -f "$SCRIPTS_DIR/template_processor.sh" ]; then
+            source "$SCRIPTS_DIR/template_processor.sh"
             print_info "✅ Template processor loaded from downloaded scripts"
         fi
     else

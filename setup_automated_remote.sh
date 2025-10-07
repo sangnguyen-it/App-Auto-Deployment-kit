@@ -2047,6 +2047,12 @@ main() {
         echo "🔄 Downloading templates from GitHub (REMOTE_EXECUTION=$REMOTE_EXECUTION)..."
         download_templates_from_github
         
+        # Source the downloaded common functions if available
+        if [ -f "$SCRIPT_DIR/common_functions.sh" ]; then
+            source "$SCRIPT_DIR/common_functions.sh"
+            print_info "✅ Common functions loaded from downloaded scripts"
+        fi
+        
         # Source the downloaded template processor if available
         if [ -f "$SCRIPT_DIR/template_processor.sh" ]; then
             source "$SCRIPT_DIR/template_processor.sh"

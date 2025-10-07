@@ -451,6 +451,24 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
 	fi
 	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
+	$(eval VERSION_FULL := $(call get_current_version))
+	$(eval VERSION_NAME := $(call get_current_version_name))
+	$(eval VERSION_CODE := $(call get_current_version_code))
+	$(eval ANDROID_VERSION_NAME := $(call get_android_version_name))
+	$(eval ANDROID_VERSION_CODE := $(call get_android_version_code))
+	$(eval IOS_VERSION_NAME := $(call get_ios_version_name))
+	$(eval IOS_VERSION_CODE := $(call get_ios_version_code))
+	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
+	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
+	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
+	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
+	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
+	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
 	@mkdir -p $(OUTPUT_DIR)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
@@ -632,6 +650,24 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
 	fi
 	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
+	$(eval VERSION_FULL := $(call get_current_version))
+	$(eval VERSION_NAME := $(call get_current_version_name))
+	$(eval VERSION_CODE := $(call get_current_version_code))
+	$(eval ANDROID_VERSION_NAME := $(call get_android_version_name))
+	$(eval ANDROID_VERSION_CODE := $(call get_android_version_code))
+	$(eval IOS_VERSION_NAME := $(call get_ios_version_name))
+	$(eval IOS_VERSION_CODE := $(call get_ios_version_code))
+	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
+	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
+	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
+	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
+	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
+	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
 	@mkdir -p $(OUTPUT_DIR)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
@@ -799,15 +835,17 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	
 	@printf "\n"
 	@printf "$(CYAN)📝 Creating Git tag for version tracking...$(NC)\n"
-	@VERSION=$$(grep "version:" pubspec.yaml | cut -d' ' -f2 | tr -d ' '); \
-	if [ -z "$$VERSION" ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract version from pubspec.yaml"; \
+	@ANDROID_VER="$(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)"; \
+	IOS_VER="$(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)"; \
+	if [ -z "$(ANDROID_VERSION_NAME)" ] || [ -z "$(IOS_VERSION_NAME)" ]; then \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract Android/iOS versions from dynamic_version_manager"; \
 		exit 1; \
 	fi; \
-	printf "$(CYAN)$(INFO) %s$(NC)\n" "Extracted version: $$VERSION"; \
-	TAG_NAME="v$$VERSION"; \
+	printf "$(CYAN)$(INFO) %s$(NC)\n" "Android version: $$ANDROID_VER"; \
+	printf "$(CYAN)$(INFO) %s$(NC)\n" "iOS version: $$IOS_VER"; \
+	TAG_NAME="v$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE)_$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)"; \
 	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
-	if git tag -a "$$TAG_NAME" -m "Local build and upload completed - Apps already deployed via Fastlane" 2>/dev/null; then \
+	if git tag -a "$$TAG_NAME" -m "Local build and upload completed - Android: $$ANDROID_VER, iOS: $$IOS_VER - Apps already deployed via Fastlane" 2>/dev/null; then \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \
 		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Pushing git tag to remote..."; \
 		if git push origin "$$TAG_NAME" 2>/dev/null; then \
@@ -841,15 +879,35 @@ live-github: ## ☁️ Automated Live Production Pipeline (GitHub Only)
 		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping dynamic version management"; \
 	fi
 	
-	@VERSION=$$(grep "version:" pubspec.yaml | cut -d' ' -f2 | tr -d ' '); \
-	if [ -z "$$VERSION" ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract version from pubspec.yaml"; \
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
+	$(eval VERSION_FULL := $(call get_current_version))
+	$(eval VERSION_NAME := $(call get_current_version_name))
+	$(eval VERSION_CODE := $(call get_current_version_code))
+	$(eval ANDROID_VERSION_NAME := $(call get_android_version_name))
+	$(eval ANDROID_VERSION_CODE := $(call get_android_version_code))
+	$(eval IOS_VERSION_NAME := $(call get_ios_version_name))
+	$(eval IOS_VERSION_CODE := $(call get_ios_version_code))
+	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
+	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
+	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
+	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
+	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
+	
+	@ANDROID_VER="$(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)"; \
+	IOS_VER="$(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)"; \
+	if [ -z "$(ANDROID_VERSION_NAME)" ] || [ -z "$(IOS_VERSION_NAME)" ]; then \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract Android/iOS versions from dynamic_version_manager"; \
 		exit 1; \
 	fi; \
-	printf "$(CYAN)$(INFO) %s$(NC)\n" "Extracted version: $$VERSION"; \
-	TAG_NAME="v$$VERSION"; \
+	printf "$(CYAN)$(INFO) %s$(NC)\n" "Android version: $$ANDROID_VER"; \
+	printf "$(CYAN)$(INFO) %s$(NC)\n" "iOS version: $$IOS_VER"; \
+	TAG_NAME="v$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE)_$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)"; \
 	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
-	if git tag -a "$$TAG_NAME" -m "🚀 Production release $$VERSION" 2>/dev/null; then \
+	if git tag -a "$$TAG_NAME" -m "🚀 Production release - Android: $$ANDROID_VER, iOS: $$IOS_VER" 2>/dev/null; then \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \
 	else \
 		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git tag already exists or failed to create"; \
@@ -880,15 +938,17 @@ trigger-github-actions: ## 🚀 Trigger GitHub Actions CI/CD (Tag Push + API)
 	@printf "\n"
 	@printf "$(CYAN)🚀 Triggering GitHub Actions CI/CD$(NC)\n"
 	@printf "\n"
-	@VERSION=$$(grep "version:" pubspec.yaml | cut -d' ' -f2 | tr -d ' '); \
-	if [ -z "$$VERSION" ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract version from pubspec.yaml"; \
+	@ANDROID_VER="$(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)"; \
+	IOS_VER="$(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)"; \
+	if [ -z "$(ANDROID_VERSION_NAME)" ] || [ -z "$(IOS_VERSION_NAME)" ]; then \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract Android/iOS versions from dynamic_version_manager"; \
 		exit 1; \
 	fi; \
-	printf "$(CYAN)$(INFO) %s$(NC)\n" "Extracted version: $$VERSION"; \
-	TAG_NAME="v$$VERSION"; \
+	printf "$(CYAN)$(INFO) %s$(NC)\n" "Android version: $$ANDROID_VER"; \
+	printf "$(CYAN)$(INFO) %s$(NC)\n" "iOS version: $$IOS_VER"; \
+	TAG_NAME="v$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE)_$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)"; \
 	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
-	if git tag -a "$$TAG_NAME" -m "🚀 Production release $$VERSION" 2>/dev/null; then \
+	if git tag -a "$$TAG_NAME" -m "🚀 Production release - Android: $$ANDROID_VER, iOS: $$IOS_VER" 2>/dev/null; then \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \
 	else \
 		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git tag already exists or failed to create"; \

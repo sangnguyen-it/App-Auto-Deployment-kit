@@ -271,58 +271,33 @@ detect_git_provider() {
     echo "$git_provider"
 }
 
-# Function to prompt user for deployment mode
-prompt_deployment_mode() {
+# Function to automatically select deployment mode based on Git provider
+auto_select_deployment_mode() {
     # Detect Git provider first
     local git_provider=$(detect_git_provider)
     
-    print_header "Deployment Mode Selection"
+    print_header "Auto-Detecting Deployment Mode"
     
     if [[ "$git_provider" == "github" ]]; then
-        echo -e "${CYAN}GitHub repository detected! Please choose your deployment mode:${NC}"
-        echo ""
-        echo -e "${GREEN}1. Local Deployment${NC}"
-        echo -e "   • Deploy apps locally using Fastlane"
-        echo -e "   • No GitHub authentication required"
-        echo -e "   • Manual deployment process"
-        echo ""
-        echo -e "${BLUE}2. GitHub Actions Deployment${NC}"
-        echo -e "   • Automated deployment via GitHub Actions"
-        echo -e "   • Requires GitHub authentication"
-        echo -e "   • CI/CD pipeline setup"
-        echo ""
-        
-        local user_choice
-        while true; do
-            read_with_fallback "Enter your choice (1 for Local, 2 for GitHub): " "1" user_choice
-            
-            case "$user_choice" in
-                1|"local"|"Local"|"LOCAL")
-                    DEPLOYMENT_MODE="local"
-                    print_success "Selected: Local Deployment"
-                    break
-                    ;;
-                2|"github"|"GitHub"|"GITHUB")
-                    DEPLOYMENT_MODE="github"
-                    print_success "Selected: GitHub Actions Deployment"
-                    break
-                    ;;
-                *)
-                    print_error "Invalid choice. Please enter 1 for Local or 2 for GitHub."
-                    ;;
-            esac
-        done
-    else
-        echo -e "${CYAN}Non-GitHub repository detected. Using Local Deployment mode:${NC}"
-        echo ""
-        echo -e "${GREEN}Local Deployment${NC}"
+        echo -e "${CYAN}GitHub repository detected!${NC}"
+        echo -e "${GREEN}Auto-selecting: Local Deployment${NC}"
         echo -e "   • Deploy apps locally using Fastlane"
         echo -e "   • No GitHub authentication required"
         echo -e "   • Manual deployment process"
         echo ""
         
         DEPLOYMENT_MODE="local"
-        print_success "Auto-selected: Local Deployment (GitHub Actions not available for non-GitHub repositories)"
+        print_success "Auto-selected: Local Deployment"
+    else
+        echo -e "${CYAN}Non-GitHub repository detected!${NC}"
+        echo -e "${GREEN}Auto-selecting: Local Deployment${NC}"
+        echo -e "   • Deploy apps locally using Fastlane"
+        echo -e "   • No GitHub authentication required"
+        echo -e "   • Manual deployment process"
+        echo ""
+        
+        DEPLOYMENT_MODE="local"
+        print_success "Auto-selected: Local Deployment"
     fi
     
     echo ""
@@ -2165,14 +2140,15 @@ main() {
         DEPLOYMENT_MODE="$FORCE_DEPLOYMENT_MODE"
         print_success "Deployment mode forced to: $DEPLOYMENT_MODE"
     else
-        # Prompt user for deployment mode
-        prompt_deployment_mode
+        # Auto-select deployment mode based on Git provider
+        auto_select_deployment_mode
     fi
     
     # Execute setup steps
     detect_project_info
     
-    # Check GitHub authentication if GitHub mode is selected
+    # Since we auto-select local deployment, skip GitHub authentication
+    # GitHub authentication is only needed for GitHub Actions deployment
     if [ "$DEPLOYMENT_MODE" = "github" ]; then
         check_github_auth
     fi

@@ -1685,6 +1685,92 @@ EOF
     
     echo "✅ Created project.config"
 }
+
+# Function to create common_functions.sh inline (optimized)
+create_common_functions_inline() {
+    print_step "Creating common_functions.sh (inline, optimized)..."
+    
+    cat > "$TARGET_DIR/scripts/common_functions.sh" << 'EOF'
+#!/bin/bash
+
+# Color definitions
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+NC='\033[0m' # No Color
+
+# Print functions with colors
+print_header() {
+    echo -e "\n${PURPLE}=== $1 ===${NC}\n"
+}
+
+print_step() {
+    echo -e "${BLUE}➤ $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+print_info() {
+    echo -e "${CYAN}ℹ️  $1${NC}"
+}
+
+# Validate Flutter project
+validate_flutter_project() {
+    if [ ! -f "pubspec.yaml" ]; then
+        echo "❌ pubspec.yaml not found. This doesn't appear to be a Flutter project."
+        echo "💡 Please run this script from the root of your Flutter project."
+        exit 1
+    fi
+    
+    if [ ! -d "android" ] || [ ! -d "ios" ]; then
+        echo "⚠️  Android or iOS directory not found."
+        echo "💡 Make sure this is a complete Flutter project with both platforms."
+        exit 1
+    fi
+    
+    echo "✅ Flutter project structure validated"
+}
+
+# Get project information functions
+get_project_name() {
+    if [ -f "pubspec.yaml" ]; then
+        grep "^name:" pubspec.yaml | sed 's/name: *//' | tr -d '"' | tr -d "'"
+    else
+        basename "$(pwd)"
+    fi
+}
+
+get_android_package() {
+    if [ -f "android/app/build.gradle" ]; then
+        grep "applicationId" android/app/build.gradle | sed 's/.*applicationId *"//' | sed 's/".*//'
+    elif [ -f "android/app/build.gradle.kts" ]; then
+        grep "applicationId" android/app/build.gradle.kts | sed 's/.*applicationId.*= *"//' | sed 's/".*//'
+    else
+        echo "com.example.$(get_project_name)"
+    fi
+}
+
+get_ios_bundle_id() {
+    if [ -f "ios/Runner/Info.plist" ]; then
+        /usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" ios/Runner/Info.plist 2>/dev/null || echo "com.example.$(get_project_name)"
+    else
+        echo "com.example.$(get_project_name)"
+    fi
+}
 EOF
     chmod +x "$TARGET_DIR/scripts/common_functions.sh"
     print_success "common_functions.sh created (inline, optimized)"

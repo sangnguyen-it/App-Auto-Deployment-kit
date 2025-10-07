@@ -2085,13 +2085,15 @@ main() {
         echo "Flutter CI/CD Pipeline Setup (Refactored)"
         echo "=========================================="
         echo ""
-        echo "Usage: $0 [TARGET_PROJECT_PATH]"
+        echo "Usage: $0 [TARGET_PROJECT_PATH] [OPTIONS]"
         echo ""
         echo "Arguments:"
         echo "  TARGET_PROJECT_PATH    Path to Flutter project directory (optional, defaults to current directory)"
         echo ""
         echo "Options:"
         echo "  --help, -h            Show this help message"
+        echo "  --local               Force local deployment mode (skip deployment mode selection)"
+        echo "  --github              Force GitHub Actions deployment mode"
         echo ""
         echo "Description:"
         echo "  This script automatically sets up a complete CI/CD pipeline for Flutter projects."
@@ -2109,9 +2111,36 @@ main() {
     
     print_header "Flutter CI/CD Pipeline Setup (Refactored)"
     
+    # Parse command line arguments
+    FORCE_DEPLOYMENT_MODE=""
+    TARGET_DIR_ARG=""
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --local)
+                FORCE_DEPLOYMENT_MODE="local"
+                shift
+                ;;
+            --github)
+                FORCE_DEPLOYMENT_MODE="github"
+                shift
+                ;;
+            --help|-h)
+                # Already handled above
+                shift
+                ;;
+            *)
+                if [[ -z "$TARGET_DIR_ARG" ]]; then
+                    TARGET_DIR_ARG="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
     # Determine target directory
-    if [ -n "$1" ]; then
-        TARGET_DIR="$(cd "$1" && pwd)"
+    if [ -n "$TARGET_DIR_ARG" ]; then
+        TARGET_DIR="$(cd "$TARGET_DIR_ARG" && pwd)"
     else
         TARGET_DIR="$(pwd)"
     fi
@@ -2124,8 +2153,14 @@ main() {
     
     print_success "Flutter project detected: $TARGET_DIR"
     
-    # Prompt user for deployment mode
-    prompt_deployment_mode
+    # Set deployment mode based on force flag or prompt user
+    if [ -n "$FORCE_DEPLOYMENT_MODE" ]; then
+        DEPLOYMENT_MODE="$FORCE_DEPLOYMENT_MODE"
+        print_success "Deployment mode forced to: $DEPLOYMENT_MODE"
+    else
+        # Prompt user for deployment mode
+        prompt_deployment_mode
+    fi
     
     # Execute setup steps
     detect_project_info

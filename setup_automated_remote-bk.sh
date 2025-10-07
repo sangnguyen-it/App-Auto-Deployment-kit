@@ -1,7 +1,7 @@
 #!/bin/bash
 # Automated Setup - Complete CI/CD Integration Script
 # Automatically integrates complete CI/CD pipeline into any Flutter project
-# Usage: ./setup_automated.sh [TARGET_PROJECT_PATH]
+# Usage: ./setup_automated_remote.sh [TARGET_PROJECT_PATH]
 
 # Exit on error, but handle curl download gracefully
 set -e
@@ -13,6 +13,8 @@ if [ -t 0 ]; then
 else
     # Running non-interactively (e.g., via curl | bash)
     export TERM=dumb
+    export REMOTE_EXECUTION=true
+    echo "🔄 Detected non-interactive execution (pipe mode) - enabling auto-mode"
 fi
 
 # Set safe locale to prevent encoding issues
@@ -63,18 +65,21 @@ read_with_fallback() {
     local default_value="${2:-n}"
     local variable_name="$3"
     
-    if [[ -t 0 ]]; then
-        read -p "$prompt" "$variable_name"
-    else
-        printf "$prompt"
-        if read "$variable_name" < /dev/tty 2>/dev/null; then
-            # Successfully read from /dev/tty
-            :
-        else
-            # Cannot read from terminal, use default
-            echo "$default_value (auto-selected for remote execution)"
-            eval "$variable_name=\"$default_value\""
-        fi
+    # Check if we're in pipe mode (REMOTE_EXECUTION=true)
+    if [[ "${REMOTE_EXECUTION:-}" == "true" ]]; then
+        # In pipe mode, automatically use default value
+        echo "${prompt}${default_value} (auto-selected in pipe mode)"
+        eval "$variable_name=\"$default_value\""
+        return 0
+    fi
+    
+    # Interactive mode - prompt for user input
+    echo -n "$prompt"
+    read "$variable_name"
+    
+    # Use default if no input provided
+    if [[ -z "${!variable_name}" ]]; then
+        eval "$variable_name=\"$default_value\""
     fi
 }
 
@@ -82,20 +87,23 @@ read_with_fallback() {
 read_required_or_skip() {
     local prompt="$1"
     local variable_name="$2"
-    local skip_message="${3:-Skipping input for remote execution}"
+    local skip_message="${3:-Skipping input for non-interactive mode}"
     
+    # Check if we're in a remote/automated environment
+    if [[ "${CI:-}" == "true" ]] || [[ "${AUTOMATED:-}" == "true" ]] || [[ "${REMOTE_EXECUTION:-}" == "true" ]] || [[ ! -t 0 ]]; then
+        # In automated/remote environment, return "skip" to indicate skipping
+        echo "→ $prompt skip (auto-selected: $skip_message)"
+        eval "$variable_name=\"skip\""
+        return 0
+    fi
+    
+    # Interactive environment - prompt for input
     if [[ -t 0 ]]; then
         read -p "$prompt" "$variable_name"
     else
-        printf "$prompt"
-        if read "$variable_name" < /dev/tty 2>/dev/null; then
-            # Successfully read from /dev/tty
-            :
-        else
-            # Cannot read from terminal, skip this input
-            echo "skip (auto-selected: $skip_message)"
-            eval "$variable_name=\"skip\""
-        fi
+        # Fallback: we're not in a terminal, skip this input
+        echo "→ $prompt skip (auto-selected: $skip_message)"
+        eval "$variable_name=\"skip\""
     fi
 }
 
@@ -272,7 +280,16 @@ is_cicd_source_directory() {
     # Must have essential CI/CD files
     [[ -f "$dir/Makefile" ]] || return 1
     [[ -d "$dir/scripts" ]] || return 1
-    [[ -f "$dir/scripts/setup_automated.sh" ]] || return 1
+    
+    # Check for optimized scripts (new structure)
+    if [[ -f "$dir/scripts/setup.sh" && -f "$dir/scripts/common_functions.sh" ]]; then
+        return 0
+    fi
+    
+    # Fallback: check for old structure
+    if [[ -f "$dir/scripts/setup_automated.sh" ]]; then
+        return 0
+    fi
     
     # Verify it's actually a CI/CD source by checking Makefile content
     if grep -q "Flutter CI/CD\|CI.*CD\|PACKAGE_NAME.*:=\|auto-build\|fastlane" "$dir/Makefile" 2>/dev/null; then
@@ -280,9 +297,78 @@ is_cicd_source_directory() {
     fi
     
     # Alternative check: scripts directory with automation files
-    if [[ -f "$dir/scripts/version_manager.dart" ]] || [[ -f "$dir/scripts/flutter_project_analyzer.dart" ]]; then
+    if [[ -f "$dir/scripts/version_manager.dart" ]] || [[ -f "$dir/scripts/build_info_generator.dart" ]]; then
         return 0  
     fi
+    
+    return 1
+}
+
+# Detect scripts directory dynamically
+detect_scripts_directory() {
+    local base_dir="${1:-$(pwd)}"
+    
+    # If SOURCE_DIR is available and has scripts, use it
+    if [[ -n "$SOURCE_DIR" && -d "$SOURCE_DIR/scripts" ]]; then
+        echo "$SOURCE_DIR/scripts"
+        return 0
+    fi
+    
+    # Search in common locations relative to base directory
+    local potential_dirs=(
+        "$base_dir/scripts"
+        "$(dirname "$base_dir")/scripts"
+        "$base_dir/../scripts"
+        "$base_dir/../../scripts"
+    )
+    
+    # Add common development paths
+    if [[ -n "$HOME" ]]; then
+        potential_dirs+=(
+            "$HOME/Development/*/scripts"
+            "$HOME/Projects/*/scripts"
+            "$HOME/workspace/*/scripts"
+        )
+    fi
+    
+    # Search in /Volumes for macOS development setups
+    if [[ -d "/Volumes" ]]; then
+        potential_dirs+=(
+            "/Volumes/*/Development/*/scripts"
+            "/Volumes/*/Projects/*/scripts"
+            "/Volumes/*/*/scripts"
+        )
+    fi
+    
+    # Find first existing directory with required scripts
+    for dir_pattern in "${potential_dirs[@]}"; do
+        # Handle glob patterns
+        for dir in $dir_pattern; do
+            if [[ -d "$dir" ]]; then
+                # Priority 1: New optimized structure (setup.sh + common_functions.sh)
+                if [[ -f "$dir/setup.sh" && -f "$dir/common_functions.sh" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+                # Priority 2: New structure with build_info_generator.dart
+                if [[ -f "$dir/setup.sh" && -f "$dir/build_info_generator.dart" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+                # Priority 3: Legacy compatibility (check for old project structures)
+                # Note: These files may not exist in the source but could exist in target projects
+                if [[ -f "$dir/setup_automated.sh" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+                # Priority 4: Basic scripts with version_manager.dart
+                if [[ -f "$dir/version_manager.dart" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+            fi
+        done
+    done
     
     return 1
 }
@@ -293,8 +379,12 @@ PACKAGE_NAME=""
 GIT_REPO=""
 CURRENT_VERSION=""
 
-# Interactive mode flag
-INTERACTIVE_MODE=false
+# Interactive mode flag - detect based on terminal availability
+if [ -t 0 ] && [ -t 1 ] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]] && [[ "${REMOTE_EXECUTION:-}" != "true" ]]; then
+    INTERACTIVE_MODE=true
+else
+    INTERACTIVE_MODE=false
+fi
 
 # Validation flags
 VALIDATION_REQUIRED=true
@@ -306,114 +396,163 @@ IOS_READY=false
 print_header() {
     echo ""
     echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC} ${ROCKET} ${WHITE}Flutter CI/CD Automated Setup${NC} ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC} ${WHITE}Flutter CI/CD Automated Setup${NC} ${BLUE}║${NC}"
     echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${CYAN}${STAR} $1${NC}"
+    echo -e "${CYAN}$1${NC}"
     echo ""
 }
 
 print_step() {
-    echo -e "${CYAN}${GEAR} $1${NC}"
+    echo -e "${CYAN}$1${NC}"
 }
 
 print_success() {
-    echo -e "${GREEN}${CHECK} $1${NC}"
+    echo -e "${GREEN}✅ $1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}${CROSS} $1${NC}"
+    echo -e "${RED}❌ $1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}${WARNING} $1${NC}"
+    echo -e "${YELLOW}⚠️ $1${NC}"
 }
 
 print_info() {
-    echo -e "${BLUE}${INFO} $1${NC}"
+    echo -e "${BLUE}$1${NC}"
 }
 
 print_separator() {
     echo -e "${GRAY}─────────────────────────────────────────────────────────────────${NC}"
 }
 
-# Check and fix Bundler version issues
-check_and_fix_bundler_version() {
-    print_step "Checking Bundler version compatibility..."
+# Function to prompt user for production version
+prompt_production_version() {
+    local platform="$1"
+    local current_version="$2"
+    local production_version=""
     
-    # Check if Bundler is installed
-    if ! command -v bundle >/dev/null 2>&1; then
-        print_warning "Bundler not found. Installing..."
-        if gem install bundler >/dev/null 2>&1; then
-            print_success "Bundler installed successfully"
+    print_warning "Không thể lấy version từ $platform store"
+    echo -e "${CYAN}${INFO} Version hiện tại trong project: ${WHITE}$current_version${NC}"
+    echo ""
+    
+    while true; do
+        if [[ -t 0 ]]; then
+            read -p "$(echo -e "${YELLOW}Vui lòng nhập version production hiện tại trên $platform store: ${NC}")" production_version
         else
-            print_error "Failed to install Bundler"
-            return 1
+            # For non-interactive mode, use current version as fallback
+            production_version="$current_version"
+            print_info "Chế độ non-interactive: sử dụng version hiện tại ($current_version)"
+            break
         fi
+        
+        if [[ -n "$production_version" ]]; then
+            # Validate version format (basic check)
+            if [[ "$production_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\+[0-9]+)?$ ]]; then
+                break
+            else
+                print_error "Format version không hợp lệ. Vui lòng sử dụng format: x.y.z hoặc x.y.z+build"
+            fi
+        else
+            print_error "Version không được để trống"
+        fi
+    done
+    
+    echo "$production_version"
+}
+
+# Function to save version to changelog
+save_to_changelog() {
+    local version="$1"
+    local platform="$2"
+    local changelog_file="CHANGELOG.md"
+    local temp_file="/tmp/changelog_temp.md"
+    
+    # Create changelog if it doesn't exist
+    if [ ! -f "$changelog_file" ]; then
+        cat > "$changelog_file" << EOF
+# Changelog
+
+Tất cả các thay đổi quan trọng của project sẽ được ghi lại trong file này.
+
+EOF
+        print_success "Đã tạo file changelog mới: $changelog_file"
     fi
     
-    # Get current Bundler version
-    CURRENT_BUNDLER_VERSION=$(bundle --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
-    if [ -z "$CURRENT_BUNDLER_VERSION" ]; then
-        print_warning "Could not determine current Bundler version"
+    # Prepare new entry
+    local date_str=$(date '+%Y-%m-%d %H:%M:%S')
+    local new_entry="## [$version] - $date_str - $platform Release"
+    
+    # Check if this version already exists in changelog
+    if grep -q "## \[$version\]" "$changelog_file"; then
+        print_info "Version $version đã tồn tại trong changelog"
         return 0
     fi
     
-    print_info "Current Bundler version: $CURRENT_BUNDLER_VERSION"
+    # Add new entry to changelog
+    {
+        head -n 3 "$changelog_file"
+        echo ""
+        echo "$new_entry"
+        echo ""
+        echo "### Added"
+        echo "- Production release version $version for $platform"
+        echo ""
+        tail -n +4 "$changelog_file"
+    } > "$temp_file"
     
-    # Check Gemfile.lock files for required Bundler version
-    REQUIRED_VERSION=""
-    GEMFILE_LOCK_PATHS=("$TARGET_DIR/Gemfile.lock" "$TARGET_DIR/android/Gemfile.lock" "$TARGET_DIR/ios/Gemfile.lock")
+    mv "$temp_file" "$changelog_file"
+    print_success "Đã lưu version $version vào changelog cho $platform"
+}
+
+# Function to get production version with fallback to user input
+get_production_version() {
+    local platform="$1"
+    local current_version="$2"
+    local store_version=""
+    local production_version=""
     
-    for GEMFILE_LOCK in "${GEMFILE_LOCK_PATHS[@]}"; do
-        if [ -f "$GEMFILE_LOCK" ]; then
-            BUNDLED_WITH=$(grep -A1 "BUNDLED WITH" "$GEMFILE_LOCK" 2>/dev/null | tail -1 | tr -d ' ')
-            if [ -n "$BUNDLED_WITH" ]; then
-                REQUIRED_VERSION="$BUNDLED_WITH"
-                print_info "Found required Bundler version in $(basename "$(dirname "$GEMFILE_LOCK")"): $REQUIRED_VERSION"
-                break
+    case "$platform" in
+        "Android"|"Google Play")
+            # Try to get from Google Play Store
+            if command -v ruby >/dev/null 2>&1 && [ -f "scripts/google_play_version_checker.rb" ]; then
+                if ruby scripts/google_play_version_checker.rb simple 2>/dev/null; then
+                    if [ -f "/tmp/google_play_version.txt" ]; then
+                        store_version=$(cat /tmp/google_play_version.txt 2>/dev/null | head -1)
+                        if [ -n "$store_version" ] && [ "$store_version" != "unknown" ] && [ "$store_version" != "1.0.0" ]; then
+                            print_success "Đã lấy version từ Google Play Store: $store_version"
+                            production_version="$store_version"
+                        fi
+                    fi
+                fi
             fi
-        fi
-    done
-    
-    # If we found a required version and it's different from current, update
-    if [ -n "$REQUIRED_VERSION" ] && [ "$CURRENT_BUNDLER_VERSION" != "$REQUIRED_VERSION" ]; then
-        print_warning "Bundler version mismatch detected!"
-        print_info "Current: $CURRENT_BUNDLER_VERSION, Required: $REQUIRED_VERSION"
-        print_step "Updating Bundler to version $REQUIRED_VERSION..."
-        
-        if gem install bundler -v "$REQUIRED_VERSION" >/dev/null 2>&1; then
-            print_success "Bundler updated to version $REQUIRED_VERSION"
-            
-            # Verify the update
-            NEW_VERSION=$(bundle --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
-            if [ "$NEW_VERSION" = "$REQUIRED_VERSION" ]; then
-                print_success "Bundler version verified: $NEW_VERSION"
-            else
-                print_warning "Bundler version verification failed. Expected: $REQUIRED_VERSION, Got: $NEW_VERSION"
+            ;;
+        "iOS"|"App Store")
+            # Try to get from App Store
+            if command -v ruby >/dev/null 2>&1 && [ -f "scripts/store_version_checker.rb" ]; then
+                if ruby scripts/store_version_checker.rb simple 2>/dev/null; then
+                    if [ -f "/tmp/app_store_version.txt" ]; then
+                        store_version=$(cat /tmp/app_store_version.txt 2>/dev/null | head -1)
+                        if [ -n "$store_version" ] && [ "$store_version" != "unknown" ] && [ "$store_version" != "1.0.0" ]; then
+                            print_success "Đã lấy version từ App Store: $store_version"
+                            production_version="$store_version"
+                        fi
+                    fi
+                fi
             fi
-        else
-            print_error "Failed to update Bundler to version $REQUIRED_VERSION"
-            return 1
-        fi
-    else
-        print_success "Bundler version is compatible"
+            ;;
+    esac
+    
+    # If couldn't get from store, prompt user
+    if [ -z "$production_version" ]; then
+        production_version=$(prompt_production_version "$platform" "$current_version")
     fi
     
-    # Install gems in directories that have Gemfile
-    for DIR in "$TARGET_DIR" "$TARGET_DIR/android" "$TARGET_DIR/ios"; do
-        if [ -f "$DIR/Gemfile" ]; then
-            print_step "Installing gems in $(basename "$DIR")..."
-            if (cd "$DIR" && bundle install >/dev/null 2>&1); then
-                print_success "Gems installed in $(basename "$DIR")"
-            else
-                print_warning "Failed to install gems in $(basename "$DIR")"
-            fi
-        fi
-    done
-    
-    print_success "Bundler version check completed"
+    echo "$production_version"
 }
+
+
 
 # Auto-sync project.config with iOS fastlane files if config exists
 auto_sync_project_config() {
@@ -468,13 +607,13 @@ auto_sync_project_config() {
             sync_fastfile  
             sync_export_options
             
-            print_success "✅ iOS fastlane files synchronized with project.config"
+            print_success "iOS fastlane files synchronized with project.config"
         else
             print_info "ℹ️  No valid iOS credentials found in project.config, skipping sync"
             print_info "    Update project.config with your TEAM_ID, KEY_ID, ISSUER_ID, APPLE_ID to enable auto-sync"
         fi
     else
-        print_warning "⚠️  Failed to load project.config, skipping auto-sync"
+        print_warning "Failed to load project.config, skipping auto-sync"
     fi
     
     echo ""
@@ -540,7 +679,7 @@ validate_target_directory() {
         for location in "${search_locations[@]}"; do
             if [[ -f "$location/pubspec.yaml" ]]; then
                 print_success "Found pubspec.yaml at: $location"
-                print_info "Try running: cd '$location' && ./scripts/setup_automated.sh ."
+                print_info "Try running: cd '$location' && ./scripts/setup.sh . (recommended) or ./scripts/setup_automated.sh . (legacy)"
             else
                 print_info "Not found in: $location"
             fi
@@ -551,7 +690,7 @@ validate_target_directory() {
         echo "  1. Navigate to your Flutter project root directory"
         echo "  2. Make sure pubspec.yaml exists in the target directory"
         echo "  3. Run: find . -name 'pubspec.yaml' -type f"
-        echo "  4. Use absolute path: ./scripts/setup_automated.sh /full/path/to/project"
+        echo "  4. Use absolute path: ./scripts/setup.sh /full/path/to/project (recommended) or ./scripts/setup_automated.sh /full/path/to/project (legacy)"
         
         exit 1
     fi
@@ -582,11 +721,82 @@ extract_project_info() {
     
     # Extract project name from pubspec.yaml
     PROJECT_NAME=$(grep "^name:" pubspec.yaml | cut -d':' -f2 | tr -d ' ' | tr -d '"')
+    
+    # Ensure PROJECT_NAME has a valid value
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME=$(basename "$TARGET_DIR")
+        print_warning "Could not extract project name from pubspec.yaml, using directory name: $PROJECT_NAME"
+    fi
+    
+    # Final fallback if PROJECT_NAME is still empty
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME="flutter_app"
+        print_warning "Using fallback project name: $PROJECT_NAME"
+    fi
+    
     print_success "Project name: $PROJECT_NAME"
     
-    # Extract version
-    CURRENT_VERSION=$(grep "^version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
-    print_success "Current version: $CURRENT_VERSION"
+    # Extract version - prioritize platform-specific files over pubspec.yaml
+    ANDROID_VERSION=""
+    IOS_VERSION=""
+    PUBSPEC_VERSION=""
+    PRODUCTION_VERSION=""
+    
+    # Try to get Android version from build files
+    if [ -f "android/app/build.gradle.kts" ]; then
+        ANDROID_VERSION=$(grep -E 'versionName\s*=' "android/app/build.gradle.kts" | sed 's/.*versionName = "\([^"]*\)".*/\1/' | head -1)
+        if [ -n "$ANDROID_VERSION" ]; then
+            print_success "Android version (build.gradle.kts): $ANDROID_VERSION"
+        fi
+    fi
+    
+    # Fallback to build.gradle for Android
+    if [ -z "$ANDROID_VERSION" ] && [ -f "android/app/build.gradle" ]; then
+        ANDROID_VERSION=$(grep -E 'versionName\s*' "android/app/build.gradle" | sed 's/.*versionName "\([^"]*\)".*/\1/' | head -1)
+        if [ -n "$ANDROID_VERSION" ]; then
+            print_success "Android version (build.gradle): $ANDROID_VERSION"
+        fi
+    fi
+    
+    # Try to get iOS version from Info.plist
+    if [ -f "ios/Runner/Info.plist" ]; then
+        IOS_VERSION=$(grep -A1 "CFBundleShortVersionString" "ios/Runner/Info.plist" | tail -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | tr -d ' ')
+        if [ -n "$IOS_VERSION" ] && [ "$IOS_VERSION" != "\$(MARKETING_VERSION)" ] && [ "$IOS_VERSION" != "\$(FLUTTER_BUILD_NAME)" ]; then
+            print_success "iOS version (Info.plist): $IOS_VERSION"
+        else
+            IOS_VERSION=""
+        fi
+    fi
+    
+    # Fallback to project.pbxproj for iOS
+    if [ -z "$IOS_VERSION" ] && [ -f "ios/Runner.xcodeproj/project.pbxproj" ]; then
+        IOS_VERSION=$(grep "MARKETING_VERSION" "ios/Runner.xcodeproj/project.pbxproj" | head -1 | sed 's/.*MARKETING_VERSION = \([^;]*\);.*/\1/' | tr -d ' ')
+        if [ -n "$IOS_VERSION" ]; then
+            print_success "iOS version (project.pbxproj): $IOS_VERSION"
+        fi
+    fi
+    
+    # Get pubspec.yaml version as fallback
+    PUBSPEC_VERSION=$(grep "^version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
+    if [ -n "$PUBSPEC_VERSION" ]; then
+        print_info "Pubspec version (fallback): $PUBSPEC_VERSION"
+    fi
+    
+    # Determine current version priority: Android > iOS > Pubspec
+    if [ -n "$ANDROID_VERSION" ]; then
+        CURRENT_VERSION="$ANDROID_VERSION"
+        print_success "Using Android version as current: $CURRENT_VERSION"
+    elif [ -n "$IOS_VERSION" ]; then
+        CURRENT_VERSION="$IOS_VERSION"
+        print_success "Using iOS version as current: $CURRENT_VERSION"
+    elif [ -n "$PUBSPEC_VERSION" ]; then
+        CURRENT_VERSION="$PUBSPEC_VERSION"
+        print_warning "Using pubspec.yaml version as fallback: $CURRENT_VERSION"
+    else
+        print_error "No version found in any platform files"
+        CURRENT_VERSION="1.0.0+1"
+        print_warning "Using default version: $CURRENT_VERSION"
+    fi
     
     # Extract Android package name (try build.gradle.kts first, then AndroidManifest.xml)
     PACKAGE_NAME=""
@@ -617,8 +827,22 @@ extract_project_info() {
     # Final fallback - generate based on project name
     if [ -z "$PACKAGE_NAME" ]; then
         print_warning "Package name not found, generating from project name"
+        
+        # Ensure PROJECT_NAME has a valid value
+        if [[ -z "$PROJECT_NAME" ]]; then
+            PROJECT_NAME=$(basename "$TARGET_DIR")
+            print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+        fi
+        
         # Create package name from project name (clean and lowercase)
         CLEAN_PROJECT=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | sed 's/__*/_/g' | sed 's/^_\|_$//g')
+        
+        # Ensure CLEAN_PROJECT is not empty
+        if [[ -z "$CLEAN_PROJECT" ]]; then
+            CLEAN_PROJECT="flutter_app"
+            print_warning "Using fallback clean project name: $CLEAN_PROJECT"
+        fi
+        
         PACKAGE_NAME="com.${CLEAN_PROJECT}.app"
         print_info "Generated package name: $PACKAGE_NAME"
     fi
@@ -635,6 +859,13 @@ extract_project_info() {
         print_warning "Info.plist not found, using package name as bundle ID"
     fi
     
+    # Final validation - ensure PACKAGE_NAME is not empty
+    if [[ -z "$PACKAGE_NAME" ]]; then
+        print_warning "PACKAGE_NAME is empty, generating fallback"
+        PACKAGE_NAME="com.flutter_app.app"
+        print_info "Using fallback PACKAGE_NAME: $PACKAGE_NAME"
+    fi
+    
     # Get Git repository info
     if git rev-parse --is-inside-work-tree &>/dev/null; then
         GIT_REPO=$(git remote get-url origin 2>/dev/null || echo "")
@@ -647,14 +878,6 @@ extract_project_info() {
         print_warning "Not a Git repository"
     fi
     
-    print_separator
-    print_info "Project Summary:"
-    echo -e "  ${WHITE}• Name:${NC} $PROJECT_NAME"
-    echo -e "  ${WHITE}• Version:${NC} $CURRENT_VERSION"
-    echo -e "  ${WHITE}• Bundle ID:${NC} $BUNDLE_ID"
-    echo -e "  ${WHITE}• Package:${NC} $PACKAGE_NAME"
-    echo -e "  ${WHITE}• Git repo:${NC} ${GIT_REPO:-'None'}"
-    echo ""
 }
 
 # Check GitHub CLI authentication status
@@ -682,7 +905,7 @@ check_github_auth() {
         
         # Check and handle GITHUB_TOKEN environment variable
         if [ -n "$GITHUB_TOKEN" ]; then
-            print_warning "⚠️  GITHUB_TOKEN environment variable detected"
+            print_warning "GITHUB_TOKEN environment variable detected"
             print_info "🧹 Clearing GITHUB_TOKEN to allow interactive authentication..."
             unset GITHUB_TOKEN
             export GITHUB_TOKEN=""
@@ -735,7 +958,7 @@ check_github_auth() {
                         print_success "🔗 GitHub API access verified"
                         return 0
                     else
-                        print_warning "⚠️  Authentication succeeded but API access failed"
+                        print_warning "Authentication succeeded but API access failed"
                         print_info "🔄 Retrying API verification..."
                         sleep 3
                         if env -u GITHUB_TOKEN gh api user >/dev/null 2>&1; then
@@ -952,7 +1175,19 @@ EOF
     print_success "Android Fastfile created and customized"
     
     # Create key.properties template with dynamic project name
+    # Ensure PROJECT_NAME has a valid value
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME=$(basename "$TARGET_DIR")
+        print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+    fi
+    
     CLEAN_PROJECT_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | sed 's/__*/_/g' | sed 's/^_\|_$//g')
+    
+    # Ensure CLEAN_PROJECT_NAME is not empty
+    if [[ -z "$CLEAN_PROJECT_NAME" ]]; then
+        CLEAN_PROJECT_NAME="flutter_app"
+        print_warning "Using fallback clean project name: $CLEAN_PROJECT_NAME"
+    fi
     cat > "$TARGET_DIR/android/key.properties.template" << EOF
 # Android signing configuration template for $PROJECT_NAME
 # Copy this to key.properties and update with your keystore information
@@ -1043,7 +1278,8 @@ ISSUER_ID = "YOUR_ISSUER_ID"
 TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"]
 
 # File paths (relative to fastlane directory)
-KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"
+# Use File.expand_path to ensure absolute path resolution for AuthKey file
+KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)
 CHANGELOG_PATH = "../builder/changelog.txt"
 IPA_OUTPUT_DIR = "../build/ios/ipa"
 # Project-specific paths
@@ -1056,8 +1292,13 @@ platform :ios do
     UI.message("Setting up iOS environment for #{PROJECT_NAME}")
   end
 
-  desc "Build archive and upload to TestFlight with automatic signing"
-  lane :build_and_upload_auto do
+  desc "Build iOS archive for TestFlight"
+  lane :build_archive do
+    build_archive_beta
+  end
+  
+  desc "Build iOS archive for TestFlight (Beta)"
+  lane :build_archive_beta do
     setup_signing
     
     build_app(
@@ -1066,81 +1307,105 @@ platform :ios do
       output_directory: IPA_OUTPUT_DIR,
       xcargs: "-allowProvisioningUpdates",
       export_options: {
-        method: "app-store-connect",
         signingStyle: "automatic",
         teamID: TEAM_ID,
-        signingCertificate: "Apple Distribution",
         compileBitcode: false,
         uploadBitcode: false,
-        uploadSymbols: true,
-        provisioningProfiles: {
-          "\${BUNDLE_ID}" => "AUTO_DETECTED"
-        }
+        uploadSymbols: true
       }
-    )
-    
-    changelog_content = read_changelog
-    
-    upload_to_testflight(
-      changelog: changelog_content,
-      skip_waiting_for_build_processing: true,
-      distribute_external: false,
-      groups: TESTER_GROUPS,
-      notify_external_testers: true
     )
   end
   
-  desc "Build archive and upload to App Store for production release"
-  lane :build_and_upload_production do
+  desc "Build iOS archive for App Store (Production)"
+  lane :build_archive_production do
     setup_signing
     
     build_app(
       scheme: "Runner",
-      export_method: "app-store",
+      export_method: "app-store-connect",
       output_directory: IPA_OUTPUT_DIR,
-      xcargs: "-allowProvisioningUpdates",
-      export_options: {
-        method: "app-store-connect",
-        signingStyle: "automatic",
-        teamID: TEAM_ID,
-        signingCertificate: "Apple Distribution",
-        compileBitcode: false,
-        uploadBitcode: false,
-        uploadSymbols: true,
-        provisioningProfiles: {
-          "\${BUNDLE_ID}" => "AUTO_DETECTED"
-        }
-      }
-    )
-    
-    changelog_content = read_changelog("production")
-    
-    upload_to_testflight(
-      changelog: changelog_content,
-      skip_waiting_for_build_processing: true,
-      distribute_external: false,
-      groups: TESTER_GROUPS,
-      notify_external_testers: false
+      xcargs: "-allowProvisioningUpdates"
     )
   end
   
   desc "Submit a new Beta Build to TestFlight"
   lane :beta do
-    build_and_upload_auto
+    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
+      upload_to_testflight(
+      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+      changelog: read_changelog,
+      skip_waiting_for_build_processing: false,
+      distribute_external: true,
+      groups: TESTER_GROUPS,
+      notify_external_testers: true
+    )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive_beta
+      upload_to_testflight(
+        changelog: read_changelog,
+        skip_waiting_for_build_processing: false,
+        distribute_external: true,
+        groups: TESTER_GROUPS,
+        notify_external_testers: true
+      )
+    end
   end
 
   desc "Submit a new Production Build to App Store"
   lane :release do
-    build_and_upload_production
+    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
+      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
+      upload_to_app_store(
+        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+        force: true,
+        reject_if_possible: true,
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    else
+      UI.message("No existing archive found, building new one...")
+      build_archive_production
+      upload_to_app_store(
+        force: true,
+        reject_if_possible: true,
+        skip_metadata: false,
+        skip_screenshots: false,
+        submit_for_review: false,
+        automatic_release: false
+      )
+    end
   end
 
-  desc "Upload archive to TestFlight"
-  lane :upload_only do
+  desc "Upload existing IPA to TestFlight"
+  lane :upload_testflight do
+    setup_signing
+    
     upload_to_testflight(
-      skip_waiting_for_build_processing: true,
-      distribute_external: false,
-      groups: TESTER_GROUPS,
-      notify_external_testers: true
+        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+        changelog: read_changelog,
+        skip_waiting_for_build_processing: false,
+        distribute_external: true,
+        groups: TESTER_GROUPS,
+        notify_external_testers: true
+      )
+  end
+
+  desc "Upload existing IPA to App Store"
+  lane :upload_appstore do
+    setup_signing
+    
+    upload_to_app_store(
+      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
+      force: true,
+      reject_if_possible: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: false,
+      automatic_release: false
     )
   end
 
@@ -1167,9 +1432,9 @@ platform :ios do
       changelog_content = File.read(CHANGELOG_PATH)
     else
       if mode == "production"
-        changelog_content = "🚀 #{PROJECT_NAME} Production Release\\n\\n• New features and improvements\\n• Performance optimizations\\n• Bug fixes and stability enhancements"
+        changelog_content = "🚀 #{PROJECT_NAME} Production Release\n\n• New features and improvements\n• Performance optimizations\n• Bug fixes and stability enhancements"
       else
-        changelog_content = "🚀 #{PROJECT_NAME} Update\\n\\n• Performance improvements\\n• Bug fixes and stability enhancements\\n• Updated dependencies"
+        changelog_content = "🚀 #{PROJECT_NAME} Update\n\n• Performance improvements\n• Bug fixes and stability enhancements\n• Updated dependencies"
       end
     end
     
@@ -1187,7 +1452,7 @@ EOF
 <plist version="1.0">
 <dict>
     <key>method</key>
-    <string>app-store</string>
+    <string>app-store-connect</string>
     <key>teamID</key>
     <string>YOUR_TEAM_ID</string>
     <key>uploadBitcode</key>
@@ -1230,7 +1495,7 @@ PROJECT_NAME := PROJECT_PLACEHOLDER
 APP_NAME := APP_PLACEHOLDER
 FLUTTER_VERSION := stable
 PACKAGE_NAME := PACKAGE_PLACEHOLDER
-PACKAGE := $(PROJECT_NAME)
+PACKAGE := PACKAGE_PLACEHOLDER
 
 # Version Configuration
 VERSION_FULL := $(shell grep "^version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
@@ -1299,20 +1564,24 @@ menu: ## PROJECT_PLACEHOLDER - Automated Build & Deploy System
 	@printf "$(PURPLE)$(BOLD)Automated Build Pipelines:$(NC)\n"
 	@printf "\n"
 	@printf "$(CYAN)  1)$(NC) $(BOLD)$(YELLOW)🧪 Build App Tester$(NC)     $(GRAY)# Auto: APK + TestFlight (No Git Upload)$(NC)\n"
-	@printf "$(CYAN)  2)$(NC) $(BOLD)$(GREEN)🚀 Build App Live$(NC)       $(GRAY)# Auto: AAB + Production (Optional Git Upload)$(NC)\n"
+	@printf "$(CYAN)  2)$(NC) $(BOLD)$(GREEN)🚀 Build Live (Local)$(NC)    $(GRAY)# Local build + upload, no GitHub Actions$(NC)\n"
+	@printf "$(CYAN)  3)$(NC) $(BOLD)$(BLUE)☁️  Build Live (GitHub)$(NC)   $(GRAY)# Remote build + upload via GitHub Actions$(NC)\n"
+	@printf "$(CYAN)  4)$(NC) $(BOLD)$(MAGENTA)🔄 Build Live (Hybrid)$(NC)    $(GRAY)# Local build + GitHub Actions upload$(NC)\n"
 	@printf "\n"
 	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
 	@printf "$(PURPLE)$(BOLD)Advanced Options:$(NC)\n"
-	@printf "$(CYAN)  3)$(NC) $(WHITE)⚙️  Manual Operations$(NC)    $(GRAY)# Version, Changelog, Deploy, Setup...$(NC)\n"
+	@printf "$(CYAN)  5)$(NC) $(WHITE)⚙️  Manual Operations$(NC)    $(GRAY)# Version, Changelog, Deploy, Setup...$(NC)\n"
 	@printf "\n"
 	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
-	@printf "$(WHITE)Enter your choice [1-3]:$(NC) "
+	@printf "$(WHITE)Enter your choice [1-5]:$(NC) "
 	@read -p "" CHOICE; \
 	case $$CHOICE in \
 		1) $(MAKE) auto-build-tester ;; \
-		2) $(MAKE) auto-build-live ;; \
-		3) $(MAKE) manual-operations ;; \
-		*) printf "$(RED)Invalid choice. Please select 1-3.$(NC)\n" ;; \
+		2) $(MAKE) auto-build-live-local ;; \
+		3) $(MAKE) auto-build-live-github ;; \
+		4) $(MAKE) auto-build-live ;; \
+		5) $(MAKE) manual-operations ;; \
+		*) printf "$(RED)Invalid choice. Please select 1-5.$(NC)\n" ;; \
 	esac
 
 tester: auto-build-tester ## 🧪 Alias for auto-build-tester
@@ -1352,15 +1621,22 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 		exit 1; \
 	fi
 	
-	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Syncing version with store..."
-	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/version_manager.dart smart-bump auto 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version synced with store"; \
-		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Version sync failed - continuing with current version"; \
-		fi; \
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking Google Play Store version..."
+	@ANDROID_PRODUCTION_VERSION=$$(get_production_version "Google Play" "$(CURRENT_VERSION)"); \
+	if [ -n "$$ANDROID_PRODUCTION_VERSION" ]; then \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Google Play production version: $$ANDROID_PRODUCTION_VERSION"; \
+		save_to_changelog "$$ANDROID_PRODUCTION_VERSION" "Android"; \
 	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping version sync"; \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Could not determine Google Play production version"; \
+	fi
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking iOS App Store version..."
+	@IOS_PRODUCTION_VERSION=$$(get_production_version "App Store" "$(CURRENT_VERSION)"); \
+	if [ -n "$$IOS_PRODUCTION_VERSION" ]; then \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "App Store production version: $$IOS_PRODUCTION_VERSION"; \
+		save_to_changelog "$$IOS_PRODUCTION_VERSION" "iOS"; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Could not determine App Store production version"; \
 	fi
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
@@ -1406,7 +1682,7 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 				if [ -f "fastlane/ExportOptions.plist" ]; then \
 					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
 				else \
-					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
 				fi; \
 				IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
@@ -1415,7 +1691,16 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to TestFlight..."; \
 					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
-						if fastlane ios beta 2>/dev/null; then \
+						if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+							if bundle exec fastlane ios beta 2>/dev/null; then \
+								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight via bundle"; \
+							elif fastlane ios beta 2>/dev/null; then \
+								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight"; \
+							else \
+								printf "$(YELLOW)$(WARNING) %s$(NC)\n" "TestFlight upload failed - check fastlane configuration"; \
+								printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && bundle exec fastlane ios beta"; \
+							fi; \
+						elif fastlane ios beta 2>/dev/null; then \
 							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight"; \
 						else \
 							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "TestFlight upload failed - check fastlane configuration"; \
@@ -1443,9 +1728,11 @@ auto-build-tester: ## 🧪 Automated Tester Build Pipeline (No Git Upload)
 		printf "$(WHITE)🍎 iOS IPA:$(NC) $(OUTPUT_DIR)/$(IPA_NAME)\n"; \
 	fi
 
-live: auto-build-live ## 🚀 Alias for auto-build-live
+live: auto-build-live ## 🚀 Alias for auto-build-live (Hybrid)
+live-local: auto-build-live-local ## 🚀 Alias for auto-build-live-local
+live-github: auto-build-live-github ## ☁️ Alias for auto-build-live-github
 
-auto-build-live: ## 🚀 Automated Live Production Pipeline
+auto-build-live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 	@printf "\n"
 	@printf "$(CYAN)🌟 Building for Production$(NC)\n"
 	@printf "\n"
@@ -1534,7 +1821,7 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 				if [ -f "fastlane/ExportOptions.plist" ]; then \
 				xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
 				else \
-					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
 				fi; \
 				IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
@@ -1543,7 +1830,16 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
 					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
-						if fastlane ios release 2>/dev/null; then \
+						if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+							if bundle exec fastlane ios release 2>/dev/null; then \
+								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store via bundle"; \
+							elif fastlane ios release 2>/dev/null; then \
+								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
+							else \
+								printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
+								printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && bundle exec fastlane ios release"; \
+							fi; \
+						elif fastlane ios release 2>/dev/null; then \
 							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
 						else \
 							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
@@ -1574,6 +1870,227 @@ auto-build-live: ## 🚀 Automated Live Production Pipeline
 	@printf "\n"
 	@printf "$(CYAN)🚀 Triggering GitHub Actions for Store Upload...$(NC)\n"
 	@$(MAKE) trigger-github-actions
+
+auto-build-live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
+	@printf "\n"
+	@printf "$(CYAN)🌟 Building for Production (Local Upload)$(NC)\n"
+	@printf "\n"
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Checking dependencies..."
+	@if command -v ruby >/dev/null 2>&1 && command -v gem >/dev/null 2>&1; then \
+		if ! command -v bundle >/dev/null 2>&1; then \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler not found. Installing..."; \
+			if gem install bundler 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Bundler installed successfully"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundler install failed - continuing without gems"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: gem install bundler"; \
+			fi; \
+		fi; \
+		if [ -f "Gemfile" ] && command -v bundle >/dev/null 2>&1; then \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Installing Ruby gems..."; \
+			if bundle install 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Ruby gems installed"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Bundle install failed - continuing without gems"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual fix: bundle install"; \
+			fi; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Ruby/Gems not found - skipping gem dependencies"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Install Ruby if you need Fastlane functionality"; \
+	fi
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Starting system configuration check..."
+	@$(MAKE) system-check
+	@if [ $$? -ne 0 ]; then \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "System configuration failed! Please fix issues above."; \
+		exit 1; \
+	fi
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Syncing version with store..."
+	@if command -v dart >/dev/null 2>&1; then \
+		if dart scripts/version_manager.dart smart-bump auto 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version synced with store"; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Version sync failed - continuing with current version"; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping version sync"; \
+	fi
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating Builder Directory"
+	@mkdir -p $(OUTPUT_DIR)
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Builder directory ready"
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
+	@if command -v dart >/dev/null 2>&1; then \
+		if dart scripts/build_info_generator.dart 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Build information generated"; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Build info generation failed - continuing"; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Dart not found - skipping build info generation"; \
+	fi
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building Android AAB for Google Play Production"
+	@flutter clean && flutter pub get
+	@flutter build appbundle --release
+	@if [ -f "build/app/outputs/bundle/release/app-release.aab" ]; then \
+		AAB_SIZE=$$(du -h "build/app/outputs/bundle/release/app-release.aab" | awk '{print $$1}'); \
+		printf "$(GREEN)$(CHECK) %s ($$AAB_SIZE)$(NC)\n" "Android AAB built successfully"; \
+		cp "build/app/outputs/bundle/release/app-release.aab" "$(OUTPUT_DIR)/$(AAB_NAME)"; \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "AAB copied to $(OUTPUT_DIR)/$(AAB_NAME)"; \
+		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading Android AAB to Google Play..."; \
+		if command -v fastlane >/dev/null 2>&1 && [ -f "android/fastlane/Fastfile" ]; then \
+			cd android; \
+			if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+				if bundle exec fastlane android release 2>/dev/null; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to Google Play via bundle"; \
+				elif fastlane android release 2>/dev/null; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to Google Play"; \
+				else \
+					printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Google Play upload failed - check fastlane configuration"; \
+					printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: cd android && bundle exec fastlane android release"; \
+				fi; \
+			elif fastlane android release 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to Google Play"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Google Play upload failed - check fastlane configuration"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: cd android && fastlane android release"; \
+			fi; \
+			cd ..; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - manual Google Play upload required"; \
+			printf "$(CYAN)$(INFO) %s$(NC)\n" "Upload manually: Use Google Play Console"; \
+			printf "$(CYAN)$(INFO) %s$(NC)\n" "AAB location: $(OUTPUT_DIR)/$(AAB_NAME)"; \
+		fi; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "Android AAB build failed"; \
+		exit 1; \
+	fi
+	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building iOS for App Store"
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		flutter build ios --release; \
+		if [ $$? -eq 0 ]; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
+			mkdir -p build/ios/archive build/ios/ipa; \
+			cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
+			if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
+				cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
+				printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting Production IPA from Archive..."; \
+				if [ -f "fastlane/ExportOptions.plist" ]; then \
+				xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
+				else \
+					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store-connect</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+				fi; \
+				IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
+					cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
+					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
+						if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
+							if bundle exec fastlane ios release 2>/dev/null; then \
+								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store via bundle"; \
+							elif fastlane ios release 2>/dev/null; then \
+								printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
+							else \
+								printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
+								printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && bundle exec fastlane ios release"; \
+							fi; \
+						elif fastlane ios release 2>/dev/null; then \
+							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store"; \
+						else \
+							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "App Store upload failed - check fastlane configuration"; \
+							printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual upload: Use Xcode or: cd ios && fastlane ios release"; \
+						fi; \
+					else \
+						printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - manual App Store upload required"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "Upload manually: Use Xcode Organizer or Transporter app"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					fi; \
+				else \
+					printf "$(RED)$(CROSS) %s$(NC)\n" "Production IPA export failed"; \
+				fi; \
+			fi; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "iOS build skipped (requires macOS)"; \
+	fi
+	
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production build completed"
+	@printf "$(GREEN)🚀 Live Production Pipeline (Local) Completed!$(NC)\n"
+	@printf "$(WHITE)📁 Builder Directory:$(NC) $(OUTPUT_DIR)/\n"
+	@printf "$(WHITE)📦 Android AAB:$(NC) $(OUTPUT_DIR)/$(AAB_NAME)\n"
+	@if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$(IPA_PROD_NAME)" ]; then \
+		printf "$(WHITE)🍎 iOS Production IPA:$(NC) $(OUTPUT_DIR)/$(IPA_PROD_NAME)\n"; \
+	fi
+	
+	@printf "\n"
+	@printf "$(CYAN)📝 Creating Git tag for version tracking...$(NC)\n"
+	@VERSION=$$(grep "version:" pubspec.yaml | cut -d' ' -f2 | tr -d ' '); \
+	if [ -z "$$VERSION" ]; then \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract version from pubspec.yaml"; \
+		exit 1; \
+	fi; \
+	printf "$(CYAN)$(INFO) %s$(NC)\n" "Extracted version: $$VERSION"; \
+	TAG_NAME="v$$VERSION"; \
+	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
+	if git tag -a "$$TAG_NAME" -m "Local build and upload completed - Apps already deployed via Fastlane" 2>/dev/null; then \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \
+		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Pushing git tag to remote..."; \
+		if git push origin "$$TAG_NAME" 2>/dev/null; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag pushed successfully"; \
+			printf "$(CYAN)$(INFO) %s$(NC)\n" "Apps uploaded directly via Fastlane - no GitHub Actions triggered"; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git push failed - tag created locally only"; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git tag already exists or failed to create"; \
+	fi
+
+auto-build-live-github: ## ☁️ Automated Live Production Pipeline (GitHub Only)
+	@printf "\n"
+	@printf "$(CYAN)☁️ Triggering GitHub Actions for Production Build$(NC)\n"
+	@printf "\n"
+	@VERSION=$$(grep "version:" pubspec.yaml | cut -d' ' -f2 | tr -d ' '); \
+	if [ -z "$$VERSION" ]; then \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract version from pubspec.yaml"; \
+		exit 1; \
+	fi; \
+	printf "$(CYAN)$(INFO) %s$(NC)\n" "Extracted version: $$VERSION"; \
+	TAG_NAME="v$$VERSION"; \
+	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
+	if git tag -a "$$TAG_NAME" -m "🚀 Production release $$VERSION" 2>/dev/null; then \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git tag already exists or failed to create"; \
+	fi; \
+	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Pushing git tag to remote..."; \
+	if git push origin "$$TAG_NAME" 2>/dev/null; then \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag pushed successfully"; \
+		printf "$(CYAN)$(GEAR) %s$(NC)\n" "GitHub Actions triggered by tag push"; \
+		printf "$(GREEN)$(ROCKET) %s$(NC)\n" "Monitor deployment: https://github.com/$$(git remote get-url origin | sed 's/.*github.com[:/]\([^.]*\).*/\1/')/actions"; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git push failed - trying GitHub API trigger..."; \
+		if command -v gh >/dev/null 2>&1; then \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Using GitHub CLI to trigger workflow..."; \
+			if gh workflow run deploy.yml --field environment=production --field platforms=all 2>/dev/null; then \
+				printf "$(GREEN)$(CHECK) %s$(NC)\n" "GitHub Actions triggered via API"; \
+				printf "$(GREEN)$(ROCKET) %s$(NC)\n" "Monitor deployment: gh run list --workflow=deploy.yml"; \
+			else \
+				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "GitHub CLI trigger failed"; \
+				printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual trigger: Go to GitHub → Actions → Run workflow"; \
+			fi; \
+		else \
+			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "GitHub CLI not found"; \
+			printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual trigger: Go to GitHub → Actions → Run workflow"; \
+		fi; \
+	fi
 
 trigger-github-actions: ## 🚀 Trigger GitHub Actions CI/CD (Tag Push + API)
 	@printf "\n"
@@ -1759,23 +2276,25 @@ manual-operations: ## ⚙️ Manual Operations Menu
 	@printf "$(PURPLE)$(BOLD)Available Manual Operations:$(NC)\n"
 	@printf "\n"
 	@printf "$(CYAN)  1)$(NC) $(WHITE)🔨 Build Management$(NC)        $(GRAY)# Interactive builds$(NC)\n"
-	@printf "$(CYAN)  2)$(NC) $(WHITE)🚀 Trigger GitHub Actions$(NC)  $(GRAY)# Git tag + CI/CD trigger$(NC)\n"
-	@printf "$(CYAN)  3)$(NC) $(WHITE)⚙️  Environment Setup$(NC)       $(GRAY)# Configure development environment$(NC)\n"
-	@printf "$(CYAN)  4)$(NC) $(WHITE)🧹 Clean & Reset$(NC)           $(GRAY)# Clean build artifacts$(NC)\n"
-	@printf "$(CYAN)  5)$(NC) $(WHITE)🔍 System Check$(NC)            $(GRAY)# Verify configuration$(NC)\n"
-	@printf "$(CYAN)  6)$(NC) $(WHITE)⬅️  Back to Main Menu$(NC)       $(GRAY)# Return to automated pipelines$(NC)\n"
+	@printf "$(CYAN)  2)$(NC) $(WHITE)📋 Version Management$(NC)      $(GRAY)# Version sync, validation, tagging$(NC)\n"
+	@printf "$(CYAN)  3)$(NC) $(WHITE)🚀 Trigger GitHub Actions$(NC)  $(GRAY)# Git tag + CI/CD trigger$(NC)\n"
+	@printf "$(CYAN)  4)$(NC) $(WHITE)⚙️  Environment Setup$(NC)       $(GRAY)# Configure development environment$(NC)\n"
+	@printf "$(CYAN)  5)$(NC) $(WHITE)🧹 Clean & Reset$(NC)           $(GRAY)# Clean build artifacts$(NC)\n"
+	@printf "$(CYAN)  6)$(NC) $(WHITE)🔍 System Check$(NC)            $(GRAY)# Verify configuration$(NC)\n"
+	@printf "$(CYAN)  7)$(NC) $(WHITE)⬅️  Back to Main Menu$(NC)       $(GRAY)# Return to automated pipelines$(NC)\n"
 	@printf "\n"
 	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
-	@printf "$(WHITE)Enter your choice [1-6]:$(NC) "
+	@printf "$(WHITE)Enter your choice [1-7]:$(NC) "
 	@read -p "" CHOICE; \
 	case $$CHOICE in \
 		1) $(MAKE) build-management-menu ;; \
-		2) $(MAKE) trigger-github-actions ;; \
-		3) $(MAKE) setup ;; \
-		4) $(MAKE) clean ;; \
-		5) $(MAKE) system-check ;; \
-		6) $(MAKE) menu ;; \
-		*) printf "$(RED)Invalid choice. Please select 1-6.$(NC)\n" ;; \
+		2) $(MAKE) version-management-menu ;; \
+		3) $(MAKE) trigger-github-actions ;; \
+		4) $(MAKE) setup ;; \
+		5) $(MAKE) clean ;; \
+		6) $(MAKE) system-check ;; \
+		7) $(MAKE) menu ;; \
+		*) printf "$(RED)Invalid choice. Please select 1-7.$(NC)\n" ;; \
 	esac
 
 build-management-menu: ## 🔨 Build Management Menu
@@ -1801,6 +2320,145 @@ build-management-menu: ## 🔨 Build Management Menu
 		4) $(MAKE) manual-operations ;; \
 		*) printf "$(RED)Invalid choice. Please select 1-4.$(NC)\n" ;; \
 	esac
+
+version-management-menu: ## 📋 Version Management Menu
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(SPARKLES) $(WHITE)Version Management & Synchronization$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@printf "$(PURPLE)$(BOLD)Version Operations:$(NC)\n"
+	@printf "\n"
+	@printf "$(CYAN)  1)$(NC) $(WHITE)📊 Show Current Versions$(NC)    $(GRAY)# Display all platform versions$(NC)\n"
+	@printf "$(CYAN)  2)$(NC) $(WHITE)🔄 Sync Versions$(NC)           $(GRAY)# Synchronize across platforms$(NC)\n"
+	@printf "$(CYAN)  3)$(NC) $(WHITE)🔍 Validate Versions$(NC)       $(GRAY)# Check store conflicts$(NC)\n"
+	@printf "$(CYAN)  4)$(NC) $(WHITE)🚀 Bump Version$(NC)            $(GRAY)# Increment version numbers$(NC)\n"
+	@printf "$(CYAN)  5)$(NC) $(WHITE)🏷️  Generate Tag$(NC)            $(GRAY)# Create deployment tag$(NC)\n"
+	@printf "$(CYAN)  6)$(NC) $(WHITE)🔧 Auto-Fix Issues$(NC)         $(GRAY)# Automatically resolve conflicts$(NC)\n"
+	@printf "$(CYAN)  7)$(NC) $(WHITE)⬅️  Back to Manual Operations$(NC) $(GRAY)# Return to previous menu$(NC)\n"
+	@printf "\n"
+	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
+	@printf "$(WHITE)Enter your choice [1-7]:$(NC) "
+	@read -p "" CHOICE; \
+	case $$CHOICE in \
+		1) $(MAKE) version-show ;; \
+		2) $(MAKE) version-sync ;; \
+		3) $(MAKE) version-validate ;; \
+		4) $(MAKE) version-bump ;; \
+		5) $(MAKE) version-tag ;; \
+		6) $(MAKE) version-autofix ;; \
+		7) $(MAKE) manual-operations ;; \
+		*) printf "$(RED)Invalid choice. Please select 1-7.$(NC)\n" ;; \
+	esac
+
+version-show: ## 📊 Show current versions across all platforms
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(INFO) $(WHITE)Current Version Information$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/version_manager.dart" ]; then \
+		dart scripts/version_manager.dart show; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "version_manager.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
+
+version-sync: ## 🔄 Synchronize versions across platforms
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(GEAR) $(WHITE)Version Synchronization$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/version_sync.dart" ]; then \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Checking current synchronization status..."; \
+		dart scripts/version_sync.dart status; \
+		printf "\n$(YELLOW)$(WARNING) %s$(NC) " "Sync all platforms to pubspec.yaml version? [y/N]:"; \
+		read -p "" CONFIRM; \
+		if [ "$$CONFIRM" = "y" ] || [ "$$CONFIRM" = "Y" ]; then \
+			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Synchronizing versions..."; \
+			dart scripts/version_sync.dart sync pubspec; \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version synchronization completed"; \
+		else \
+			printf "$(GRAY)$(INFO) %s$(NC)\n" "Synchronization cancelled"; \
+		fi; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "version_sync.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
+
+version-validate: ## 🔍 Validate versions against store versions
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(SHIELD) $(WHITE)Version Validation$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/version_manager.dart" ]; then \
+		dart scripts/version_manager.dart validate; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "version_manager.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
+
+version-bump: ## 🚀 Bump version numbers
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(ROCKET) $(WHITE)Version Bump$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/version_manager.dart" ]; then \
+		printf "$(PURPLE)$(BOLD)Bump Options:$(NC)\n"; \
+		printf "$(CYAN)  1)$(NC) $(WHITE)Major$(NC)   $(GRAY)# 1.0.0 → 2.0.0$(NC)\n"; \
+		printf "$(CYAN)  2)$(NC) $(WHITE)Minor$(NC)   $(GRAY)# 1.0.0 → 1.1.0$(NC)\n"; \
+		printf "$(CYAN)  3)$(NC) $(WHITE)Patch$(NC)   $(GRAY)# 1.0.0 → 1.0.1$(NC)\n"; \
+		printf "$(CYAN)  4)$(NC) $(WHITE)Build$(NC)   $(GRAY)# 1.0.0+1 → 1.0.0+2$(NC)\n"; \
+		printf "$(CYAN)  5)$(NC) $(WHITE)Auto$(NC)    $(GRAY)# Smart bump based on store$(NC)\n"; \
+		printf "\n$(WHITE)Select bump type [1-5]:$(NC) "; \
+		read -p "" BUMP_TYPE; \
+		case $$BUMP_TYPE in \
+			1) dart scripts/version_manager.dart bump major ;; \
+			2) dart scripts/version_manager.dart bump minor ;; \
+			3) dart scripts/version_manager.dart bump patch ;; \
+			4) dart scripts/version_manager.dart bump build ;; \
+			5) dart scripts/version_manager.dart bump auto ;; \
+			*) printf "$(RED)Invalid choice. Please select 1-5.$(NC)\n" ;; \
+		esac; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "version_manager.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
+
+version-tag: ## 🏷️ Generate deployment tag
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(STAR) $(WHITE)Generate Deployment Tag$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/tag_generator.dart" ]; then \
+		dart scripts/tag_generator.dart; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "tag_generator.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
+
+version-autofix: ## 🔧 Auto-fix version conflicts
+	@printf "\n"
+	@printf "$(BLUE)╔══════════════════════════════════════════════════════════════╗$(NC)\n"
+	@printf "$(BLUE)║$(NC) $(WRENCH) $(WHITE)Auto-Fix Version Issues$(NC) $(BLUE)║$(NC)\n"
+	@printf "$(BLUE)╚══════════════════════════════════════════════════════════════╝$(NC)\n"
+	@printf "\n"
+	@if [ -f "scripts/version_manager.dart" ]; then \
+		printf "$(YELLOW)$(WARNING) %s$(NC) " "This will automatically fix version conflicts. Continue? [y/N]:"; \
+		read -p "" CONFIRM; \
+		if [ "$$CONFIRM" = "y" ] || [ "$$CONFIRM" = "Y" ]; then \
+			dart scripts/version_manager.dart auto-fix; \
+		else \
+			printf "$(GRAY)$(INFO) %s$(NC)\n" "Auto-fix cancelled"; \
+		fi; \
+	else \
+		printf "$(RED)$(CROSS) %s$(NC)\n" "version_manager.dart not found"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "Run 'make setup' to install version management tools"; \
+	fi
 
 build-android-apk: ## Build Android APK for testing
 	@printf "\n"
@@ -1938,23 +2596,76 @@ create_makefile() {
         create_comprehensive_makefile
     fi
     
+    # Ensure PROJECT_NAME has a valid value before replacement
+    if [[ -z "$PROJECT_NAME" ]]; then
+        # Try to extract from pubspec.yaml again
+        if [[ -f "$TARGET_DIR/pubspec.yaml" ]]; then
+            PROJECT_NAME=$(grep "^name:" "$TARGET_DIR/pubspec.yaml" | cut -d':' -f2 | tr -d ' ' | tr -d '"')
+        fi
+        
+        # If still empty, use directory name as fallback
+        if [[ -z "$PROJECT_NAME" ]]; then
+            PROJECT_NAME=$(basename "$TARGET_DIR")
+            print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+        fi
+    fi
+    
+    # Ensure PACKAGE_NAME has a valid value
+    if [[ -z "$PACKAGE_NAME" ]]; then
+        print_warning "PACKAGE_NAME is empty, generating fallback"
+        PACKAGE_NAME="com.flutter_app.app"
+        print_info "Using fallback PACKAGE_NAME: $PACKAGE_NAME"
+    fi
+    
+    # Create safe package name (lowercase, no spaces, no special chars)
+    SAFE_PACKAGE_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | sed 's/[^a-z0-9-]//g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
+    
+    # Ensure we have a valid package name
+    if [[ -z "$SAFE_PACKAGE_NAME" ]]; then
+        SAFE_PACKAGE_NAME="flutter-app"
+        print_warning "Using fallback package name: $SAFE_PACKAGE_NAME"
+    fi
+    
+    print_info "Using PROJECT_NAME: $PROJECT_NAME"
+    print_info "Using PACKAGE_NAME: $PACKAGE_NAME"
+    print_info "Using SAFE_PACKAGE_NAME: $SAFE_PACKAGE_NAME"
+    
+    # Verify Makefile exists before customization
+    if [[ ! -f "$TARGET_DIR/Makefile" ]]; then
+        print_error "Makefile not found at $TARGET_DIR/Makefile"
+        return 1
+    fi
+    
+    # Show current PACKAGE value in Makefile before replacement
+    if grep -q "PACKAGE := PACKAGE_PLACEHOLDER" "$TARGET_DIR/Makefile"; then
+        print_info "Found PACKAGE_PLACEHOLDER in Makefile, replacing with: $SAFE_PACKAGE_NAME"
+    else
+        print_warning "PACKAGE_PLACEHOLDER not found in Makefile"
+    fi
+    
     # Customize Makefile with project-specific values
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s/PROJECT_NAME := TrackAsia Live/PROJECT_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i '' "s/PROJECT_NAME := PROJECT_PLACEHOLDER/PROJECT_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i '' "s/PACKAGE_NAME := com.trackasia.live/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
         sed -i '' "s/PACKAGE_NAME := PACKAGE_PLACEHOLDER/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i '' "s/APP_NAME := trackasiamap/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i '' "s/APP_NAME := APP_PLACEHOLDER/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i '' "s/PACKAGE := TrackAsia-Live/PACKAGE := $(echo "$PROJECT_NAME" | tr ' ' '-')/g" "$TARGET_DIR/Makefile"
+        sed -i '' "s/PACKAGE := PACKAGE_PLACEHOLDER/PACKAGE := $SAFE_PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
     else
-        sed -i "s/PROJECT_NAME := TrackAsia Live/PROJECT_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i "s/PROJECT_NAME := PROJECT_PLACEHOLDER/PROJECT_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i "s/PACKAGE_NAME := com.trackasia.live/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
         sed -i "s/PACKAGE_NAME := PACKAGE_PLACEHOLDER/PACKAGE_NAME := $PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i "s/APP_NAME := trackasiamap/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
         sed -i "s/APP_NAME := APP_PLACEHOLDER/APP_NAME := $PROJECT_NAME/g" "$TARGET_DIR/Makefile"
-        sed -i "s/PACKAGE := TrackAsia-Live/PACKAGE := $(echo "$PROJECT_NAME" | tr ' ' '-')/g" "$TARGET_DIR/Makefile"
+        sed -i "s/PACKAGE := PACKAGE_PLACEHOLDER/PACKAGE := $SAFE_PACKAGE_NAME/g" "$TARGET_DIR/Makefile"
+    fi
+    
+    # Verify replacement was successful
+    if grep -q "PACKAGE := PACKAGE_PLACEHOLDER" "$TARGET_DIR/Makefile"; then
+        print_error "Failed to replace PACKAGE_PLACEHOLDER in Makefile!"
+        print_info "Current PACKAGE line in Makefile:"
+        grep "PACKAGE :=" "$TARGET_DIR/Makefile" || echo "No PACKAGE line found"
+        return 1
+    else
+        print_success "Successfully replaced PACKAGE_PLACEHOLDER with: $SAFE_PACKAGE_NAME"
+        print_info "Current PACKAGE line in Makefile:"
+        grep "PACKAGE :=" "$TARGET_DIR/Makefile" || echo "No PACKAGE line found"
     fi
     
     print_success "Customized Makefile created"
@@ -2315,13 +3026,121 @@ EOF
     echo ""
 }
 
+# Create inline setup scripts when no local scripts are found
+create_inline_setup_scripts() {
+    print_step "Creating basic setup.sh script..."
+    
+    # Create a basic setup.sh script
+    cat > "$TARGET_DIR/scripts/setup.sh" << 'EOF'
+#!/bin/bash
+
+# Basic setup script for Flutter project automation
+# This script was auto-generated by the App Auto Deployment Kit
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+
+
+# Main setup function
+main() {
+    print_info "Basic Flutter project setup"
+    print_step "Setting up project structure..."
+    
+    # Ensure basic directories exist
+    mkdir -p android/fastlane
+    mkdir -p ios/fastlane
+    mkdir -p .github/workflows
+    
+    print_success "Basic setup completed!"
+    print_info "For full automation features, please run the complete setup from:"
+    print_info "curl -fsSL https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/setup_automated_remote.sh | bash"
+}
+
+# Execute main function
+main "$@"
+EOF
+
+    chmod +x "$TARGET_DIR/scripts/setup.sh"
+    print_success "Created basic setup.sh script"
+    
+    # Create a basic common_functions.sh
+    print_step "Creating common_functions.sh script..."
+    cat > "$TARGET_DIR/scripts/common_functions.sh" << 'EOF'
+#!/bin/bash
+
+# Common functions for Flutter project automation
+# This script was auto-generated by the App Auto Deployment Kit
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Print functions
+print_info() {
+    echo -e "${BLUE}$1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️ $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+print_step() {
+    echo -e "${BLUE}$1${NC}"
+}
+
+print_header() {
+    echo ""
+    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC} $1 ${BLUE}║${NC}"
+    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+# Basic project detection
+detect_project_type() {
+    if [ -f "pubspec.yaml" ]; then
+        echo "flutter"
+    elif [ -f "package.json" ]; then
+        echo "node"
+    elif [ -f "Gemfile" ]; then
+        echo "ruby"
+    else
+        echo "unknown"
+    fi
+}
+
+# Export functions for use in other scripts
+export -f print_info print_success print_warning print_error print_step print_header detect_project_type
+EOF
+
+    print_success "Created common_functions.sh script"
+}
+
 # Create project configuration with user confirmation
 create_project_config() {
     print_header "Project Configuration Setup"
     
     # Check if config file already exists
     if [ -f "$TARGET_DIR/project.config" ]; then
-        print_warning "⚠️  project.config already exists!"
+        print_warning "project.config already exists!"
         echo ""
         echo "📄 Current config file found at: project.config"
         echo ""
@@ -2479,51 +3298,140 @@ copy_automation_scripts() {
     # Create scripts directory if it doesn't exist
     mkdir -p "$TARGET_DIR/scripts"
     
-    # Copy or create setup_automated.sh if source is available
-    if [[ -n "$SOURCE_DIR" && -f "$SOURCE_DIR/scripts/setup_automated.sh" && "$SOURCE_DIR" != "$TARGET_DIR" ]]; then
-        print_step "Copying setup_automated.sh from source..."
-        cp "$SOURCE_DIR/scripts/setup_automated.sh" "$TARGET_DIR/scripts/"
-        print_success "Copied setup_automated.sh from: $SOURCE_DIR/scripts/"
+    # Copy or create optimized setup scripts if source is available
+    if [[ -n "$SOURCE_DIR" && -f "$SOURCE_DIR/scripts/setup.sh" && "$SOURCE_DIR" != "$TARGET_DIR" ]]; then
+        print_step "Copying optimized setup scripts from source..."
+        cp "$SOURCE_DIR/scripts/setup.sh" "$TARGET_DIR/scripts/" 2>/dev/null || true
+        cp "$SOURCE_DIR/scripts/common_functions.sh" "$TARGET_DIR/scripts/" 2>/dev/null || true
+        print_success "Copied optimized scripts from: $SOURCE_DIR/scripts/"
+    elif [[ -n "$SOURCE_DIR" && -f "$SOURCE_DIR/scripts/setup_automated.sh" && "$SOURCE_DIR" != "$TARGET_DIR" ]]; then
+        print_step "Copying legacy setup script from source..."
+        cp "$SOURCE_DIR/scripts/setup_automated.sh" "$TARGET_DIR/scripts/" 2>/dev/null || true
+        print_success "Copied legacy script from: $SOURCE_DIR/scripts/"
     else
-        print_step "Downloading setup_automated.sh from remote repository..."
-        # Download setup_automated.sh from GitHub
-        if command -v curl >/dev/null 2>&1; then
-            if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/setup_automated.sh" -o "$TARGET_DIR/scripts/setup_automated.sh"; then
-                print_success "Downloaded setup_automated.sh from remote repository"
-            else
-                print_error "Failed to download setup_automated.sh from remote repository"
-                return 1
+        # Try to use local scripts from the project repository
+        local local_scripts_dir
+        local_scripts_dir=$(detect_scripts_directory "$TARGET_DIR")
+        local local_scripts_found=false
+        
+        if [[ -d "$local_scripts_dir" ]]; then
+            print_step "Checking for local setup scripts in project repository..."
+            # Copy optimized scripts from local repository
+            if [[ -f "$local_scripts_dir/setup.sh" ]] && [[ -f "$local_scripts_dir/common_functions.sh" ]]; then
+                cp "$local_scripts_dir/setup.sh" "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
+                cp "$local_scripts_dir/common_functions.sh" "$TARGET_DIR/scripts/common_functions.sh" 2>/dev/null || true
+                print_success "Copied optimized setup scripts from local repository"
+                chmod +x "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
+                local_scripts_found=true
+            # Fallback to setup.sh with build_info_generator.dart
+            elif [[ -f "$local_scripts_dir/setup.sh" ]] && [[ -f "$local_scripts_dir/build_info_generator.dart" ]]; then
+                cp "$local_scripts_dir/setup.sh" "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
+                cp "$local_scripts_dir/build_info_generator.dart" "$TARGET_DIR/scripts/build_info_generator.dart" 2>/dev/null || true
+                print_success "Copied setup script with build generator from local repository"
+                chmod +x "$TARGET_DIR/scripts/setup.sh" 2>/dev/null || true
+                local_scripts_found=true
+            # Fallback to legacy scripts if available
+            elif [[ -f "$local_scripts_dir/setup_automated.sh" ]]; then
+                cp "$local_scripts_dir/setup_automated.sh" "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
+                print_success "Copied legacy setup script from local repository"
+                chmod +x "$TARGET_DIR/scripts/setup_automated.sh" 2>/dev/null || true
+                local_scripts_found=true
             fi
-        else
-            print_error "curl not available - cannot download setup_automated.sh"
-            return 1
+        fi
+        
+        # If no local scripts found, create inline scripts
+        if [[ "$local_scripts_found" == "false" ]]; then
+            print_warning "No suitable setup scripts found in local repository"
+            print_step "Creating inline setup scripts..."
+            create_inline_setup_scripts
         fi
     fi
     
     # Copy other essential scripts if available
     if [[ -n "$SOURCE_DIR" && -d "$SOURCE_DIR/scripts" && "$SOURCE_DIR" != "$TARGET_DIR" ]]; then
         print_step "Copying additional automation scripts..."
-        for script_file in "$SOURCE_DIR/scripts"/*.sh "$SOURCE_DIR/scripts"/*.dart; do
+        for script_file in "$SOURCE_DIR/scripts"/*.sh "$SOURCE_DIR/scripts"/*.dart "$SOURCE_DIR/scripts"/*.rb; do
             if [[ -f "$script_file" ]]; then
                 script_name=$(basename "$script_file")
-                if [[ "$script_name" != "setup_automated.sh" ]]; then
+                # Skip setup scripts as they're handled separately
+                if [[ "$script_name" != "setup_automated.sh" && "$script_name" != "setup.sh" ]]; then
                     cp "$script_file" "$TARGET_DIR/scripts/" 2>/dev/null || true
+                    print_info "Copied: $script_name"
+                    
+                    # Set execute permissions for Dart scripts
+                    if [[ "$script_name" == *.dart ]]; then
+                        chmod +x "$TARGET_DIR/scripts/$script_name" 2>/dev/null || true
+                    fi
                 fi
             fi
         done
+        
+        # Ensure we have the latest version management tools
+        if [[ -f "$SOURCE_DIR/scripts/version_manager.dart" ]]; then
+            cp "$SOURCE_DIR/scripts/version_manager.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+            chmod +x "$TARGET_DIR/scripts/version_manager.dart" 2>/dev/null || true
+            print_info "Updated: version_manager.dart (with enhanced validation)"
+        fi
+        
+        if [[ -f "$SOURCE_DIR/scripts/tag_generator.dart" ]]; then
+            cp "$SOURCE_DIR/scripts/tag_generator.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+            chmod +x "$TARGET_DIR/scripts/tag_generator.dart" 2>/dev/null || true
+            print_info "Added: tag_generator.dart (deployment tagging)"
+        fi
+        
+        if [[ -f "$SOURCE_DIR/scripts/version_sync.dart" ]]; then
+            cp "$SOURCE_DIR/scripts/version_sync.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+            chmod +x "$TARGET_DIR/scripts/version_sync.dart" 2>/dev/null || true
+            print_info "Added: version_sync.dart (cross-platform sync)"
+        fi
+        
         print_success "Additional scripts copied"
     elif [[ "$SCRIPT_PATH" == "/dev/stdin" || "$SCRIPT_PATH" == *"/tmp/"* || "$SCRIPT_PATH" == *"/var/"* ]]; then
-        print_step "Downloading additional automation scripts from remote..."
-        # Download essential scripts from GitHub
-        local essential_scripts=("common_functions.sh" "integration_test.sh" "quick_setup.sh" "setup_interactive.sh" "version_manager.dart" "build_info_generator.dart")
-        for script_name in "${essential_scripts[@]}"; do
-            if curl -fsSL "https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/scripts/$script_name" -o "$TARGET_DIR/scripts/$script_name" 2>/dev/null; then
-                print_info "Downloaded $script_name"
-            else
-                print_warning "Could not download $script_name (optional)"
+        print_step "Copying additional automation scripts from local repository..."
+        # Copy essential scripts from local repository
+        local local_scripts_dir
+        local_scripts_dir=$(detect_scripts_directory "$TARGET_DIR")
+        
+        if [[ -d "$local_scripts_dir" ]]; then
+            # Copy all available scripts from local repository
+            for script_file in "$local_scripts_dir"/*.sh "$local_scripts_dir"/*.dart "$local_scripts_dir"/*.rb; do
+                if [[ -f "$script_file" ]]; then
+                    script_name=$(basename "$script_file")
+                    # Skip setup scripts as they're handled separately
+                    if [[ "$script_name" != "setup_automated.sh" && "$script_name" != "setup.sh" ]]; then
+                        cp "$script_file" "$TARGET_DIR/scripts/" 2>/dev/null || true
+                        print_info "Copied: $script_name"
+                        # Set execute permissions for scripts
+                        if [[ "$script_name" == *.sh || "$script_name" == *.dart ]]; then
+                            chmod +x "$TARGET_DIR/scripts/$script_name" 2>/dev/null || true
+                        fi
+                    fi
+                fi
+            done
+            
+            # Ensure we have the latest version management tools from local repository
+            if [[ -f "$local_scripts_dir/version_manager.dart" ]]; then
+                cp "$local_scripts_dir/version_manager.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+                chmod +x "$TARGET_DIR/scripts/version_manager.dart" 2>/dev/null || true
+                print_info "Updated: version_manager.dart (with enhanced validation)"
             fi
-        done
-        print_success "Essential scripts downloaded"
+            
+            if [[ -f "$local_scripts_dir/tag_generator.dart" ]]; then
+                cp "$local_scripts_dir/tag_generator.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+                chmod +x "$TARGET_DIR/scripts/tag_generator.dart" 2>/dev/null || true
+                print_info "Added: tag_generator.dart (deployment tagging)"
+            fi
+            
+            if [[ -f "$local_scripts_dir/version_sync.dart" ]]; then
+                cp "$local_scripts_dir/version_sync.dart" "$TARGET_DIR/scripts/" 2>/dev/null || true
+                chmod +x "$TARGET_DIR/scripts/version_sync.dart" 2>/dev/null || true
+                print_info "Added: version_sync.dart (cross-platform sync)"
+            fi
+            
+            print_success "Essential scripts copied from local repository"
+        else
+            print_warning "Local scripts directory not found, skipping additional scripts"
+        fi
     fi
     
     print_success "Automation scripts are now available"
@@ -2590,7 +3498,6 @@ create_setup_guide() {
 **Project**: $PROJECT_NAME  
 **Bundle ID**: $BUNDLE_ID  
 **Package Name**: $PACKAGE_NAME  
-**Current Version**: $CURRENT_VERSION  
 
 ## 📁 Files Created
 
@@ -2740,69 +3647,7 @@ EOF
     echo ""
 }
 
-# Setup basic environment
-setup_basic_environment() {
-    print_header "Setting Up Basic Environment"
-    
-    cd "$TARGET_DIR"
-    
-    # Install Ruby gems if possible
-    if command -v bundle &> /dev/null; then
-        print_step "Installing Ruby gems..."
-        if bundle install 2>/dev/null; then
-            print_success "Ruby gems installed"
-        else
-            print_warning "Bundle install failed (will retry later)"
-            print_info "💡 Fix: Run 'gem install bundler' then 'bundle install'"
-        fi
-    else
-        print_info "Installing bundler first..."
-        if command -v gem &> /dev/null; then
-            if gem install bundler 2>/dev/null; then
-                print_success "Bundler installed"
-                print_step "Installing Ruby gems..."
-                if bundle install 2>/dev/null; then
-                    print_success "Ruby gems installed"
-                else
-                    print_warning "Bundle install failed - manual setup required"
-                    print_info "💡 Run: bundle install"
-                fi
-            else
-                print_warning "Could not install bundler"
-                print_info "💡 Manual setup: gem install bundler && bundle install"
-            fi
-        else
-            print_warning "Ruby gems not available - skip Ruby dependencies"
-        fi
-    fi
-    
-    # Setup iOS dependencies on macOS
-    if [[ "$OSTYPE" == "darwin"* ]] && [ -d "ios" ]; then
-        print_step "Installing iOS dependencies..."
-        if command -v pod &> /dev/null; then
-            cd ios
-            if pod install --silent 2>/dev/null; then
-                print_success "CocoaPods dependencies installed"
-            else
-                print_warning "Pod install failed - continuing anyway"
-                print_info "💡 Run manually: cd ios && pod install"
-            fi
-            cd ..
-        else
-            print_info "CocoaPods not found - install with: sudo gem install cocoapods"
-        fi
-    fi
-    
-    # Update Flutter dependencies
-    print_step "Updating Flutter dependencies..."
-    if flutter pub get; then
-        print_success "Flutter dependencies updated"
-    else
-        print_warning "Flutter pub get failed"
-    fi
-    
-    echo ""
-}
+
 
 # Generate environment configuration
 generate_env_config() {
@@ -2810,7 +3655,19 @@ generate_env_config() {
     
     local env_config_path="$TARGET_DIR/.env.example"
     
+    # Ensure PROJECT_NAME has a valid value
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME=$(basename "$TARGET_DIR")
+        print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+    fi
+    
     CLEAN_PROJECT_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | sed 's/__*/_/g' | sed 's/^_\|_$//g')
+    
+    # Ensure CLEAN_PROJECT_NAME is not empty
+    if [[ -z "$CLEAN_PROJECT_NAME" ]]; then
+        CLEAN_PROJECT_NAME="flutter_app"
+        print_warning "Using fallback clean project name: $CLEAN_PROJECT_NAME"
+    fi
     cat > "$env_config_path" << EOF
 # Environment Configuration for $PROJECT_NAME
 # Generated on: $(date)
@@ -2949,43 +3806,7 @@ EOF
     print_success "Credential setup guide generated: $guide_path"
 }
 
-# Show completion summary
-show_completion() {
-    clear
-    print_header "🎉 Integration Complete!"
-    
-    echo -e "${GREEN}🎉 Success! Your Flutter project now has complete CI/CD automation.${NC}"
-    echo ""
-    
-    echo -e "${WHITE}📁 Project:${NC} $TARGET_DIR"
-    echo -e "${WHITE}📱 App Name:${NC} $PROJECT_NAME"  
-    echo -e "${WHITE}📦 Package:${NC} $PACKAGE_NAME"
-    echo -e "${WHITE}🍎 Bundle ID:${NC} $BUNDLE_ID"
-    echo ""
-    
-    echo -e "${BLUE}📋 Files Created:${NC}"
-    echo -e "  ${CHECK} Makefile (customized)"
-    echo -e "  ${CHECK} .github/workflows/deploy.yml"
-    echo -e "  ${CHECK} android/fastlane/ (Appfile, Fastfile)"
-    echo -e "  ${CHECK} ios/fastlane/ (Appfile, Fastfile)"
-    echo -e "  ${CHECK} ios/ExportOptions.plist"
-    echo -e "  ${CHECK} Gemfile"
-    echo -e "  ${CHECK} project.config"
-    echo -e "  ${CHECK} scripts/ (automation tools)"
-    echo -e "  ${CHECK} docs/ (documentation)"
-    echo -e "  ${CHECK} docs/CICD_INTEGRATION_COMPLETE.md (setup guide)"
-    echo ""
-    
-    echo -e "${YELLOW}⚠️ Required Next Steps:${NC}"
-    echo -e "  ${WARNING} Complete iOS configuration (Team ID, API Key, etc.)"
-    echo -e "  ${WARNING} Create Android keystore and update key.properties"
-    echo -e "  ${WARNING} Setup GitHub Secrets for CI/CD"
-    echo ""
-    
-    print_success "CI/CD integration completed successfully!"
-    echo -e "${WHITE}📖 See docs/CICD_INTEGRATION_COMPLETE.md for detailed setup instructions.${NC}"
-    echo ""
-}
+
 
 # Validation and interactive setup functions
 validate_credentials() {
@@ -3175,13 +3996,13 @@ sync_appfile() {
         return 0
     fi
     
-    print_step "🔄 Syncing project.config with iOS Fastlane Appfile..."
+    print_step "Syncing project.config with iOS Fastlane Appfile..."
     
     # Load current project config
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
     else
-        print_warning "⚠️  project.config not found, skipping Appfile sync"
+        print_warning "project.config not found, skipping Appfile sync"
         return 0
     fi
     
@@ -3218,7 +4039,7 @@ sync_appfile() {
     # Replace original Appfile with updated version
     mv "$temp_appfile" "$appfile_path"
     
-    print_success "✅ iOS Fastlane Appfile updated with project.config values"
+    print_success "iOS Fastlane Appfile updated with project.config values"
     
     if [[ "${DEBUG:-}" == "true" ]]; then
         echo "🐛 DEBUG: Updated Appfile content:" >&2
@@ -3246,19 +4067,34 @@ sync_fastfile() {
         return 0
     fi
     
-    print_step "🔄 Syncing project.config with iOS Fastlane Fastfile..."
+    print_step "Syncing project.config with iOS Fastlane Fastfile..."
     
     # Load current project config
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
     else
-        print_warning "⚠️  project.config not found, skipping Fastfile sync"
+        print_warning "project.config not found, skipping Fastfile sync"
         return 0
     fi
     
     # Update Fastfile with values from project.config using sed
     local temp_fastfile=$(mktemp)
     cp "$fastfile_path" "$temp_fastfile"
+    
+    # First, fix KEY_PATH to use absolute path for reliable file access
+    # This prevents "Couldn't find key p8 file" errors in app_store_connect_api_key
+    # File.expand_path ensures the AuthKey file is found regardless of working directory
+    sed -i.bak 's|KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"|KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)|g' "$temp_fastfile"
+    sed -i.bak 's|KEY_PATH = "./AuthKey_#{KEY_ID}.p8"|KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)|g' "$temp_fastfile"
+    
+    # Replace placeholders with actual values BEFORE updating variable definitions
+    if [[ -n "$KEY_ID" && "$KEY_ID" != "YOUR_KEY_ID" ]]; then
+        sed -i.bak "s|#{KEY_ID}|$KEY_ID|g" "$temp_fastfile"
+    fi
+    
+    if [[ -n "$PROJECT_NAME" && "$PROJECT_NAME" != "YOUR_PROJECT_NAME" ]]; then
+        sed -i.bak "s|#{PROJECT_NAME}|$PROJECT_NAME|g" "$temp_fastfile"
+    fi
     
     # Update TEAM_ID
     if [[ -n "$TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
@@ -3281,15 +4117,12 @@ sync_fastfile() {
         sed -i.bak "s/^ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
     fi
     
-    # Fix KEY_PATH to use correct relative path from ios/ directory
-    sed -i.bak 's|KEY_PATH = "./AuthKey_#{KEY_ID}.p8"|KEY_PATH = "./fastlane/AuthKey_#{KEY_ID}.p8"|g' "$temp_fastfile"
-    
     # Update export_options to include proper signing certificate and bitcode settings
     # Fix build_and_upload_auto lane
     sed -i.bak '/build_and_upload_auto/,/^  end$/{
         /export_options: {/,/}$/{
             s/export_options: {.*/export_options: {/
-            /method: "app-store",/a\
+            /method: "app-store-connect",/a\
         signingStyle: "automatic",\
         teamID: TEAM_ID,\
         signingCertificate: "Apple Distribution",\
@@ -3304,7 +4137,7 @@ sync_fastfile() {
     sed -i.bak '/build_and_upload_production/,/^  end$/{
         /export_options: {/,/}$/{
             s/export_options: {.*/export_options: {/
-            /method: "app-store",/a\
+            /method: "app-store-connect",/a\
         signingStyle: "automatic",\
         teamID: TEAM_ID,\
         signingCertificate: "Apple Distribution",\
@@ -3321,7 +4154,7 @@ sync_fastfile() {
     # Replace original Fastfile with updated version
     mv "$temp_fastfile" "$fastfile_path"
     
-    print_success "✅ iOS Fastlane Fastfile updated with project.config values and iOS build fixes"
+    print_success "iOS Fastlane Fastfile updated with project.config values and iOS build fixes"
     
     if [[ "${DEBUG:-}" == "true" ]]; then
         echo "🐛 DEBUG: Updated Fastfile content (relevant lines):" >&2
@@ -3341,21 +4174,18 @@ sync_export_options() {
         return 0
     fi
     
-    print_step "🔄 Syncing project.config with iOS ExportOptions.plist..."
+    print_step "Syncing project.config with iOS ExportOptions.plist..."
     
     # Load project.config values
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
     else
-        print_warning "⚠️  project.config not found, skipping ExportOptions.plist sync"
+        print_warning "project.config not found, skipping ExportOptions.plist sync"
         return 0
     fi
     
     # Only update if TEAM_ID is not empty and not a placeholder
     if [ -n "$TEAM_ID" ] && [ "$TEAM_ID" != "YOUR_TEAM_ID" ] && [ "$TEAM_ID" != "TEAM_ID" ]; then
-        # Create backup
-        cp "$export_options_path" "$export_options_path.bak"
-        
         # Update teamID in ExportOptions.plist
         sed -i.tmp "s/<string>YOUR_TEAM_ID<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"
         sed -i.tmp "s/<string>TEAM_ID<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"
@@ -3369,7 +4199,7 @@ sync_export_options() {
             echo "🐛 DEBUG: Updated ExportOptions.plist teamID to: $TEAM_ID" >&2
         fi
     else
-        print_info "ℹ️  Skipping ExportOptions.plist update (TEAM_ID not set or is placeholder)"
+        print_info "Skipping ExportOptions.plist update (TEAM_ID not set or is placeholder)"
     fi
 }
 
@@ -3392,7 +4222,7 @@ collect_ios_credentials() {
         local input_team_id
         read_required_or_skip "Team ID: " input_team_id
         if [[ "$input_team_id" == "skip" ]]; then
-            print_warning "⚠️ Skipping Team ID setup for remote execution"
+            print_warning "Skipping Team ID setup for remote execution"
             break
         elif [[ -n "$input_team_id" && "$input_team_id" != "YOUR_TEAM_ID" ]]; then
             TEAM_ID="$input_team_id"
@@ -3411,7 +4241,7 @@ collect_ios_credentials() {
         local input_key_id
         read_required_or_skip "Key ID: " input_key_id
         if [[ "$input_key_id" == "skip" ]]; then
-            print_warning "⚠️ Skipping Key ID setup for remote execution"
+            print_warning "Skipping Key ID setup for remote execution"
             break
         elif [[ -n "$input_key_id" && "$input_key_id" != "YOUR_KEY_ID" ]]; then
             KEY_ID="$input_key_id"
@@ -3430,7 +4260,7 @@ collect_ios_credentials() {
         local input_issuer_id
         read_required_or_skip "Issuer ID: " input_issuer_id
         if [[ "$input_issuer_id" == "skip" ]]; then
-            print_warning "⚠️ Skipping Issuer ID setup for remote execution"
+            print_warning "Skipping Issuer ID setup for remote execution"
             break
         elif [[ -n "$input_issuer_id" && "$input_issuer_id" != "YOUR_ISSUER_ID" ]]; then
             ISSUER_ID="$input_issuer_id"
@@ -3448,7 +4278,7 @@ collect_ios_credentials() {
         local input_apple_id
         read_required_or_skip "Apple ID: " input_apple_id
         if [[ "$input_apple_id" == "skip" ]]; then
-            print_warning "⚠️ Skipping Apple ID setup for remote execution"
+            print_warning "Skipping Apple ID setup for remote execution"
             break
         elif [[ "$input_apple_id" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
             APPLE_ID="$input_apple_id"
@@ -3506,7 +4336,19 @@ collect_android_credentials() {
     # Check for keystore
     local keystore_found=false
     # Convert project name to lowercase for keystore filename
+    # Ensure PROJECT_NAME has a valid value
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME=$(basename "$TARGET_DIR")
+        print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+    fi
+    
     local project_lower=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]')
+    
+    # Ensure project_lower is not empty
+    if [[ -z "$project_lower" ]]; then
+        project_lower="flutter_app"
+        print_warning "Using fallback project name: $project_lower"
+    fi
     local keystore_files=(
         "$TARGET_DIR/android/app/app.keystore"
         "$TARGET_DIR/android/app/${project_lower}-release.keystore"
@@ -3603,7 +4445,7 @@ collect_android_credentials() {
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/demo-service-account%40demo-project.iam.gserviceaccount.com"
 }
 EOF
-                print_warning "⚠️  Demo service account JSON created for validation"
+                print_warning "Demo service account JSON created for validation"
                 print_info "📝 Replace this with your real service account for production deployment"
                 print_info "📍 File: android/fastlane/play_store_service_account.json"
                 break
@@ -3630,7 +4472,19 @@ create_android_keystore() {
     print_step "Creating Android keystore..."
     
     # Convert project name to lowercase for keystore filename
+    # Ensure PROJECT_NAME has a valid value
+    if [[ -z "$PROJECT_NAME" ]]; then
+        PROJECT_NAME=$(basename "$TARGET_DIR")
+        print_warning "Using directory name as PROJECT_NAME: $PROJECT_NAME"
+    fi
+    
     local project_lower=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]')
+    
+    # Ensure project_lower is not empty
+    if [[ -z "$project_lower" ]]; then
+        project_lower="flutter_app"
+        print_warning "Using fallback project name: $project_lower"
+    fi
     local keystore_path="$TARGET_DIR/android/app/app.keystore"
     
     echo -e "${CYAN}Creating keystore for: $PROJECT_NAME${NC}"
@@ -3730,7 +4584,8 @@ This guide walks you through setting up Android deployment for your Flutter proj
 ### Option A: Use our script (Recommended)
 \`\`\`bash
 # Run the setup script and choose to create keystore
-./scripts/setup_automated.sh
+./scripts/setup.sh
+# Or use legacy script: ./scripts/setup_automated.sh
 \`\`\`
 
 ### Option B: Manual creation
@@ -3959,7 +4814,8 @@ Edit \`ios/ExportOptions.plist\`:
 ### 3.4 Update project.config
 Run the setup script to update automatically:
 \`\`\`bash
-./scripts/setup_automated.sh
+./scripts/setup.sh
+# Or use legacy script: ./scripts/setup_automated.sh
 \`\`\`
 
 ## Step 4: Xcode Project Setup
@@ -4140,7 +4996,7 @@ run_credential_setup() {
         echo -e "${CYAN}Do you want to set up credentials now? (y/n):${NC}"
         echo -e "${GRAY}This will guide you through collecting iOS and Android credentials${NC}"
         
-        # Use helper function for remote-safe input
+        # Use helper function for input - will always wait for user
         read_with_fallback "Continue with setup: " "n" "setup_choice"
         
         if [[ "$setup_choice" =~ ^[Yy] ]]; then
@@ -4163,11 +5019,23 @@ run_credential_setup() {
             else
                 print_warning "Some credentials are still missing. Check the setup guides for manual configuration."
             fi
+            return 0
         else
             print_info "Skipping interactive setup. You can run this script again or check the detailed guides."
+            print_info "Setup process stopped by user choice."
+            echo ""
+            print_success "🎯 Basic project structure has been created successfully!"
+            echo ""
+            echo -e "${BLUE}📚 Next steps:${NC}"
+            echo -e "  ${CHECK} Review the generated documentation in docs/"
+            echo -e "  ${CHECK} Set up credentials manually using the guides"
+            echo -e "  ${CHECK} Run this script again when ready to complete setup"
+            echo ""
+            return 1  # Return 1 to indicate user chose to stop
         fi
     else
         print_success "All credentials are already configured!"
+        return 0
     fi
 }
 
@@ -4176,25 +5044,6 @@ show_final_summary() {
     print_separator
     print_header "📊 Setup Summary"
     
-    echo -e "${WHITE}Project Status:${NC}"
-    if [[ "$CREDENTIALS_COMPLETE" == "true" ]]; then
-        echo -e "  ${CHECK} ${GREEN}All credentials configured${NC}"
-    else
-        echo -e "  ${WARNING} ${YELLOW}Some credentials missing${NC}"
-    fi
-    
-    if [[ "$ANDROID_READY" == "true" ]]; then
-        echo -e "  ${CHECK} ${GREEN}Android ready for deployment${NC}"
-    else
-        echo -e "  ${CROSS} ${RED}Android needs setup${NC} - See docs/ANDROID_SETUP_GUIDE.md"
-    fi
-    
-    if [[ "$IOS_READY" == "true" ]]; then
-        echo -e "  ${CHECK} ${GREEN}iOS ready for deployment${NC}"
-    else
-        echo -e "  ${CROSS} ${RED}iOS needs setup${NC} - See docs/IOS_SETUP_GUIDE.md"
-    fi
-    
     echo ""
     echo -e "${BLUE}📚 Generated Guides:${NC}"
     echo -e "  ${CHECK} docs/ANDROID_SETUP_GUIDE.md - Complete Android setup instructions"
@@ -4202,102 +5051,53 @@ show_final_summary() {
     echo -e "  ${CHECK} docs/CICD_INTEGRATION_COMPLETE.md - Full integration guide"
     echo -e "  ${CHECK} docs/CREDENTIAL_SETUP.md - Credential configuration guide"
     
-    echo ""
-    if [[ "$CREDENTIALS_COMPLETE" == "true" ]]; then
-        print_success "🎉 Your project is ready for automated deployment!"
-        echo -e "${CYAN}Quick commands:${NC}"
-        echo -e "  • ${WHITE}make help${NC} - All commands"
-        echo -e "  • ${WHITE}make system-check${NC} - Verify configuration"
-        echo -e "  • ${WHITE}make tester${NC} - Test deployment"
-        echo -e "  • ${WHITE}make live${NC} - Production deployment"
-    else
-        print_warning "⚠️ Complete setup required before deployment"
-        echo -e "${CYAN}Next steps:${NC}"
-        echo -e "  • ${WHITE}Review docs/ANDROID_SETUP_GUIDE.md${NC} for Android setup"
-        echo -e "  • ${WHITE}Review docs/IOS_SETUP_GUIDE.md${NC} for iOS setup"
-        echo -e "  • ${WHITE}Run this script again${NC} after placing credentials"
-        echo -e "  • ${WHITE}./scripts/setup_automated.sh --setup-only .${NC} for credential setup only"
-    fi
-    echo ""
 }
 
-# Main execution function
+# Main function - Entry point for the script
 main() {
-    # Handle potential curl download issues
-    if [ ! -t 0 ] && [ -z "${BASH_SOURCE[0]}" ]; then
-        # Script is being piped from curl, add small delay to ensure complete download
-        sleep 0.1
-    fi
+    print_header "🚀 Flutter CI/CD Auto Deployment Setup"
+    print_info "Starting automated setup for Flutter project..."
     
-    # Ensure we have proper error handling for non-interactive execution
-    trap 'echo "Error occurred at line $LINENO. Exit code: $?" >&2' ERR
+    # Detect target directory
+    TARGET_DIR=$(detect_target_directory "$1")
+    export TARGET_DIR
     
-    # Set target directory using robust detection (allow non-zero exit for directory detection)
-    set +e  # Temporarily disable exit on error
-    TARGET_DIR=$(detect_target_directory "${1:-$(pwd)}")
-    detect_exit_code=$?
-    set -e  # Re-enable exit on error
+    print_step "Target directory: $TARGET_DIR"
     
-    # Debug information (only in verbose mode)
-    if [[ "${DEBUG:-}" == "true" ]]; then
-        echo "🐛 DEBUG: Final TARGET_DIR = '$TARGET_DIR'" >&2
-        echo "🐛 DEBUG: Current working directory = '$(pwd)'" >&2
-        echo "🐛 DEBUG: Script arguments = '$@'" >&2
-    fi
-    
-    # Check if source directory exists (relaxed for dynamic detection)
-    if [[ -z "$SOURCE_DIR" || ! -d "$SOURCE_DIR" ]]; then
-        print_warning "Source directory not found: $SOURCE_DIR"
-        print_info "Script will use inline templates for file generation"
-        SOURCE_DIR=""  # Clear invalid source dir
-    fi
-    
-    # Always validate target directory and extract project info
+    # Validate target directory
     validate_target_directory
+    
+    # Extract project information
     extract_project_info
     
-    # Auto-sync project.config with iOS fastlane files if config exists
-    auto_sync_project_config
+    # Create project configuration
+    create_project_config
     
-    # Check GitHub CLI authentication status
-    check_github_auth
-    
-    # Check and fix Bundler version issues
-    print_separator
-    print_header "🔧 Bundler Version Check"
-    check_and_fix_bundler_version
-    
-    # Full integration mode - Execute all integration steps
+    # Create directory structure
     create_directory_structure
+    
+    # Create automation files
     create_android_fastlane
-    create_ios_fastlane  
+    create_ios_fastlane
     create_makefile
     create_github_workflow
     create_gemfile
+    create_inline_setup_scripts
     
-    # Only create project.config if it doesn't exist or user hasn't been asked yet
-    if [ ! -f "$TARGET_DIR/project.config" ] || [ -z "$PROJECT_CONFIG_USER_APPROVED" ]; then
-        create_project_config
-    else
-        print_info "Using existing project.config (user choice: keep existing)"
+    # Generate documentation
+    generate_detailed_setup_guides
+    
+    # Run credential setup if needed
+    if ! run_credential_setup; then
+        # User chose to stop the setup process
+        print_info "Setup process completed with basic structure only."
+        exit 0
     fi
     
-    copy_automation_scripts
-    generate_env_config
-    generate_credential_guide
-    create_setup_guide
-    
-    # Run credential setup
-    run_credential_setup
-    
-    # Basic environment setup
-    setup_basic_environment
-    
-    # Show completion
-    show_completion
-    
-    # Final validation summary (always show)
+    # Show final summary
     show_final_summary
+    
+    print_success "🎉 Setup completed successfully!"
 }
 
 # Script entry point - with integrity check for curl downloads

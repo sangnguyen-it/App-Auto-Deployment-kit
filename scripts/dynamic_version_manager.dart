@@ -155,7 +155,14 @@ Future<void> interactiveMode() async {
   print('   2. Manual - Enter custom versions for each platform');
   print('');
   stdout.write('Select mode (1=Auto, 2=Manual) [default: 1]: ');
-  final modeInput = stdin.readLineSync()?.trim();
+  
+  String? modeInput;
+  try {
+    modeInput = stdin.readLineSync()?.trim();
+  } catch (e) {
+    // Handle case when stdin is not available (piped input)
+    modeInput = '1';
+  }
   final mode = (modeInput?.isEmpty ?? true) ? '1' : modeInput!;
   
   String androidVersionName, androidVersionCode;
@@ -180,21 +187,41 @@ Future<void> interactiveMode() async {
     
     print('📱 ANDROID VERSION:');
     stdout.write('Enter Android version name [current: ${getVersionName()}]: ');
-    final androidVersionNameInput = stdin.readLineSync()?.trim();
+    String? androidVersionNameInput;
+    try {
+      androidVersionNameInput = stdin.readLineSync()?.trim();
+    } catch (e) {
+      androidVersionNameInput = '';
+    }
     androidVersionName = (androidVersionNameInput?.isEmpty ?? true) ? getVersionName() : androidVersionNameInput!;
     
     stdout.write('Enter Android version code [current: ${getVersionCode()}]: ');
-    final androidVersionCodeInput = stdin.readLineSync()?.trim();
+    String? androidVersionCodeInput;
+    try {
+      androidVersionCodeInput = stdin.readLineSync()?.trim();
+    } catch (e) {
+      androidVersionCodeInput = '';
+    }
     androidVersionCode = (androidVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : androidVersionCodeInput!;
     
     print('');
     print('🍎 iOS VERSION:');
     stdout.write('Enter iOS version name [current: ${getVersionName()}]: ');
-    final iosVersionNameInput = stdin.readLineSync()?.trim();
+    String? iosVersionNameInput;
+    try {
+      iosVersionNameInput = stdin.readLineSync()?.trim();
+    } catch (e) {
+      iosVersionNameInput = '';
+    }
     iosVersionName = (iosVersionNameInput?.isEmpty ?? true) ? getVersionName() : iosVersionNameInput!;
     
     stdout.write('Enter iOS version code [current: ${getVersionCode()}]: ');
-    final iosVersionCodeInput = stdin.readLineSync()?.trim();
+    String? iosVersionCodeInput;
+    try {
+      iosVersionCodeInput = stdin.readLineSync()?.trim();
+    } catch (e) {
+      iosVersionCodeInput = '';
+    }
     iosVersionCode = (iosVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : iosVersionCodeInput!;
     
     print('');
@@ -204,8 +231,15 @@ Future<void> interactiveMode() async {
   }
   
   print('');
-  stdout.write('Apply these versions? (y/N): ');
-  final confirm = stdin.readLineSync()?.trim().toLowerCase();
+  String? confirm;
+  try {
+    stdout.write('Apply these versions? (y/N): ');
+    confirm = stdin.readLineSync()?.trim().toLowerCase();
+  } catch (e) {
+    // Handle case when stdin is not available (piped input)
+    // Default to 'y' for automated builds
+    confirm = 'y';
+  }
   
   if (confirm == 'y' || confirm == 'yes') {
     // Update pubspec.yaml with Android version

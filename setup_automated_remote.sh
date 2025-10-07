@@ -1063,9 +1063,6 @@ create_makefile_inline() {
     if [[ -f "$template_file" ]]; then
         print_step "Using makefile template..."
         
-        # Copy template and process placeholders
-        cp "$template_file" "$output_file"
-        
         # Ensure we have valid values
         if [[ -z "$PROJECT_NAME" ]]; then
             PROJECT_NAME=$(basename "$TARGET_DIR")
@@ -1081,6 +1078,20 @@ create_makefile_inline() {
             APP_NAME="$PROJECT_NAME"
         fi
         
+        # Use proper template processing if available
+        if command -v process_template >/dev/null 2>&1; then
+            if process_template "$template_file" "$output_file" "$PROJECT_NAME" "$PACKAGE_NAME" "$APP_NAME" "YOUR_TEAM_ID" "your-apple-id@email.com" "$TARGET_DIR"; then
+                chmod +x "$output_file"
+                print_success "Makefile created from template using process_template"
+                return 0
+            else
+                print_warning "process_template failed, falling back to simple replacement"
+            fi
+        fi
+        
+        # Fallback: Copy template and process placeholders with sed
+        cp "$template_file" "$output_file"
+        
         # Replace placeholders in Makefile
         sed -i.bak "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$output_file"
         sed -i.bak "s/{{PACKAGE_NAME}}/$PACKAGE_NAME/g" "$output_file"
@@ -1091,7 +1102,7 @@ create_makefile_inline() {
         rm -f "$output_file.bak"
         
         chmod +x "$output_file"
-        print_success "Makefile created from template with OUTPUT_DIR=builder"
+        print_success "Makefile created from template with basic replacement"
     else
         print_warning "Template not found, creating basic Makefile"
         # Fallback to basic Makefile if template not found

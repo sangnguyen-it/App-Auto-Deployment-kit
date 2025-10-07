@@ -70,6 +70,11 @@ platform :android do
     upload_to_play_store
   end
 
+  desc "Release to Google Play Production (alias for upload_aab_production)"
+  lane :release do
+    upload_aab_production
+  end
+
   desc "Build release for {{PROJECT_NAME}}"
   lane :build do
     gradle(task: "clean bundleRelease")

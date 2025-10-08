@@ -161,7 +161,7 @@ jobs:
           bundle exec fastlane android beta
         else
           echo "🎯 Deploying to Play Store Production..."
-          bundle exec fastlane android release rollout:$ROLLOUT_PERCENTAGE
+          bundle exec fastlane android upload_aab_production
         fi
     
     - name: Cleanup sensitive files

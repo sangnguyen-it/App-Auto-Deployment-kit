@@ -840,33 +840,14 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	fi
 	
 	@printf "\n"
-	@printf "$(CYAN)📝 Creating Git tag for version tracking...$(NC)\n"
-	@ANDROID_VER="$(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)"; \
-	IOS_VER="$(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)"; \
-	if [ -z "$(ANDROID_VERSION_NAME)" ] || [ -z "$(IOS_VERSION_NAME)" ]; then \
-		printf "$(RED)$(CROSS) %s$(NC)\n" "Could not extract Android/iOS versions from dynamic_version_manager"; \
-		exit 1; \
-	fi; \
-	printf "$(CYAN)$(INFO) %s$(NC)\n" "Android version: $$ANDROID_VER"; \
-	printf "$(CYAN)$(INFO) %s$(NC)\n" "iOS version: $$IOS_VER"; \
-	TAG_NAME="android-$(ANDROID_VERSION_NAME)-build-$(ANDROID_VERSION_CODE)_ios-$(IOS_VERSION_NAME)-build-$(IOS_VERSION_CODE)"; \
-	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
-	if git tag -a "$$TAG_NAME" -m "Local build and upload completed - Android: $$ANDROID_VER, iOS: $$IOS_VER - Apps already deployed via Fastlane" 2>/dev/null; then \
-		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \
-		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Pushing git tag to remote..."; \
-		if git push origin "$$TAG_NAME" 2>/dev/null; then \
-			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag pushed successfully"; \
-			printf "$(CYAN)$(INFO) %s$(NC)\n" "Apps uploaded directly via Fastlane - no GitHub Actions triggered"; \
-		else \
-			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git push failed - tag created locally only"; \
-		fi; \
-	else \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git tag already exists or failed to create"; \
-	fi
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Local production build and upload completed successfully!"
+	@printf "$(CYAN)$(INFO) %s$(NC)\n" "Apps have been uploaded directly to stores via Fastlane"
+	@printf "$(CYAN)$(INFO) %s$(NC)\n" "No GitHub Actions triggered - this was a local-only deployment"
 
-live-github: ## ☁️ Automated Live Production Pipeline (GitHub Only)
+live-github: ## ☁️ Automated Live Production Pipeline (GitHub Actions Build & Upload)
 	@printf "\n"
-	@printf "$(CYAN)☁️ Triggering GitHub Actions for Production Build$(NC)\n"
+	@printf "$(CYAN)☁️ Triggering GitHub Actions for Production Build & Upload$(NC)\n"
+	@printf "$(CYAN)$(INFO) This will build and upload apps entirely on GitHub Actions$(NC)\n"
 	@printf "\n"
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
@@ -893,12 +874,6 @@ live-github: ## ☁️ Automated Live Production Pipeline (GitHub Only)
 	$(eval ANDROID_VERSION_CODE := $(call get_android_version_code))
 	$(eval IOS_VERSION_NAME := $(call get_ios_version_name))
 	$(eval IOS_VERSION_CODE := $(call get_ios_version_code))
-	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
-	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
-	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
-	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
 	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
 	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
@@ -913,16 +888,17 @@ live-github: ## ☁️ Automated Live Production Pipeline (GitHub Only)
 	printf "$(CYAN)$(INFO) %s$(NC)\n" "iOS version: $$IOS_VER"; \
 	TAG_NAME="android-$(ANDROID_VERSION_NAME)-build-$(ANDROID_VERSION_CODE)_ios-$(IOS_VERSION_NAME)-build-$(IOS_VERSION_CODE)"; \
 	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
-	if git tag -a "$$TAG_NAME" -m "🚀 Production release - Android: $$ANDROID_VER, iOS: $$IOS_VER" 2>/dev/null; then \
+	if git tag -a "$$TAG_NAME" -m "🚀 GitHub Actions Production Build & Upload - Android: $$ANDROID_VER, iOS: $$IOS_VER" 2>/dev/null; then \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \
 	else \
 		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git tag already exists or failed to create"; \
 	fi; \
-	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Pushing git tag to remote..."; \
+	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Pushing git tag to trigger GitHub Actions..."; \
 	if git push origin "$$TAG_NAME" 2>/dev/null; then \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag pushed successfully"; \
 		printf "$(CYAN)$(GEAR) %s$(NC)\n" "GitHub Actions triggered by tag push"; \
 		printf "$(GREEN)$(ROCKET) %s$(NC)\n" "Monitor deployment: https://github.com/$$(git remote get-url origin | sed 's/.*github.com[:/]\([^.]*\).*/\1/')/actions"; \
+		printf "$(CYAN)$(INFO) %s$(NC)\n" "GitHub Actions will build and upload apps to production stores"; \
 	else \
 		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Git push failed - trying GitHub API trigger..."; \
 		if command -v gh >/dev/null 2>&1; then \
@@ -939,6 +915,11 @@ live-github: ## ☁️ Automated Live Production Pipeline (GitHub Only)
 			printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual trigger: Go to GitHub → Actions → Run workflow"; \
 		fi; \
 	fi
+	
+	@printf "\n"
+	@printf "$(GREEN)$(ROCKET) %s$(NC)\n" "GitHub Actions deployment initiated!"
+	@printf "$(CYAN)$(INFO) %s$(NC)\n" "No local build performed - everything happens on GitHub Actions"
+	@printf "$(CYAN)$(INFO) %s$(NC)\n" "Apps will be built and uploaded to stores automatically"
 
 trigger-github-actions: ## 🚀 Trigger GitHub Actions CI/CD (Tag Push + API)
 	@printf "\n"

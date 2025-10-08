@@ -1847,6 +1847,7 @@ sync_export_options() {
         # Update teamID in ExportOptions.plist
         sed -i.tmp "s/<string>YOUR_TEAM_ID<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"
         sed -i.tmp "s/<string>TEAM_ID<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"
+        sed -i.tmp "s/<string>{{TEAM_ID}}<\/string>/<string>$TEAM_ID<\/string>/g" "$export_options_path"
         
         # Clean up temporary file
         rm -f "$export_options_path.tmp"

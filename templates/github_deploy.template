@@ -101,6 +101,20 @@ jobs:
         bundler-cache: true
         working-directory: android
     
+    - name: Create l10n directory
+      run: |
+        mkdir -p lib/l10n
+        if [ ! -f lib/l10n/app_en.arb ]; then
+          echo '{"@@locale": "en", "appTitle": "App", "@appTitle": {"description": "The title of the application"}}' > lib/l10n/app_en.arb
+        fi
+    
+    - name: Create l10n directory
+      run: |
+        mkdir -p lib/l10n
+        if [ ! -f lib/l10n/app_en.arb ]; then
+          echo '{"@@locale": "en", "appTitle": "App", "@appTitle": {"description": "The title of the application"}}' > lib/l10n/app_en.arb
+        fi
+    
     - name: Get Flutter dependencies
       run: flutter pub get
     

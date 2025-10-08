@@ -857,7 +857,8 @@ create_ios_export_options_inline() {
     local template_file="$TEMPLATES_DIR/ios_export_options.template"
     local output_file="$TARGET_DIR/ios/fastlane/ExportOptions.plist"
     
-    if [ ! -f "$output_file" ]; then
+    # Check if file doesn't exist OR is empty/has only whitespace
+    if [ ! -f "$output_file" ] || [ ! -s "$output_file" ] || [ "$(wc -c < "$output_file")" -le 1 ]; then
         mkdir -p "$TARGET_DIR/ios/fastlane"
         if [[ -f "$template_file" ]]; then
             # Simple inline template processing for ExportOptions.plist
@@ -1842,6 +1843,19 @@ sync_export_options() {
             echo "🐛 DEBUG: ExportOptions.plist not found at $export_options_path" >&2
         fi
         return 0
+    fi
+    
+    # Check if file is empty or has only whitespace
+    if [ ! -s "$export_options_path" ] || [ "$(wc -c < "$export_options_path")" -le 1 ]; then
+        if [[ "${DEBUG:-}" == "true" ]]; then
+            echo "🐛 DEBUG: ExportOptions.plist is empty, recreating from template" >&2
+        fi
+        # Recreate from template
+        create_ios_export_options_inline
+        if [ ! -f "$export_options_path" ] || [ ! -s "$export_options_path" ]; then
+            print_warning "Failed to recreate ExportOptions.plist from template"
+            return 1
+        fi
     fi
     
     print_step "Syncing project.config with iOS ExportOptions.plist..."

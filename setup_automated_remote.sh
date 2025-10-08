@@ -2042,6 +2042,20 @@ main() {
     fi
     
     copy_scripts
+    
+    # Copy templates to target directory if running remotely
+    if [ "$REMOTE_EXECUTION" = "true" ] && [ -d "$TEMPLATES_DIR" ]; then
+        echo "🔄 Copying templates to target directory..."
+        mkdir -p "$TARGET_DIR/templates"
+        if cp -r "$TEMPLATES_DIR"/* "$TARGET_DIR/templates/" 2>/dev/null; then
+            # Update TEMPLATES_DIR to point to copied location
+            TEMPLATES_DIR="$TARGET_DIR/templates"
+            echo "✅ Templates copied to $TEMPLATES_DIR"
+        else
+            echo "⚠️ Warning: Failed to copy templates, will use original location"
+        fi
+    fi
+    
     echo "Debug: After copy_scripts, about to check template processor"
     
     # Source template processor after scripts are downloaded/copied

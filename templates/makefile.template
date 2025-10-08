@@ -509,9 +509,15 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 					exit 1; \
 				fi; \
 				cd ..; \
-				IPA_FILE=$$(find build/ios/ipa -name "*.ipa" | head -1); \
+				IPA_FILE=$$(find build/ios/ipa -name "*.ipa" 2>/dev/null | head -1); \
+				if [ -z "$$IPA_FILE" ]; then \
+					IPA_FILE=$$(find ios/fastlane/builds -name "*.ipa" 2>/dev/null | head -1); \
+				fi; \
+				if [ -z "$$IPA_FILE" ]; then \
+					IPA_FILE=$$(find . -name "*.ipa" -path "*/build/*" -o -path "*/fastlane/*" 2>/dev/null | head -1); \
+				fi; \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully: $$IPA_FILE"; \
 					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
@@ -533,7 +539,8 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 					fi; \
 					cd ..; \
 				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Production IPA export failed"; \
+					printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Production IPA not found in expected locations - build may have succeeded but IPA location differs"; \
+					printf "$(CYAN)$(INFO) %s$(NC)\n" "Check fastlane logs above for actual build status"; \
 				fi; \
 			else \
 				printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - falling back to xcodebuild"; \
@@ -779,9 +786,15 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 						xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist "$$TEMP_PLIST"; \
 						rm -f "$$TEMP_PLIST"; \
 					fi; \
-					IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
+					IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" 2>/dev/null | head -1); \
+					if [ -z "$$IPA_FILE" ]; then \
+						IPA_FILE=$$(find fastlane/builds -name "*.ipa" 2>/dev/null | head -1); \
+					fi; \
+					if [ -z "$$IPA_FILE" ]; then \
+						IPA_FILE=$$(find .. -name "*.ipa" -path "*/build/*" -o -path "*/fastlane/*" 2>/dev/null | head -1); \
+					fi; \
 					if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully: $$IPA_FILE"; \
 					cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
@@ -807,7 +820,8 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					fi; \
 				else \
-					printf "$(RED)$(CROSS) %s$(NC)\n" "Production IPA export failed"; \
+					printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Production IPA not found in expected locations - build may have succeeded but IPA location differs"; \
+					printf "$(CYAN)$(INFO) %s$(NC)\n" "Check fastlane logs above for actual build status"; \
 				fi; \
 			fi; \
 		fi; \
@@ -835,7 +849,7 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	fi; \
 	printf "$(CYAN)$(INFO) %s$(NC)\n" "Android version: $$ANDROID_VER"; \
 	printf "$(CYAN)$(INFO) %s$(NC)\n" "iOS version: $$IOS_VER"; \
-	TAG_NAME="v$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE)_$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)"; \
+	TAG_NAME="android-$(ANDROID_VERSION_NAME)-build-$(ANDROID_VERSION_CODE)_ios-$(IOS_VERSION_NAME)-build-$(IOS_VERSION_CODE)"; \
 	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
 	if git tag -a "$$TAG_NAME" -m "Local build and upload completed - Android: $$ANDROID_VER, iOS: $$IOS_VER - Apps already deployed via Fastlane" 2>/dev/null; then \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \
@@ -897,7 +911,7 @@ live-github: ## ☁️ Automated Live Production Pipeline (GitHub Only)
 	fi; \
 	printf "$(CYAN)$(INFO) %s$(NC)\n" "Android version: $$ANDROID_VER"; \
 	printf "$(CYAN)$(INFO) %s$(NC)\n" "iOS version: $$IOS_VER"; \
-	TAG_NAME="v$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE)_$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)"; \
+	TAG_NAME="android-$(ANDROID_VERSION_NAME)-build-$(ANDROID_VERSION_CODE)_ios-$(IOS_VERSION_NAME)-build-$(IOS_VERSION_CODE)"; \
 	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
 	if git tag -a "$$TAG_NAME" -m "🚀 Production release - Android: $$ANDROID_VER, iOS: $$IOS_VER" 2>/dev/null; then \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \
@@ -942,7 +956,7 @@ trigger-github-actions: ## 🚀 Trigger GitHub Actions CI/CD (Tag Push + API)
 	fi; \
 	printf "$(CYAN)$(INFO) %s$(NC)\n" "Android version: $$ANDROID_VER"; \
 	printf "$(CYAN)$(INFO) %s$(NC)\n" "iOS version: $$IOS_VER"; \
-	TAG_NAME="v$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE)_$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)"; \
+	TAG_NAME="android-$(ANDROID_VERSION_NAME)-build-$(ANDROID_VERSION_CODE)_ios-$(IOS_VERSION_NAME)-build-$(IOS_VERSION_CODE)"; \
 	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
 	if git tag -a "$$TAG_NAME" -m "🚀 Production release - Android: $$ANDROID_VER, iOS: $$IOS_VER" 2>/dev/null; then \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \

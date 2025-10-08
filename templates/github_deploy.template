@@ -3,6 +3,7 @@ name: '{{PROJECT_NAME}} - Auto Deploy'
 on:
   push:
     tags: 
+      - 'android-*'
       - 'v*'
   
   # Manual trigger for testing

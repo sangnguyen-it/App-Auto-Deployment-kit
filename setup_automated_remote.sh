@@ -860,7 +860,19 @@ create_ios_export_options_inline() {
     if [ ! -f "$output_file" ]; then
         mkdir -p "$TARGET_DIR/ios/fastlane"
         if [[ -f "$template_file" ]]; then
-            process_template "$template_file" "$output_file"
+            # Simple inline template processing for ExportOptions.plist
+            local temp_content
+            temp_content=$(cat "$template_file")
+            
+            # Replace template variables with current values
+            temp_content="${temp_content//\{\{PROJECT_NAME\}\}/${PROJECT_NAME:-}}"
+            temp_content="${temp_content//\{\{PACKAGE_NAME\}\}/${PACKAGE_NAME:-}}"
+            temp_content="${temp_content//\{\{APP_NAME\}\}/${APP_NAME:-}}"
+            temp_content="${temp_content//\{\{TEAM_ID\}\}/${TEAM_ID:-YOUR_TEAM_ID}}"
+            temp_content="${temp_content//\{\{APPLE_ID\}\}/${APPLE_ID:-your-apple-id@email.com}}"
+            
+            # Write processed content to output file
+            echo "$temp_content" > "$output_file"
             print_success "iOS ExportOptions.plist created from template"
         else
             print_error "Template file not found: $template_file"

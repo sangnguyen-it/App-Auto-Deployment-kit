@@ -60,10 +60,14 @@ platform :android do
 
   desc "Upload AAB to Google Play Production"
   lane :upload_aab_production do
-    gradle(task: "clean bundleRelease")
+    # Check if AAB already exists, if not build it
+    aab_path = '../build/app/outputs/bundle/release/app-release.aab'
+    unless File.exist?(aab_path)
+      gradle(task: "clean bundleRelease")
+    end
     upload_to_play_store(
       track: 'production',
-      aab: '../../build/app/outputs/bundle/release/app-release.aab',
+      aab: aab_path,
       skip_upload_apk: true,
       skip_upload_metadata: true,
       skip_upload_images: true,

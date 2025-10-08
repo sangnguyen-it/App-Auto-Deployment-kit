@@ -176,7 +176,7 @@ platform :ios do
         skip_metadata: false,
         skip_screenshots: false,
         submit_for_review: true,
-        automatic_release: false
+        automatic_release: true
       )
     else
       UI.message("No existing archive found, building new one...")
@@ -187,7 +187,7 @@ platform :ios do
         skip_metadata: false,
         skip_screenshots: false,
         submit_for_review: true,
-        automatic_release: false
+        automatic_release: true
       )
     end
   end

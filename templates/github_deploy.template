@@ -1,4 +1,4 @@
-name: '{{PROJECT_NAME}} - Auto Deploy'
+name: 'Deploy Auto App Store: Android-V{{ANDROID_VERSION_NAME}}-{{ANDROID_VERSION_CODE}}_IOS-V{{IOS_VERSION_NAME}}-{{IOS_VERSION_CODE}}'
 
 on:
   push:
@@ -90,7 +90,8 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: 'stable'
+        flutter-version: '3.32.1'
+        channel: 'stable'
         cache: true
     
     - name: Setup Ruby
@@ -195,7 +196,8 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: 'stable'
+        flutter-version: '3.32.1'
+        channel: 'stable'
         cache: true
     
     - name: Setup Ruby

@@ -884,7 +884,7 @@ live-github: ## ☁️ Automated Live Production Pipeline (GitHub Actions Build 
 	fi; \
 	printf "$(CYAN)$(INFO) %s$(NC)\n" "Android version: $$ANDROID_VER"; \
 	printf "$(CYAN)$(INFO) %s$(NC)\n" "iOS version: $$IOS_VER"; \
-	TAG_NAME="android-$$ANDROID_VERSION_NAME-build-$$ANDROID_VERSION_CODE_ios-$$IOS_VERSION_NAME-build-$$IOS_VERSION_CODE"; \
+	TAG_NAME="android-$$ANDROID_VERSION_NAME-build-$$ANDROID_VERSION_CODE-ios-$$IOS_VERSION_NAME-build-$$IOS_VERSION_CODE"; \
 	printf "$(CYAN)$(GEAR) %s$(NC)\n" "Creating git tag: $$TAG_NAME"; \
 	if git tag -a "$$TAG_NAME" -m "🚀 GitHub Actions Production Build & Upload - Android: $$ANDROID_VER, iOS: $$IOS_VER" 2>/dev/null; then \
 		printf "$(GREEN)$(CHECK) %s$(NC)\n" "Git tag created: $$TAG_NAME"; \

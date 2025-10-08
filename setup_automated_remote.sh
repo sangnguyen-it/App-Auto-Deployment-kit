@@ -6,9 +6,29 @@
 # Exit on error, but handle curl download gracefully
 set -e
 
+# Parse command line arguments first to check for force remote option
+FORCE_REMOTE_MODE=false
+for arg in "$@"; do
+    case $arg in
+        --force-remote|--remote)
+            FORCE_REMOTE_MODE=true
+            echo "🔄 Force remote mode enabled via command line"
+            ;;
+        --help|-h)
+            echo "Usage: $0 [options] [target_directory]"
+            echo "Options:"
+            echo "  --force-remote, --remote    Force download scripts/templates to temp directory"
+            echo "  --debug                     Enable debug output"
+            echo "  --verbose                   Enable verbose output"
+            echo "  --help, -h                  Show this help message"
+            exit 0
+            ;;
+    esac
+done
+
 # Enhanced interactive detection - detect curl | bash scenarios
 # Force remote execution mode for testing or when explicitly set
-if [[ "${FORCE_REMOTE_EXECUTION:-}" == "true" ]]; then
+if [[ "${FORCE_REMOTE_EXECUTION:-}" == "true" ]] || [[ "$FORCE_REMOTE_MODE" == "true" ]]; then
     export TERM=dumb
     export REMOTE_EXECUTION=true
     echo "🔄 Remote execution mode enabled (forced)"
@@ -223,10 +243,11 @@ DEPLOYMENT_MODE=""
 
 # Interactive mode flag - detect based on terminal availability and environment
 # Check if we have access to /dev/tty for interactive input (even in pipe mode)
-if [[ "${FORCE_REMOTE_EXECUTION:-}" == "true" ]]; then
-    # Don't override if FORCE_REMOTE_EXECUTION is set
+if [[ "${FORCE_REMOTE_EXECUTION:-}" == "true" ]] || [[ "$FORCE_REMOTE_MODE" == "true" ]]; then
+    # Force remote execution mode
+    export REMOTE_EXECUTION=true
     INTERACTIVE_MODE=false
-    echo "🔄 Forced remote execution mode - keeping REMOTE_EXECUTION=$REMOTE_EXECUTION"
+    echo "🔄 Forced remote execution mode - REMOTE_EXECUTION=$REMOTE_EXECUTION"
 elif [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]]; then
     # Check if we're running via curl | bash (pipe mode) - auto-enable remote mode
     if [[ ! -t 0 ]]; then
@@ -235,17 +256,33 @@ elif [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "t
         INTERACTIVE_MODE=true
         echo "🔄 Pipe mode detected (curl | bash) - enabling remote execution to download all scripts"
     else
-        # Override REMOTE_EXECUTION if we have tty access and not in pipe mode
-        export REMOTE_EXECUTION=false
-        INTERACTIVE_MODE=true
-        echo "🔄 Interactive mode enabled (tty available)"
+        # Check if local templates/scripts directory exists, if not, force remote mode
+        if [[ ! -d "$SCRIPT_DIR/templates" ]] || [[ ! -d "$SCRIPT_DIR/scripts" ]]; then
+            export REMOTE_EXECUTION=true
+            INTERACTIVE_MODE=true
+            echo "🔄 Local templates/scripts not found - enabling remote execution to download all files"
+        else
+            # Override REMOTE_EXECUTION if we have tty access and not in pipe mode
+            export REMOTE_EXECUTION=false
+            INTERACTIVE_MODE=true
+            echo "🔄 Interactive mode enabled (tty available, local files found)"
+        fi
     fi
 elif [ -t 0 ] && [ -t 1 ] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]] && [[ "${REMOTE_EXECUTION:-}" != "true" ]]; then
-    INTERACTIVE_MODE=true
-    echo "🔄 Interactive mode enabled"
+    # Check if local templates/scripts directory exists, if not, force remote mode
+    if [[ ! -d "$SCRIPT_DIR/templates" ]] || [[ ! -d "$SCRIPT_DIR/scripts" ]]; then
+        export REMOTE_EXECUTION=true
+        INTERACTIVE_MODE=true
+        echo "🔄 Local templates/scripts not found - enabling remote execution to download all files"
+    else
+        INTERACTIVE_MODE=true
+        echo "🔄 Interactive mode enabled"
+    fi
 else
+    # Auto-enable remote mode for non-interactive execution
+    export REMOTE_EXECUTION=true
     INTERACTIVE_MODE=false
-    echo "🔄 Auto-mode enabled (non-interactive execution)"
+    echo "🔄 Auto-mode enabled (non-interactive execution) - enabling remote execution"
 fi
 
 # Function to detect Git provider
@@ -752,6 +789,17 @@ create_configuration_files() {
 create_configuration_files_inline() {
     print_step "Creating configuration files inline..."
     
+    # Fix TEMPLATES_DIR if it's empty or root
+    if [[ -z "$TEMPLATES_DIR" || "$TEMPLATES_DIR" == "/" ]]; then
+        if [[ "$REMOTE_EXECUTION" == "true" ]]; then
+            TEMPLATES_DIR="$TMP_DOWNLOAD_DIR/templates"
+        else
+            TEMPLATES_DIR="$SCRIPT_DIR/templates"
+        fi
+    fi
+    
+    echo "Debug: Fixed TEMPLATES_DIR = '$TEMPLATES_DIR'"
+    
     # Create Android Fastfile
     if [ ! -f "$TARGET_DIR/android/fastlane/Fastfile" ]; then
         create_android_fastfile_inline
@@ -786,8 +834,12 @@ create_configuration_files_inline() {
 
 # Inline creation functions (simplified versions)
 create_android_fastfile_inline() {
-    local template_file="$TEMPLATE_DIR/android_fastfile.template"
+    local template_file="$TEMPLATES_DIR/android_fastfile.template"
     local output_file="$TARGET_DIR/android/fastlane/Fastfile"
+    
+    echo "Debug: TEMPLATES_DIR = '$TEMPLATES_DIR'"
+    echo "Debug: template_file = '$template_file'"
+    echo "Debug: Checking if template file exists..."
     
     if [[ -f "$template_file" ]]; then
         process_template "$template_file" "$output_file"
@@ -800,7 +852,7 @@ create_android_fastfile_inline() {
 }
 
 create_ios_fastfile_inline() {
-    local template_file="$TEMPLATE_DIR/ios_fastfile.template"
+    local template_file="$TEMPLATES_DIR/ios_fastfile.template"
     local output_file="$TARGET_DIR/ios/fastlane/Fastfile"
     
     if [[ -f "$template_file" ]]; then
@@ -814,7 +866,7 @@ create_ios_fastfile_inline() {
 }
 
 create_ios_appfile_inline() {
-    local template_file="$TEMPLATE_DIR/ios_appfile.template"
+    local template_file="$TEMPLATES_DIR/ios_appfile.template"
     local output_file="$TARGET_DIR/ios/fastlane/Appfile"
     
     if [ ! -f "$output_file" ]; then
@@ -832,7 +884,7 @@ create_ios_appfile_inline() {
 }
 
 create_ios_export_options_inline() {
-    local template_file="$TEMPLATE_DIR/ios_export_options.template"
+    local template_file="$TEMPLATES_DIR/ios_export_options.template"
     local output_file="$TARGET_DIR/ios/fastlane/ExportOptions.plist"
     
     if [ ! -f "$output_file" ]; then
@@ -913,7 +965,7 @@ create_makefile_inline() {
 }
 
 create_github_workflow_inline() {
-    local template_file="$TEMPLATE_DIR/github_deploy.template"
+    local template_file="$TEMPLATES_DIR/github_deploy.template"
     local output_file="$TARGET_DIR/.github/workflows/deploy.yml"
     
     if [[ -f "$template_file" ]]; then
@@ -927,7 +979,7 @@ create_github_workflow_inline() {
 }
 
 create_gemfile_inline() {
-    local template_file="$TEMPLATE_DIR/gemfile.template"
+    local template_file="$TEMPLATES_DIR/gemfile.template"
     local output_file="$TARGET_DIR/Gemfile"
     
     if [[ -f "$template_file" ]]; then

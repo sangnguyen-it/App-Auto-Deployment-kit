@@ -36,6 +36,7 @@ platform :android do
     upload_to_play_store(
       track: 'internal',
       aab: '../../build/app/outputs/bundle/release/app-release.aab',
+      json_key: 'fastlane/play_store_service_account.json',
       skip_upload_apk: true,
       skip_upload_metadata: true,
       skip_upload_images: true,
@@ -50,6 +51,7 @@ platform :android do
     upload_to_play_store(
       track: 'internal',
       track_promote_to: 'beta',
+      json_key: 'fastlane/play_store_service_account.json',
       skip_upload_apk: true,
       skip_upload_aab: true,
       skip_upload_metadata: true,
@@ -68,6 +70,7 @@ platform :android do
     upload_to_play_store(
       track: 'production',
       aab: aab_path,
+      json_key: 'fastlane/play_store_service_account.json',
       skip_upload_apk: true,
       skip_upload_metadata: true,
       skip_upload_images: true,
@@ -81,6 +84,7 @@ platform :android do
   lane :deploy do
     gradle(task: "clean assembleRelease")
     upload_to_play_store(
+      json_key: 'fastlane/play_store_service_account.json',
       release_status: 'completed',
       changes_not_sent_for_review: false
     )

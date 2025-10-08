@@ -77,11 +77,9 @@ if [ "$REMOTE_EXECUTION" = "true" ]; then
 fi
 
 # Source common functions (template processor will be sourced later after download)
-if [ -f "$SCRIPTS_DIR/common_functions.sh" ]; then
-    source "$SCRIPTS_DIR/common_functions.sh"
-else
-    echo "Warning: common_functions.sh not found, using inline functions"
-fi
+    if [ -f "$SCRIPTS_DIR/common_functions.sh" ]; then
+        source "$SCRIPTS_DIR/common_functions.sh"
+    fi
 
 # Colors and styling
 RED='\033[0;31m'
@@ -565,9 +563,6 @@ download_scripts_from_github() {
             print_success "Downloaded: $script"
         else
             print_warning "Failed to download: $script (will use inline version if available)"
-            # Debug: show curl error
-            echo "Debug: curl error for $script_url" >&2
-            curl -fsSL "$script_url" -o "$script_path" || echo "Curl failed with exit code: $?" >&2
         fi
     done
     
@@ -582,19 +577,11 @@ download_scripts_from_github() {
 download_templates_from_github() {
     print_header "Downloading Templates from GitHub"
     
-    # Debug: Show current directories
-    echo "Debug: TEMPLATES_DIR = $TEMPLATES_DIR"
-    echo "Debug: Current working directory = $(pwd)"
-    
     # Ensure templates directory exists
     mkdir -p "$TEMPLATES_DIR"
     
     # Verify directory was created
-    if [ -d "$TEMPLATES_DIR" ]; then
-        echo "Debug: Templates directory exists: $TEMPLATES_DIR"
-        ls -la "$TEMPLATES_DIR" || echo "Debug: Cannot list templates directory"
-    else
-        echo "Debug: Failed to create templates directory: $TEMPLATES_DIR"
+    if [ ! -d "$TEMPLATES_DIR" ]; then
         return 1
     fi
     
@@ -621,9 +608,9 @@ download_templates_from_github() {
         # Test if we can write to the directory
         if touch "$template_path.test" 2>/dev/null; then
             rm -f "$template_path.test"
-            echo "Debug: Write permission OK for $TEMPLATES_DIR"
         else
-            echo "Debug: No write permission for $TEMPLATES_DIR"
+            print_error "No write permission for $TEMPLATES_DIR"
+            return 1
         fi
         
         if curl -fsSL "$template_url" -o "$template_path"; then
@@ -632,15 +619,11 @@ download_templates_from_github() {
             # Verify file was created
             if [ -f "$template_path" ]; then
                 print_success "Verified: $template exists at $template_path"
-                echo "Debug: File size: $(wc -c < "$template_path") bytes"
             else
                 print_warning "Warning: $template not found after download"
             fi
         else
             print_warning "Failed to download: $template (will use inline version if available)"
-            # Debug: show curl error
-            echo "Debug: curl error for $template_url" >&2
-            curl -fsSL "$template_url" -o "$template_path" || echo "Curl failed with exit code: $?" >&2
         fi
     done
     
@@ -754,19 +737,12 @@ create_configuration_files() {
 create_configuration_files_inline() {
     print_step "Creating configuration files inline..."
     
-    echo "Debug: In create_configuration_files_inline"
-    echo "Debug: TEMPLATES_DIR = '$TEMPLATES_DIR'"
-    echo "Debug: SCRIPT_DIR = '$SCRIPT_DIR'"
-    echo "Debug: TMP_DOWNLOAD_DIR = '$TMP_DOWNLOAD_DIR'"
-    
     # Ensure TEMPLATES_DIR is properly set
     if [ -z "$TEMPLATES_DIR" ] || [ "$TEMPLATES_DIR" = "/" ]; then
         if [ "$REMOTE_EXECUTION" = "true" ] && [ -n "$TMP_DOWNLOAD_DIR" ]; then
             TEMPLATES_DIR="$TMP_DOWNLOAD_DIR/templates"
-            echo "Debug: Fixed TEMPLATES_DIR to: $TEMPLATES_DIR"
         else
             TEMPLATES_DIR="$SCRIPT_DIR/templates"
-            echo "Debug: Fixed TEMPLATES_DIR to: $TEMPLATES_DIR"
         fi
     fi
     
@@ -806,10 +782,6 @@ create_configuration_files_inline() {
 create_android_fastfile_inline() {
     local template_file="$TEMPLATES_DIR/android_fastfile.template"
     local output_file="$TARGET_DIR/android/fastlane/Fastfile"
-    
-    echo "Debug: TEMPLATES_DIR = '$TEMPLATES_DIR'"
-    echo "Debug: template_file = '$template_file'"
-    echo "Debug: Checking if template file exists..."
     
     if [[ -f "$template_file" ]]; then
         process_template "$template_file" "$output_file"
@@ -891,11 +863,6 @@ create_makefile_inline() {
     # Use template system like the old flow
     local template_file="$TEMPLATES_DIR/makefile.template"
     local output_file="$TARGET_DIR/Makefile"
-    
-    # Debug: Show template path
-    echo "Debug: Looking for template at: $template_file"
-    echo "Debug: TEMPLATES_DIR = $TEMPLATES_DIR"
-    echo "Debug: SCRIPT_DIR = $SCRIPT_DIR"
     
     if [[ -f "$template_file" ]]; then
         print_step "Using makefile template..."
@@ -1313,7 +1280,6 @@ check_dependencies() {
         return 1
     fi
     
-    echo "✅ All dependencies are available"
     return 0
 }
 
@@ -1327,19 +1293,16 @@ copy_automation_files() {
     # Copy Makefile
     if [ -f "$source_dir/Makefile" ]; then
         cp "$source_dir/Makefile" "$target_dir/"
-        echo "✅ Copied Makefile"
     fi
     
     # Copy scripts directory
     if [ -d "$source_dir/scripts" ]; then
         cp -r "$source_dir/scripts" "$target_dir/"
-        echo "✅ Copied scripts directory"
     fi
     
     # Copy documentation
     if [ -d "$source_dir/docs" ]; then
         cp -r "$source_dir/docs" "$target_dir/"
-        echo "✅ Copied documentation"
     fi
 }
 
@@ -1373,8 +1336,6 @@ ANDROID_FLAVOR=""
 VERSION_STRATEGY="auto"
 CHANGELOG_ENABLED="true"
 EOF
-    
-    echo "✅ Created project.config"
 }
 
 # Function to create common_functions.sh inline (optimized)
@@ -1432,8 +1393,6 @@ validate_flutter_project() {
         echo "💡 Make sure this is a complete Flutter project with both platforms."
         exit 1
     fi
-    
-    echo "✅ Flutter project structure validated"
 }
 
 # Get project information functions
@@ -2056,22 +2015,16 @@ main() {
         fi
     fi
     
-    echo "Debug: After copy_scripts, about to check template processor"
-    
     # Source template processor after scripts are downloaded/copied
-    echo "Debug: Checking for template_processor.sh at $TARGET_DIR/scripts/template_processor.sh"
     if [ -f "$TARGET_DIR/scripts/template_processor.sh" ]; then
         # Store TEMPLATES_DIR before sourcing
         SAVED_TEMPLATES_DIR="$TEMPLATES_DIR"
-        echo "Debug: Sourcing template_processor.sh with TEMPLATES_DIR=$TEMPLATES_DIR"
         source "$TARGET_DIR/scripts/template_processor.sh"
         # Restore TEMPLATES_DIR after sourcing
         TEMPLATES_DIR="$SAVED_TEMPLATES_DIR"
-        echo "✅ Template processor loaded successfully"
     else
         echo "Warning: template_processor.sh not found in $TARGET_DIR/scripts, using inline template processing"
     fi
-    echo "Debug: About to call create_configuration_files"
     
     create_configuration_files
     create_project_config

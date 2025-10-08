@@ -90,7 +90,7 @@ create_android_fastfile_from_template() {
     local target_dir="$1"
     local project_name="$2"
     local package_name="$3"
-    local template_dir="${4:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    local template_dir="${4:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
     
     local template_file="$template_dir/android_fastfile.template"
     local output_file="$target_dir/android/fastlane/Fastfile"
@@ -109,7 +109,7 @@ create_ios_fastfile_from_template() {
     local target_dir="$1"
     local project_name="$2"
     local package_name="$3"
-    local template_dir="${4:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    local template_dir="${4:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
     
     local template_file="$template_dir/ios_fastfile.template"
     local output_file="$target_dir/ios/fastlane/Fastfile"
@@ -130,7 +130,7 @@ create_ios_appfile_from_template() {
     local package_name="$3"
     local team_id="${4:-YOUR_TEAM_ID}"
     local apple_id="${5:-your-apple-id@email.com}"
-    local template_dir="${6:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    local template_dir="${6:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
     
     local template_file="$template_dir/ios_appfile.template"
     local output_file="$target_dir/ios/fastlane/Appfile"
@@ -149,7 +149,7 @@ create_android_appfile_from_template() {
     local target_dir="$1"
     local project_name="$2"
     local package_name="$3"
-    local template_dir="${4:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    local template_dir="${4:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
     
     local template_file="$template_dir/android_appfile.template"
     local output_file="$target_dir/android/fastlane/Appfile"
@@ -169,7 +169,7 @@ create_makefile_from_template() {
     local project_name="$2"
     local package_name="$3"
     local app_name="$4"
-    local template_dir="${5:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    local template_dir="${5:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
     
     local template_file="$template_dir/makefile.template"
     local output_file="$target_dir/Makefile"
@@ -189,7 +189,7 @@ create_github_workflow_from_template() {
     local target_dir="$1"
     local project_name="$2"
     local package_name="$3"
-    local template_dir="${4:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    local template_dir="${4:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
     
     local template_file="$template_dir/github_deploy.template"
     local output_file="$target_dir/.github/workflows/deploy.yml"
@@ -207,7 +207,7 @@ create_github_workflow_from_template() {
 create_gemfile_from_template() {
     local target_dir="$1"
     local project_name="$2"
-    local template_dir="${3:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    local template_dir="${3:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
     
     local template_file="$template_dir/gemfile.template"
     local output_file="$target_dir/Gemfile"
@@ -226,7 +226,7 @@ create_gemfile_from_template() {
 create_ios_export_options_from_template() {
     local target_dir="$1"
     local team_id="$2"
-    local template_dir="${3:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    local template_dir="${3:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
     
     local template_file="$template_dir/ios_export_options.template"
     local output_file="$target_dir/ios/fastlane/ExportOptions.plist"
@@ -259,7 +259,7 @@ create_all_templates() {
     local app_name="$4"
     local team_id="${5:-YOUR_TEAM_ID}"
     local apple_id="${6:-your-apple-id@email.com}"
-    local template_dir="${7:-$(dirname "${BASH_SOURCE[0]}")/../templates}"
+    local template_dir="${7:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
 
     
     # Create directory structure

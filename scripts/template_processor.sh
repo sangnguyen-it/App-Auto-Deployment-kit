@@ -79,6 +79,12 @@ process_template() {
     temp_content="${temp_content//\{\{VERSION_CODE\}\}/$version_code}"
     temp_content="${temp_content//\{\{FLUTTER_VERSION\}\}/$flutter_version}"
     
+    # Replace Android and iOS specific version variables
+    temp_content="${temp_content//\{\{ANDROID_VERSION_NAME\}\}/$version_name}"
+    temp_content="${temp_content//\{\{ANDROID_VERSION_CODE\}\}/$version_code}"
+    temp_content="${temp_content//\{\{IOS_VERSION_NAME\}\}/$version_name}"
+    temp_content="${temp_content//\{\{IOS_VERSION_CODE\}\}/$version_code}"
+    
     # Write processed content to output file
     echo "$temp_content" > "$output_file"
     

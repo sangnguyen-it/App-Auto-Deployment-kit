@@ -77,24 +77,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATES_DIR="$SCRIPT_DIR/templates"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 
-# Create temporary directory for downloads if running remotely
-if [ "$REMOTE_EXECUTION" = "true" ]; then
-    TMP_DOWNLOAD_DIR="/tmp/flutter_cicd_setup_$$"
-    mkdir -p "$TMP_DOWNLOAD_DIR"
-    echo "📁 Created temporary directory: $TMP_DOWNLOAD_DIR"
-    
-    # Override script directories to use temp directory
-    SCRIPT_DIR="$TMP_DOWNLOAD_DIR"
-    TEMPLATES_DIR="$TMP_DOWNLOAD_DIR/templates"
-    SCRIPTS_DIR="$TMP_DOWNLOAD_DIR/scripts"
-    
-    # Create subdirectories in temp
-    mkdir -p "$TEMPLATES_DIR"
-    mkdir -p "$SCRIPTS_DIR"
-    
-    # Set cleanup trap
-    trap 'rm -rf "$TMP_DOWNLOAD_DIR" 2>/dev/null || true' EXIT
-fi
+# Note: TMP_DOWNLOAD_DIR and directory overrides will be set later after REMOTE_EXECUTION detection
 
 # Source common functions and template processor
 if [ -f "$SCRIPTS_DIR/common_functions.sh" ]; then
@@ -283,6 +266,25 @@ else
     export REMOTE_EXECUTION=true
     INTERACTIVE_MODE=false
     echo "🔄 Auto-mode enabled (non-interactive execution) - enabling remote execution"
+fi
+
+# Create temporary directory for downloads if running remotely (after REMOTE_EXECUTION detection)
+if [ "$REMOTE_EXECUTION" = "true" ]; then
+    TMP_DOWNLOAD_DIR="/tmp/flutter_cicd_setup_$$"
+    mkdir -p "$TMP_DOWNLOAD_DIR"
+    echo "📁 Created temporary directory: $TMP_DOWNLOAD_DIR"
+    
+    # Override script directories to use temp directory
+    SCRIPT_DIR="$TMP_DOWNLOAD_DIR"
+    TEMPLATES_DIR="$TMP_DOWNLOAD_DIR/templates"
+    SCRIPTS_DIR="$TMP_DOWNLOAD_DIR/scripts"
+    
+    # Create subdirectories in temp
+    mkdir -p "$TEMPLATES_DIR"
+    mkdir -p "$SCRIPTS_DIR"
+    
+    # Set cleanup trap
+    trap 'rm -rf "$TMP_DOWNLOAD_DIR" 2>/dev/null || true' EXIT
 fi
 
 # Function to detect Git provider

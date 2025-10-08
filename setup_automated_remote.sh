@@ -6,29 +6,9 @@
 # Exit on error, but handle curl download gracefully
 set -e
 
-# Parse command line arguments first to check for force remote option
-FORCE_REMOTE_MODE=false
-for arg in "$@"; do
-    case $arg in
-        --force-remote|--remote)
-            FORCE_REMOTE_MODE=true
-            echo "🔄 Force remote mode enabled via command line"
-            ;;
-        --help|-h)
-            echo "Usage: $0 [options] [target_directory]"
-            echo "Options:"
-            echo "  --force-remote, --remote    Force download scripts/templates to temp directory"
-            echo "  --debug                     Enable debug output"
-            echo "  --verbose                   Enable verbose output"
-            echo "  --help, -h                  Show this help message"
-            exit 0
-            ;;
-    esac
-done
-
 # Enhanced interactive detection - detect curl | bash scenarios
 # Force remote execution mode for testing or when explicitly set
-if [[ "${FORCE_REMOTE_EXECUTION:-}" == "true" ]] || [[ "$FORCE_REMOTE_MODE" == "true" ]]; then
+if [[ "${FORCE_REMOTE_EXECUTION:-}" == "true" ]]; then
     export TERM=dumb
     export REMOTE_EXECUTION=true
     echo "🔄 Remote execution mode enabled (forced)"
@@ -77,19 +57,30 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATES_DIR="$SCRIPT_DIR/templates"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 
-# Note: TMP_DOWNLOAD_DIR and directory overrides will be set later after REMOTE_EXECUTION detection
+# Create temporary directory for downloads if running remotely
+if [ "$REMOTE_EXECUTION" = "true" ]; then
+    TMP_DOWNLOAD_DIR="/tmp/flutter_cicd_setup_$$"
+    mkdir -p "$TMP_DOWNLOAD_DIR"
+    echo "📁 Created temporary directory: $TMP_DOWNLOAD_DIR"
+    
+    # Override script directories to use temp directory
+    SCRIPT_DIR="$TMP_DOWNLOAD_DIR"
+    TEMPLATES_DIR="$TMP_DOWNLOAD_DIR/templates"
+    SCRIPTS_DIR="$TMP_DOWNLOAD_DIR/scripts"
+    
+    # Create subdirectories in temp
+    mkdir -p "$TEMPLATES_DIR"
+    mkdir -p "$SCRIPTS_DIR"
+    
+    # Set cleanup trap
+    trap 'rm -rf "$TMP_DOWNLOAD_DIR" 2>/dev/null || true' EXIT
+fi
 
-# Source common functions and template processor
+# Source common functions (template processor will be sourced later after download)
 if [ -f "$SCRIPTS_DIR/common_functions.sh" ]; then
     source "$SCRIPTS_DIR/common_functions.sh"
 else
     echo "Warning: common_functions.sh not found, using inline functions"
-fi
-
-if [ -f "$SCRIPTS_DIR/template_processor.sh" ]; then
-    source "$SCRIPTS_DIR/template_processor.sh"
-else
-    echo "Warning: template_processor.sh not found, using inline template processing"
 fi
 
 # Colors and styling
@@ -226,11 +217,10 @@ DEPLOYMENT_MODE=""
 
 # Interactive mode flag - detect based on terminal availability and environment
 # Check if we have access to /dev/tty for interactive input (even in pipe mode)
-if [[ "${FORCE_REMOTE_EXECUTION:-}" == "true" ]] || [[ "$FORCE_REMOTE_MODE" == "true" ]]; then
-    # Force remote execution mode
-    export REMOTE_EXECUTION=true
+if [[ "${FORCE_REMOTE_EXECUTION:-}" == "true" ]]; then
+    # Don't override if FORCE_REMOTE_EXECUTION is set
     INTERACTIVE_MODE=false
-    echo "🔄 Forced remote execution mode - REMOTE_EXECUTION=$REMOTE_EXECUTION"
+    echo "🔄 Forced remote execution mode - keeping REMOTE_EXECUTION=$REMOTE_EXECUTION"
 elif [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]]; then
     # Check if we're running via curl | bash (pipe mode) - auto-enable remote mode
     if [[ ! -t 0 ]]; then
@@ -239,52 +229,17 @@ elif [[ -r /dev/tty ]] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "t
         INTERACTIVE_MODE=true
         echo "🔄 Pipe mode detected (curl | bash) - enabling remote execution to download all scripts"
     else
-        # Check if local templates/scripts directory exists, if not, force remote mode
-        if [[ ! -d "$SCRIPT_DIR/templates" ]] || [[ ! -d "$SCRIPT_DIR/scripts" ]]; then
-            export REMOTE_EXECUTION=true
-            INTERACTIVE_MODE=true
-            echo "🔄 Local templates/scripts not found - enabling remote execution to download all files"
-        else
-            # Override REMOTE_EXECUTION if we have tty access and not in pipe mode
-            export REMOTE_EXECUTION=false
-            INTERACTIVE_MODE=true
-            echo "🔄 Interactive mode enabled (tty available, local files found)"
-        fi
+        # Override REMOTE_EXECUTION if we have tty access and not in pipe mode
+        export REMOTE_EXECUTION=false
+        INTERACTIVE_MODE=true
+        echo "🔄 Interactive mode enabled (tty available)"
     fi
 elif [ -t 0 ] && [ -t 1 ] && [[ "${CI:-}" != "true" ]] && [[ "${AUTOMATED:-}" != "true" ]] && [[ "${REMOTE_EXECUTION:-}" != "true" ]]; then
-    # Check if local templates/scripts directory exists, if not, force remote mode
-    if [[ ! -d "$SCRIPT_DIR/templates" ]] || [[ ! -d "$SCRIPT_DIR/scripts" ]]; then
-        export REMOTE_EXECUTION=true
-        INTERACTIVE_MODE=true
-        echo "🔄 Local templates/scripts not found - enabling remote execution to download all files"
-    else
-        INTERACTIVE_MODE=true
-        echo "🔄 Interactive mode enabled"
-    fi
+    INTERACTIVE_MODE=true
+    echo "🔄 Interactive mode enabled"
 else
-    # Auto-enable remote mode for non-interactive execution
-    export REMOTE_EXECUTION=true
     INTERACTIVE_MODE=false
-    echo "🔄 Auto-mode enabled (non-interactive execution) - enabling remote execution"
-fi
-
-# Create temporary directory for downloads if running remotely (after REMOTE_EXECUTION detection)
-if [ "$REMOTE_EXECUTION" = "true" ]; then
-    TMP_DOWNLOAD_DIR="/tmp/flutter_cicd_setup_$$"
-    mkdir -p "$TMP_DOWNLOAD_DIR"
-    echo "📁 Created temporary directory: $TMP_DOWNLOAD_DIR"
-    
-    # Override script directories to use temp directory
-    SCRIPT_DIR="$TMP_DOWNLOAD_DIR"
-    TEMPLATES_DIR="$TMP_DOWNLOAD_DIR/templates"
-    SCRIPTS_DIR="$TMP_DOWNLOAD_DIR/scripts"
-    
-    # Create subdirectories in temp
-    mkdir -p "$TEMPLATES_DIR"
-    mkdir -p "$SCRIPTS_DIR"
-    
-    # Set cleanup trap
-    trap 'rm -rf "$TMP_DOWNLOAD_DIR" 2>/dev/null || true' EXIT
+    echo "🔄 Auto-mode enabled (non-interactive execution)"
 fi
 
 # Function to detect Git provider
@@ -723,10 +678,18 @@ copy_scripts() {
     
     for script in "${script_files[@]}"; do
         if [ -f "$SCRIPTS_DIR/$script" ]; then
-            cp "$SCRIPTS_DIR/$script" "$TARGET_DIR/scripts/"
-            chmod +x "$TARGET_DIR/scripts/$script" 2>/dev/null || true
-            ((scripts_copied++))
-            # print_success "Copied: $script"
+            # Only copy if source and target are different
+            if [ "$SCRIPTS_DIR/$script" != "$TARGET_DIR/scripts/$script" ]; then
+                cp "$SCRIPTS_DIR/$script" "$TARGET_DIR/scripts/"
+                chmod +x "$TARGET_DIR/scripts/$script" 2>/dev/null || true
+                ((scripts_copied++))
+                # print_success "Copied: $script"
+            else
+                # File already exists in target location
+                chmod +x "$TARGET_DIR/scripts/$script" 2>/dev/null || true
+                ((scripts_copied++))
+                # print_success "Already exists: $script"
+            fi
         else
             # Create essential scripts inline if not found
             case "$script" in
@@ -791,16 +754,21 @@ create_configuration_files() {
 create_configuration_files_inline() {
     print_step "Creating configuration files inline..."
     
-    # Fix TEMPLATES_DIR if it's empty or root
-    if [[ -z "$TEMPLATES_DIR" || "$TEMPLATES_DIR" == "/" ]]; then
-        if [[ "$REMOTE_EXECUTION" == "true" ]]; then
+    echo "Debug: In create_configuration_files_inline"
+    echo "Debug: TEMPLATES_DIR = '$TEMPLATES_DIR'"
+    echo "Debug: SCRIPT_DIR = '$SCRIPT_DIR'"
+    echo "Debug: TMP_DOWNLOAD_DIR = '$TMP_DOWNLOAD_DIR'"
+    
+    # Ensure TEMPLATES_DIR is properly set
+    if [ -z "$TEMPLATES_DIR" ] || [ "$TEMPLATES_DIR" = "/" ]; then
+        if [ "$REMOTE_EXECUTION" = "true" ] && [ -n "$TMP_DOWNLOAD_DIR" ]; then
             TEMPLATES_DIR="$TMP_DOWNLOAD_DIR/templates"
+            echo "Debug: Fixed TEMPLATES_DIR to: $TEMPLATES_DIR"
         else
             TEMPLATES_DIR="$SCRIPT_DIR/templates"
+            echo "Debug: Fixed TEMPLATES_DIR to: $TEMPLATES_DIR"
         fi
     fi
-    
-    echo "Debug: Fixed TEMPLATES_DIR = '$TEMPLATES_DIR'"
     
     # Create Android Fastfile
     if [ ! -f "$TARGET_DIR/android/fastlane/Fastfile" ]; then
@@ -2047,6 +2015,23 @@ main() {
     fi
     
     copy_scripts
+    echo "Debug: After copy_scripts, about to check template processor"
+    
+    # Source template processor after scripts are downloaded/copied
+    echo "Debug: Checking for template_processor.sh at $TARGET_DIR/scripts/template_processor.sh"
+    if [ -f "$TARGET_DIR/scripts/template_processor.sh" ]; then
+        # Store TEMPLATES_DIR before sourcing
+        SAVED_TEMPLATES_DIR="$TEMPLATES_DIR"
+        echo "Debug: Sourcing template_processor.sh with TEMPLATES_DIR=$TEMPLATES_DIR"
+        source "$TARGET_DIR/scripts/template_processor.sh"
+        # Restore TEMPLATES_DIR after sourcing
+        TEMPLATES_DIR="$SAVED_TEMPLATES_DIR"
+        echo "✅ Template processor loaded successfully"
+    else
+        echo "Warning: template_processor.sh not found in $TARGET_DIR/scripts, using inline template processing"
+    fi
+    echo "Debug: About to call create_configuration_files"
+    
     create_configuration_files
     create_project_config
     

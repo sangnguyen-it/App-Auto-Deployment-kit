@@ -135,7 +135,7 @@ platform :ios do
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
       xcargs: "-allowProvisioningUpdates",
-      export_options: "./ExportOptions.plist"
+      export_options: "fastlane/ExportOptions.plist"
 
     )
   end

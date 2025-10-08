@@ -115,12 +115,12 @@ jobs:
         echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/app.keystore
         
         # Create key.properties
-        cat > android/key.properties << EOF
+        cat > android/key.properties << 'EOF'
         storeFile=app.keystore
         storePassword=$KEYSTORE_PASSWORD
         keyAlias=$KEY_ALIAS
         keyPassword=$KEY_PASSWORD
-EOF
+        EOF
         
         echo "✅ Keystore setup completed"
     

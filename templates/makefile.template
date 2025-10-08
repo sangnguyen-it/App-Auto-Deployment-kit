@@ -25,9 +25,9 @@ OUTPUT_DIR := builder
 APK_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.apk
 AAB_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.aab
 IPA_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.ipa
-IPA_PROD_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}-production.ipa
+IPA_PROD_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.ipa
 ARCHIVE_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.xcarchive
-ARCHIVE_PROD_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}-production.xcarchive
+ARCHIVE_PROD_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.xcarchive
 
 # Function to get current version (will be called during build)
 define get_current_version
@@ -232,9 +232,9 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
 	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
 	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
 	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
 	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
 	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
@@ -254,9 +254,9 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
 	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
 	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
 	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
 	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
 	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
@@ -272,9 +272,9 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
 	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
 	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
 	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
 	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
 	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
@@ -290,9 +290,9 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
 	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
 	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
 	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
 	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
 	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
@@ -446,9 +446,9 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
 	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
 	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
 	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
 	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
 	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
@@ -648,9 +648,9 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
 	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
 	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
 	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
 	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
 	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
@@ -772,12 +772,15 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting Production IPA from Archive..."; \
 					if [ -f "fastlane/ExportOptions.plist" ]; then \
-					xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
+						xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
 					else \
-						xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist <(printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>'); \
+						TEMP_PLIST=$$(mktemp /tmp/ExportOptions.XXXXXX.plist); \
+						printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n<key>method</key>\n<string>app-store</string>\n<key>uploadBitcode</key>\n<false/>\n<key>compileBitcode</key>\n<false/>\n<key>uploadSymbols</key>\n<true/>\n<key>signingStyle</key>\n<string>automatic</string>\n</dict>\n</plist>' > "$$TEMP_PLIST"; \
+						xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist "$$TEMP_PLIST"; \
+						rm -f "$$TEMP_PLIST"; \
 					fi; \
 					IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
-				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
+					if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
 					cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
@@ -879,9 +882,9 @@ live-github: ## ☁️ Automated Live Production Pipeline (GitHub Only)
 	$(eval APK_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).apk)
 	$(eval AAB_NAME := $(PROJECT_NAME)-$(ANDROID_VERSION_NAME)-$(ANDROID_VERSION_CODE).aab)
 	$(eval IPA_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
-	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.ipa)
+	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
 	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
-	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE)-production.xcarchive)
+	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
 	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
 	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"

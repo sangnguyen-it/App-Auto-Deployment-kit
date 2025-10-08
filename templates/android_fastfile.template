@@ -19,6 +19,11 @@
 
 default_platform(:android)
 
+# Configuration
+PROJECT_NAME = "{{PROJECT_NAME}}"
+PACKAGE_NAME = "{{PACKAGE_NAME}}"
+CHANGELOG_PATH = "../CHANGELOG.md"
+
 platform :android do
   desc "Runs all the tests"
   lane :test do
@@ -34,7 +39,9 @@ platform :android do
       skip_upload_apk: true,
       skip_upload_metadata: true,
       skip_upload_images: true,
-      skip_upload_screenshots: true
+      skip_upload_screenshots: true,
+      release_status: 'draft',
+      changes_not_sent_for_review: false
     )
   end
 
@@ -60,14 +67,19 @@ platform :android do
       skip_upload_apk: true,
       skip_upload_metadata: true,
       skip_upload_images: true,
-      skip_upload_screenshots: true
+      skip_upload_screenshots: true,
+      release_status: 'completed',
+      changes_not_sent_for_review: false
     )
   end
 
   desc "Deploy a new version to the Google Play"
   lane :deploy do
     gradle(task: "clean assembleRelease")
-    upload_to_play_store
+    upload_to_play_store(
+      release_status: 'completed',
+      changes_not_sent_for_review: false
+    )
   end
 
   desc "Release to Google Play Production (alias for upload_aab_production)"
@@ -90,5 +102,22 @@ platform :android do
   lane :clean do
     gradle(task: "clean")
     UI.message("Cleaned build artifacts for {{PROJECT_NAME}}")
+  end
+
+  # Private lanes
+  private_lane :read_changelog do |mode = "production"|
+    changelog_content = ""
+    
+    if File.exist?(CHANGELOG_PATH)
+      changelog_content = File.read(CHANGELOG_PATH)
+    else
+      if mode == "production"
+        changelog_content = "🚀 #{PROJECT_NAME} Production Release\n\n• New features and improvements\n• Performance optimizations\n• Bug fixes and stability enhancements"
+      else
+        changelog_content = "🚀 #{PROJECT_NAME} Update\n\n• Performance improvements\n• Bug fixes and stability enhancements\n• Updated dependencies"
+      end
+    end
+    
+    changelog_content
   end
 end

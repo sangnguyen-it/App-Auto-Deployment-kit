@@ -42,7 +42,7 @@ TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Teste
 # File paths (relative to fastlane directory)
 # Use File.expand_path to ensure absolute path resolution for AuthKey file
 KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)
-CHANGELOG_PATH = "../builder/changelog.txt"
+CHANGELOG_PATH = "../CHANGELOG.md"
 IPA_OUTPUT_DIR = "../build/ios/ipa"
 PUBSPEC_PATH = "../pubspec.yaml"
 # Project-specific paths
@@ -110,8 +110,7 @@ platform :ios do
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
-      xcargs: "-allowProvisioningUpdates",
-      export_options: "./ExportOptions.plist"
+      xcargs: "-allowProvisioningUpdates"
     )
   end
   
@@ -137,6 +136,7 @@ platform :ios do
       output_directory: IPA_OUTPUT_DIR,
       xcargs: "-allowProvisioningUpdates",
       export_options: "./ExportOptions.plist"
+
     )
   end
   
@@ -175,7 +175,7 @@ platform :ios do
         reject_if_possible: true,
         skip_metadata: false,
         skip_screenshots: false,
-        submit_for_review: false,
+        submit_for_review: true,
         automatic_release: false
       )
     else
@@ -186,7 +186,7 @@ platform :ios do
         reject_if_possible: true,
         skip_metadata: false,
         skip_screenshots: false,
-        submit_for_review: false,
+        submit_for_review: true,
         automatic_release: false
       )
     end
@@ -216,7 +216,7 @@ platform :ios do
       reject_if_possible: true,
       skip_metadata: false,
       skip_screenshots: false,
-      submit_for_review: false,
+      submit_for_review: true,
       automatic_release: false
     )
   end

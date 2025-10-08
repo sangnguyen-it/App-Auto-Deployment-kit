@@ -551,7 +551,6 @@ download_scripts_from_github() {
         "build_info_generator.dart"
         "tag_generator.dart"
         "common_functions.sh"
-        "setup.sh"
         "dynamic_version_manager.dart"
         "store_version_checker.rb"
         "google_play_version_checker.rb"
@@ -608,6 +607,13 @@ download_templates_from_github() {
     local github_base_url="https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/templates"
     local template_files=(
         "makefile.template"
+        "android_fastfile.template"
+        "ios_fastfile.template"
+        "github_deploy.template"
+        "gemfile.template"
+        "android_appfile.template"
+        "ios_appfile.template"
+        "ios_export_options.template"
     )
     
     local downloaded_count=0
@@ -667,7 +673,6 @@ copy_scripts() {
         "build_info_generator.dart"
         "tag_generator.dart"
         "common_functions.sh"
-        "setup.sh"
         "dynamic_version_manager.dart"
         "store_version_checker.rb"
         "google_play_version_checker.rb"
@@ -696,10 +701,6 @@ copy_scripts() {
                     ;;
                 "dynamic_version_manager.dart")
                     create_dynamic_version_manager_inline
-                    ((scripts_created_inline++))
-                    ;;
-                "setup.sh")
-                    create_setup_sh_inline
                     ((scripts_created_inline++))
                     ;;
                 "common_functions.sh")
@@ -785,278 +786,65 @@ create_configuration_files_inline() {
 
 # Inline creation functions (simplified versions)
 create_android_fastfile_inline() {
-    cat > "$TARGET_DIR/android/fastlane/Fastfile" << EOF
-# Fastlane configuration for $PROJECT_NAME Android
-# Package: $PACKAGE_NAME
-
-default_platform(:android)
-
-platform :android do
-  desc "Submit a new Beta Build to Google Play Internal Testing"
-  lane :beta do
-    gradle(task: "clean bundleRelease")
-    upload_to_play_store(
-      track: 'internal',
-      aab: '../build/app/outputs/bundle/release/app-release.aab',
-      skip_upload_apk: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true
-    )
-  end
-
-  desc "Upload AAB to Google Play Production"
-  lane :upload_aab_production do
-    gradle(task: "clean bundleRelease")
-    upload_to_play_store(
-      track: 'production',
-      aab: '../build/app/outputs/bundle/release/app-release.aab',
-      skip_upload_apk: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true
-    )
-  end
-end
-EOF
-    print_success "Android Fastfile created (inline)"
+    local template_file="$TEMPLATE_DIR/android_fastfile.template"
+    local output_file="$TARGET_DIR/android/fastlane/Fastfile"
+    
+    if [[ -f "$template_file" ]]; then
+        process_template "$template_file" "$output_file"
+        print_success "Android Fastfile created from template"
+    else
+        print_error "Template file not found: $template_file"
+        print_error "Cannot create Android Fastfile without template"
+        return 1
+    fi
 }
 
 create_ios_fastfile_inline() {
-    cat > "$TARGET_DIR/ios/fastlane/Fastfile" << EOF
-# Fastlane configuration for $PROJECT_NAME iOS
-# Bundle ID: $BUNDLE_ID
-# Generated on: $(date)
-
-fastlane_version "2.228.0"
-default_platform(:ios)
-
-# Disable update checker to prevent initialization issues
-ENV["FASTLANE_SKIP_UPDATE_CHECK"] = "1"
-
-# Error handling for FastlaneCore issues
-begin
-  require 'fastlane'
-rescue LoadError => e
-  UI.error("Failed to load Fastlane: #{e.message}")
-  exit(1)
-end
-
-# Project Configuration
-PROJECT_NAME = "$PROJECT_NAME"
-BUNDLE_ID = "$BUNDLE_ID"
-TEAM_ID = "YOUR_TEAM_ID"
-KEY_ID = "YOUR_KEY_ID"
-ISSUER_ID = "YOUR_ISSUER_ID"
-TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"]
-
-# File paths (relative to fastlane directory)
-KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)
-CHANGELOG_PATH = "../builder/changelog.txt"
-IPA_OUTPUT_DIR = "../build/ios/ipa"
-
-platform :ios do
-  desc "Setup iOS environment"
-  lane :setup do
-    UI.message("Setting up iOS environment for #{PROJECT_NAME}")
-  end
-
-  desc "Build iOS archive for TestFlight"
-  lane :build_archive do
-    build_archive_beta
-  end
-  
-  desc "Build iOS archive for TestFlight (Beta)"
-  lane :build_archive_beta do
-    setup_signing
+    local template_file="$TEMPLATE_DIR/ios_fastfile.template"
+    local output_file="$TARGET_DIR/ios/fastlane/Fastfile"
     
-    build_app(
-      scheme: "Runner",
-      export_method: "app-store",
-      output_directory: IPA_OUTPUT_DIR,
-      xcargs: "-allowProvisioningUpdates",
-      export_options: {
-        signingStyle: "automatic",
-        teamID: TEAM_ID,
-        compileBitcode: false,
-        uploadBitcode: false,
-        uploadSymbols: true
-      }
-    )
-  end
-  
-  desc "Build iOS archive for App Store (Production)"
-  lane :build_archive_production do
-    setup_signing
-    
-    build_app(
-      scheme: "Runner",
-      export_method: "app-store-connect",
-      output_directory: IPA_OUTPUT_DIR,
-      xcargs: "-allowProvisioningUpdates"
-    )
-  end
-
-  desc "Submit a new Beta Build to TestFlight"
-  lane :beta do
-    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
-      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
-      upload_to_testflight(
-        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
-        changelog: read_changelog,
-        skip_waiting_for_build_processing: false,
-        distribute_external: true,
-        groups: TESTER_GROUPS,
-        notify_external_testers: true
-      )
+    if [[ -f "$template_file" ]]; then
+        process_template "$template_file" "$output_file"
+        print_success "iOS Fastfile created from template"
     else
-      UI.message("No existing archive found, building new one...")
-      build_archive_beta
-      upload_to_testflight(
-        changelog: read_changelog,
-        skip_waiting_for_build_processing: false,
-        distribute_external: true,
-        groups: TESTER_GROUPS,
-        notify_external_testers: true
-      )
-    end
-  end
-
-  desc "Submit a new Production Build to App Store"
-  lane :release do
-    if File.exist?("#{IPA_OUTPUT_DIR}/Runner.ipa")
-      UI.message("Using existing archive at #{IPA_OUTPUT_DIR}/Runner.ipa")
-      upload_to_app_store(
-        ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
-        force: true,
-        reject_if_possible: true,
-        skip_metadata: false,
-        skip_screenshots: false,
-        submit_for_review: false,
-        automatic_release: false
-      )
-    else
-      UI.message("No existing archive found, building new one...")
-      build_archive_production
-      upload_to_app_store(
-        force: true,
-        reject_if_possible: true,
-        skip_metadata: false,
-        skip_screenshots: false,
-        submit_for_review: false,
-        automatic_release: false
-      )
-    end
-  end
-
-  desc "Upload existing IPA to TestFlight"
-  lane :upload_testflight do
-    setup_signing
-    
-    upload_to_testflight(
-      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
-      changelog: read_changelog,
-      skip_waiting_for_build_processing: false,
-      distribute_external: true,
-      groups: TESTER_GROUPS,
-      notify_external_testers: true
-    )
-  end
-
-  desc "Upload existing IPA to App Store"
-  lane :upload_appstore do
-    setup_signing
-    
-    upload_to_app_store(
-      ipa: "#{IPA_OUTPUT_DIR}/Runner.ipa",
-      force: true,
-      reject_if_possible: true,
-      skip_metadata: false,
-      skip_screenshots: false,
-      submit_for_review: false,
-      automatic_release: false
-    )
-  end
-
-  desc "Clean iOS build artifacts"
-  lane :clean do
-    clear_derived_data
-  end
-  
-  private_lane :setup_signing do
-    app_store_connect_api_key(
-      key_id: KEY_ID,
-      issuer_id: ISSUER_ID,
-      key_filepath: KEY_PATH,
-      duration: 1200,
-      in_house: false
-    )
-  end
-  
-  private_lane :read_changelog do |mode = "testing"|
-    changelog_content = ""
-    
-    if File.exist?(CHANGELOG_PATH)
-      changelog_content = File.read(CHANGELOG_PATH)
-    else
-      if mode == "production"
-        changelog_content = "🚀 #{PROJECT_NAME} Production Release\n\n• New features and improvements\n• Performance optimizations\n• Bug fixes and stability enhancements"
-      else
-        changelog_content = "🚀 #{PROJECT_NAME} Update\n\n• Performance improvements\n• Bug fixes and stability enhancements\n• Updated dependencies"
-      end
-    end
-    
-    changelog_content
-  end
-end
-EOF
-    print_success "iOS Fastfile created (inline)"
+        print_error "Template file not found: $template_file"
+        print_error "Cannot create iOS Fastfile without template"
+        return 1
+    fi
 }
 
 create_ios_appfile_inline() {
-    if [ ! -f "$TARGET_DIR/ios/fastlane/Appfile" ]; then
-        cat > "$TARGET_DIR/ios/fastlane/Appfile" << EOF
-# Appfile for $PROJECT_NAME iOS
-# Configuration for App Store Connect and Apple Developer
-
-app_identifier("$BUNDLE_ID") # Your bundle identifier
-apple_id("your-apple-id@email.com") # Replace with your Apple ID
-team_id("YOUR_TEAM_ID") # Replace with your Apple Developer Team ID
-
-# Optional: If you belong to multiple teams
-# itc_team_id("YOUR_TEAM_ID") # App Store Connect Team ID (if different from team_id)
-
-EOF
-        print_success "iOS Appfile created (inline)"
+    local template_file="$TEMPLATE_DIR/ios_appfile.template"
+    local output_file="$TARGET_DIR/ios/fastlane/Appfile"
+    
+    if [ ! -f "$output_file" ]; then
+        if [[ -f "$template_file" ]]; then
+            process_template "$template_file" "$output_file"
+            print_success "iOS Appfile created from template"
+        else
+            print_error "Template file not found: $template_file"
+            print_error "Cannot create iOS Appfile without template"
+            return 1
+        fi
     else
         print_info "iOS Appfile already exists, skipping creation"
     fi
 }
 
 create_ios_export_options_inline() {
-    if [ ! -f "$TARGET_DIR/ios/fastlane/ExportOptions.plist" ]; then
+    local template_file="$TEMPLATE_DIR/ios_export_options.template"
+    local output_file="$TARGET_DIR/ios/fastlane/ExportOptions.plist"
+    
+    if [ ! -f "$output_file" ]; then
         mkdir -p "$TARGET_DIR/ios/fastlane"
-        cat > "$TARGET_DIR/ios/fastlane/ExportOptions.plist" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>app-store-connect</string>
-    <key>teamID</key>
-    <string>YOUR_TEAM_ID</string>
-    <key>uploadBitcode</key>
-    <false/>
-    <key>compileBitcode</key>
-    <false/>
-    <key>uploadSymbols</key>
-    <true/>
-    <key>signingStyle</key>
-    <string>automatic</string>
-</dict>
-</plist>
-EOF
-        print_success "iOS ExportOptions.plist created (inline)"
+        if [[ -f "$template_file" ]]; then
+            process_template "$template_file" "$output_file"
+            print_success "iOS ExportOptions.plist created from template"
+        else
+            print_error "Template file not found: $template_file"
+            print_error "Cannot create iOS ExportOptions.plist without template"
+            return 1
+        fi
     else
         print_info "iOS ExportOptions.plist already exists, skipping creation"
     fi
@@ -1118,138 +906,38 @@ create_makefile_inline() {
         chmod +x "$output_file"
         print_success "Makefile created from template with basic replacement"
     else
-        print_warning "Template not found, creating basic Makefile"
-        # Fallback to basic Makefile if template not found
-        cat > "$output_file" << 'EOF'
-# Makefile for Flutter CI/CD Pipeline
-# Project: {{PROJECT_NAME}}
-
-OUTPUT_DIR := builder
-
-.PHONY: help tester live deps clean build test
-
-help:
-	@echo "Available targets:"
-	@echo "  tester  - Build for testing (APK + TestFlight)"
-	@echo "  live    - Build for production"
-	@echo "  deps    - Install dependencies"
-	@echo "  clean   - Clean build artifacts"
-	@echo "  build   - Build release versions"
-	@echo "  test    - Run tests"
-
-tester:
-	@echo "🚀 Building tester version..."
-	mkdir -p $(OUTPUT_DIR)
-	flutter clean
-	flutter pub get
-	flutter build apk --release
-	@if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then \
-		cp build/app/outputs/flutter-apk/app-release.apk $(OUTPUT_DIR)/; \
-		echo "✅ APK copied to $(OUTPUT_DIR)/"; \
-	fi
-	cd ios && fastlane build_archive_beta && fastlane beta
-
-live:
-	@echo "🚀 Building production version..."
-	mkdir -p $(OUTPUT_DIR)
-	flutter clean
-	flutter pub get
-	flutter build appbundle --release
-	@if [ -f "build/app/outputs/bundle/release/app-release.aab" ]; then \
-		cp build/app/outputs/bundle/release/app-release.aab $(OUTPUT_DIR)/; \
-		echo "✅ AAB copied to $(OUTPUT_DIR)/"; \
-	fi
-	cd android && fastlane upload_aab_production
-	cd ios && fastlane build_archive_production && fastlane release
-
-deps:
-	@echo "📦 Installing dependencies..."
-	flutter pub get
-	cd android && bundle install
-	cd ios && bundle install && pod install
-
-clean:
-	@echo "🧹 Cleaning..."
-	flutter clean
-	rm -rf $(OUTPUT_DIR)
-
-build:
-	@echo "🔨 Building..."
-	mkdir -p $(OUTPUT_DIR)
-	flutter build apk --release
-	flutter build appbundle --release
-
-test:
-	@echo "🧪 Running tests..."
-	flutter test
-EOF
-        
-        # Replace placeholder with actual project name
-        sed -i.bak "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$output_file" && rm "$output_file.bak"
-        chmod +x "$output_file"
-        print_success "Basic Makefile created with OUTPUT_DIR=builder"
+        print_error "Template file not found: $template_file"
+        print_error "Cannot create Makefile without template"
+        return 1
     fi
 }
 
 create_github_workflow_inline() {
-    cat > "$TARGET_DIR/.github/workflows/deploy.yml" << EOF
-name: Deploy to Stores
-on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-
-jobs:
-  deploy-android:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.3'
-      - run: flutter pub get
-      - run: flutter build appbundle --release
-      - uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: \${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
-          packageName: $PACKAGE_NAME
-          releaseFiles: build/app/outputs/bundle/release/app-release.aab
-          track: production
-
-  deploy-ios:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.3'
-      - run: flutter pub get
-      - run: flutter build ios --release --no-codesign
-      - run: cd ios && fastlane build_archive_production && fastlane release
-        env:
-          APP_STORE_CONNECT_API_KEY_ID: \${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: \${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_CONTENT: \${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
-EOF
-    print_success "GitHub Actions workflow created (inline)"
+    local template_file="$TEMPLATE_DIR/github_deploy.template"
+    local output_file="$TARGET_DIR/.github/workflows/deploy.yml"
+    
+    if [[ -f "$template_file" ]]; then
+        process_template "$template_file" "$output_file"
+        print_success "GitHub Actions workflow created from template"
+    else
+        print_error "Template file not found: $template_file"
+        print_error "Cannot create GitHub workflow without template"
+        return 1
+    fi
 }
 
 create_gemfile_inline() {
-    cat > "$TARGET_DIR/Gemfile" << EOF
-source "https://rubygems.org"
-
-gem "fastlane", "~> 2.228.0"
-gem "cocoapods", "~> 1.15.0"
-
-plugins_path = File.join(File.dirname(__FILE__), 'fastlane', 'Pluginfile')
-eval_gemfile(plugins_path) if File.exist?(plugins_path)
-EOF
-    print_success "Gemfile created (inline)"
+    local template_file="$TEMPLATE_DIR/gemfile.template"
+    local output_file="$TARGET_DIR/Gemfile"
+    
+    if [[ -f "$template_file" ]]; then
+        process_template "$template_file" "$output_file"
+        print_success "Gemfile created from template"
+    else
+        print_error "Template file not found: $template_file"
+        print_error "Cannot create Gemfile without template"
+        return 1
+    fi
 }
 
 # Inline creation function for version_manager.dart
@@ -1481,38 +1169,6 @@ Future<void> interactiveMode() async {
 EOF
     chmod +x "$TARGET_DIR/scripts/dynamic_version_manager.dart"
     print_success "dynamic_version_manager.dart created (inline)"
-}
-
-# Inline creation function for setup.sh
-create_setup_sh_inline() {
-    cat > "$TARGET_DIR/scripts/setup.sh" << 'EOF'
-#!/bin/bash
-# Flutter CI/CD Setup Script - Simplified inline version
-set -e
-
-# Main setup function
-main() {
-    print_step "Flutter CI/CD Setup"
-    
-    if [ ! -f "pubspec.yaml" ]; then
-        print_error "Not a Flutter project. Run this script from your Flutter project root."
-        exit 1
-    fi
-    
-    print_success "Flutter project detected"
-    print_success "Setup completed successfully!"
-    
-    echo ""
-    echo "📖 Next steps:"
-    echo "   1. Configure your credentials in the generated files"
-    echo "   2. Run 'make help' to see available commands"
-    echo "   3. Test your setup with 'make test'"
-}
-
-main "$@"
-EOF
-    chmod +x "$TARGET_DIR/scripts/setup.sh"
-    print_success "setup.sh created (inline)"
 }
 
 # Inline creation function for common_functions.sh

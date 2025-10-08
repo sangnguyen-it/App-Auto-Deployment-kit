@@ -377,22 +377,6 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 🚀 PRODUCTION PIPELINES
-# ═══════════════════════════════════════════════════════════════════════════════
-
-live: ## 🚀 Building production version
-	@echo "🚀 Building production version..."
-	mkdir -p $(OUTPUT_DIR)
-	flutter clean
-	flutter pub get
-	flutter build appbundle --release
-	@if [ -f "build/app/outputs/bundle/release/app-release.aab" ]; then \
-		cp build/app/outputs/bundle/release/app-release.aab $(OUTPUT_DIR)/; \
-		echo "✅ AAB copied to $(OUTPUT_DIR)/"; \
-	fi
-	cd android && fastlane upload_aab_production
-	cd ios && fastlane build_archive_production && fastlane release
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🌟 LIVE PRODUCTION PIPELINE - AAB + APP STORE
 # ═══════════════════════════════════════════════════════════════════════════════

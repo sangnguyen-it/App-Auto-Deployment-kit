@@ -42,11 +42,11 @@ TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Teste
 # File paths (relative to fastlane directory)
 # Use File.expand_path to ensure absolute path resolution for AuthKey file
 KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)
-CHANGELOG_PATH = "../CHANGELOG.md"
-IPA_OUTPUT_DIR = "../build/ios/ipa"
-PUBSPEC_PATH = "../pubspec.yaml"
+CHANGELOG_PATH = "../../CHANGELOG.md"
+IPA_OUTPUT_DIR = "../../build/ios/ipa"
+PUBSPEC_PATH = "../../pubspec.yaml"
 # Project-specific paths
-PROJECT_KEYSTORE_PATH = "../app/#{PROJECT_NAME.downcase.gsub(/[^a-z0-9]/, '_')}-release.keystore"
+PROJECT_KEYSTORE_PATH = "../../app/#{PROJECT_NAME.downcase.gsub(/[^a-z0-9]/, '_')}-release.keystore"
 
 # Function to read version from pubspec.yaml
 def read_pubspec_version

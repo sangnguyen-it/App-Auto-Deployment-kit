@@ -927,6 +927,10 @@ trigger-github-actions: ## 🚀 Trigger GitHub Actions CI/CD (Tag Push + API)
 	@printf "\n"
 	@printf "$(CYAN)🚀 Triggering GitHub Actions CI/CD$(NC)\n"
 	@printf "\n"
+	$(eval ANDROID_VERSION_NAME := $(call get_android_version_name))
+	$(eval ANDROID_VERSION_CODE := $(call get_android_version_code))
+	$(eval IOS_VERSION_NAME := $(call get_ios_version_name))
+	$(eval IOS_VERSION_CODE := $(call get_ios_version_code))
 	@ANDROID_VER="$(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)"; \
 	IOS_VER="$(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)"; \
 	if [ -z "$(ANDROID_VERSION_NAME)" ] || [ -z "$(IOS_VERSION_NAME)" ]; then \

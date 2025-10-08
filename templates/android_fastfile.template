@@ -22,7 +22,7 @@ default_platform(:android)
 # Configuration
 PROJECT_NAME = "{{PROJECT_NAME}}"
 PACKAGE_NAME = "{{PACKAGE_NAME}}"
-CHANGELOG_PATH = "../CHANGELOG.md"
+CHANGELOG_PATH = "../../CHANGELOG.md"
 
 platform :android do
   desc "Runs all the tests"
@@ -35,7 +35,7 @@ platform :android do
     gradle(task: "clean bundleRelease")
     upload_to_play_store(
       track: 'internal',
-      aab: '../build/app/outputs/bundle/release/app-release.aab',
+      aab: '../../build/app/outputs/bundle/release/app-release.aab',
       skip_upload_apk: true,
       skip_upload_metadata: true,
       skip_upload_images: true,
@@ -63,7 +63,7 @@ platform :android do
     gradle(task: "clean bundleRelease")
     upload_to_play_store(
       track: 'production',
-      aab: '../build/app/outputs/bundle/release/app-release.aab',
+      aab: '../../build/app/outputs/bundle/release/app-release.aab',
       skip_upload_apk: true,
       skip_upload_metadata: true,
       skip_upload_images: true,

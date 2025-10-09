@@ -127,8 +127,39 @@ jobs:
       run: |
         echo "🔐 Setting up Android keystore..."
         
-        # Decode and save keystore
-        echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/app.keystore
+        # Validate that the keystore secret exists and is not empty
+        if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+          echo "❌ Error: ANDROID_KEYSTORE_BASE64 secret is not set or empty"
+          echo "Please set the ANDROID_KEYSTORE_BASE64 secret in GitHub repository settings"
+          exit 1
+        fi
+        
+        # Check base64 string length
+        echo "📊 Keystore base64 string length: ${#ANDROID_KEYSTORE_BASE64}"
+        
+        # Try to decode keystore with error handling
+        if echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/app.keystore 2>/dev/null; then
+          echo "✅ Keystore base64 decode successful"
+        else
+          echo "❌ Keystore base64 decode failed - trying with padding fix..."
+          # Add padding if needed and retry
+          PADDED_KEYSTORE=$(echo "$ANDROID_KEYSTORE_BASE64" | sed 's/$/===/' | fold -w 4 | sed '$ s/=*$//' | tr -d '\n')
+          if echo "$PADDED_KEYSTORE" | base64 -d > android/app/app.keystore 2>/dev/null; then
+            echo "✅ Keystore base64 decode successful with padding fix"
+          else
+            echo "❌ Error: Failed to decode ANDROID_KEYSTORE_BASE64"
+            echo "Please check that the secret contains valid base64 encoded keystore"
+            exit 1
+          fi
+        fi
+        
+        # Validate keystore file was created
+        if [ -f "android/app/app.keystore" ] && [ -s "android/app/app.keystore" ]; then
+          echo "📄 Keystore file created successfully"
+        else
+          echo "❌ Error: Keystore file was not created or is empty"
+          exit 1
+        fi
         
         # Create key.properties
         cat > android/key.properties << EOF
@@ -145,7 +176,48 @@ jobs:
         PLAY_STORE_JSON_BASE64: ${{ secrets.PLAY_STORE_JSON_BASE64 }}
       run: |
         echo "🔑 Setting up Google Play service account..."
-        echo "$PLAY_STORE_JSON_BASE64" | base64 -d > android/fastlane/play_store_service_account.json
+        
+        # Validate that the secret exists and is not empty
+        if [ -z "$PLAY_STORE_JSON_BASE64" ]; then
+          echo "❌ Error: PLAY_STORE_JSON_BASE64 secret is not set or empty"
+          echo "Please set the PLAY_STORE_JSON_BASE64 secret in GitHub repository settings"
+          exit 1
+        fi
+        
+        # Check base64 string length and format
+        echo "📊 Base64 string length: ${#PLAY_STORE_JSON_BASE64}"
+        
+        # Try to decode with error handling
+        if echo "$PLAY_STORE_JSON_BASE64" | base64 -d > android/fastlane/play_store_service_account.json 2>/dev/null; then
+          echo "✅ Base64 decode successful"
+        else
+          echo "❌ Base64 decode failed - trying with padding fix..."
+          # Add padding if needed and retry
+          PADDED_BASE64=$(echo "$PLAY_STORE_JSON_BASE64" | sed 's/$/===/' | fold -w 4 | sed '$ s/=*$//' | tr -d '\n')
+          if echo "$PADDED_BASE64" | base64 -d > android/fastlane/play_store_service_account.json 2>/dev/null; then
+            echo "✅ Base64 decode successful with padding fix"
+          else
+            echo "❌ Error: Failed to decode PLAY_STORE_JSON_BASE64"
+            echo "Please check that the secret contains valid base64 encoded JSON"
+            exit 1
+          fi
+        fi
+        
+        # Validate the decoded JSON file
+        if [ -f "android/fastlane/play_store_service_account.json" ] && [ -s "android/fastlane/play_store_service_account.json" ]; then
+          echo "📄 Service account JSON file created successfully"
+          # Validate JSON format
+          if python3 -m json.tool android/fastlane/play_store_service_account.json > /dev/null 2>&1; then
+            echo "✅ JSON format validation passed"
+          else
+            echo "❌ Error: Decoded content is not valid JSON"
+            exit 1
+          fi
+        else
+          echo "❌ Error: Service account JSON file was not created or is empty"
+          exit 1
+        fi
+        
         echo "FASTLANE_JSON_KEY_FILE=play_store_service_account.json" >> $GITHUB_ENV
         echo "✅ Service account setup completed"
     
@@ -235,7 +307,34 @@ jobs:
       run: |
         if [[ -n "$APP_STORE_KEY_ID" && -n "$APP_STORE_ISSUER_ID" && -n "$APP_STORE_KEY_CONTENT" ]]; then
           echo "🔑 Setting up App Store Connect API authentication..."
-          echo "$APP_STORE_KEY_CONTENT" | base64 -d > ios/fastlane/AuthKey_$APP_STORE_KEY_ID.p8
+          
+          # Check base64 string length
+          echo "📊 App Store key base64 string length: ${#APP_STORE_KEY_CONTENT}"
+          
+          # Try to decode App Store key with error handling
+          if echo "$APP_STORE_KEY_CONTENT" | base64 -d > ios/fastlane/AuthKey_$APP_STORE_KEY_ID.p8 2>/dev/null; then
+            echo "✅ App Store key base64 decode successful"
+          else
+            echo "❌ App Store key base64 decode failed - trying with padding fix..."
+            # Add padding if needed and retry
+            PADDED_KEY=$(echo "$APP_STORE_KEY_CONTENT" | sed 's/$/===/' | fold -w 4 | sed '$ s/=*$//' | tr -d '\n')
+            if echo "$PADDED_KEY" | base64 -d > ios/fastlane/AuthKey_$APP_STORE_KEY_ID.p8 2>/dev/null; then
+              echo "✅ App Store key base64 decode successful with padding fix"
+            else
+              echo "❌ Error: Failed to decode APP_STORE_KEY_CONTENT"
+              echo "Please check that the secret contains valid base64 encoded key"
+              exit 1
+            fi
+          fi
+          
+          # Validate key file was created
+          if [ -f "ios/fastlane/AuthKey_$APP_STORE_KEY_ID.p8" ] && [ -s "ios/fastlane/AuthKey_$APP_STORE_KEY_ID.p8" ]; then
+            echo "📄 App Store key file created successfully"
+          else
+            echo "❌ Error: App Store key file was not created or is empty"
+            exit 1
+          fi
+          
           echo "✅ App Store Connect API configured"
         else
           echo "⚠️ App Store Connect API not configured, skipping iOS deployment"

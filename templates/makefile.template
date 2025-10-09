@@ -850,6 +850,19 @@ live-github: ## ☁️ Automated Live Production Pipeline (GitHub Actions Build 
 	@printf "$(CYAN)$(INFO) This will build and upload apps entirely on GitHub Actions$(NC)\n"
 	@printf "\n"
 	
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Validating GitHub secrets before deployment..."
+	@if [ -f "scripts/github_secrets_validator.sh" ]; then \
+		if bash scripts/github_secrets_validator.sh; then \
+			printf "$(GREEN)$(CHECK) %s$(NC)\n" "GitHub secrets validation passed"; \
+		else \
+			printf "$(RED)$(CROSS) %s$(NC)\n" "GitHub secrets validation failed"; \
+			printf "$(CYAN)$(INFO) %s$(NC)\n" "Please fix the secrets configuration before proceeding"; \
+			exit 1; \
+		fi; \
+	else \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "GitHub secrets validator not found - skipping validation"; \
+	fi
+	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
 	@if command -v dart >/dev/null 2>&1; then \
 		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \

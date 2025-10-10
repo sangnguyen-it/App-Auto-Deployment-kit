@@ -43,6 +43,8 @@ process_template() {
     local target_dir="${8:-$(dirname "$output_file")}" 
     # Optional: bundle_id; defaults to package_name if not provided
     local bundle_id="${9:-$package_name}"
+    local key_id="${KEY_ID:-YOUR_KEY_ID}"
+    local issuer_id="${ISSUER_ID:-YOUR_ISSUER_ID}"
     
     if [ ! -f "$template_file" ]; then
         echo "Error: Template file not found: $template_file" >&2
@@ -76,6 +78,8 @@ process_template() {
     temp_content="${temp_content//\{\{TEAM_ID\}\}/$team_id}"
     temp_content="${temp_content//\{\{APPLE_ID\}\}/$apple_id}"
     temp_content="${temp_content//\{\{BUNDLE_ID\}\}/$bundle_id}"
+    temp_content="${temp_content//\{\{KEY_ID\}\}/$key_id}"
+    temp_content="${temp_content//\{\{ISSUER_ID\}\}/$issuer_id}"
     temp_content="${temp_content//\{\{GENERATION_DATE\}\}/$(date)}"
     temp_content="${temp_content//\{\{VERSION_FULL\}\}/$version_full}"
     temp_content="${temp_content//\{\{VERSION_NAME\}\}/$version_name}"

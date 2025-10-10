@@ -721,7 +721,7 @@ create_configuration_files() {
     # Check if template processor is available
     if command -v create_all_templates >/dev/null 2>&1; then
         # Use template processor
-        if create_all_templates "$TARGET_DIR" "$PROJECT_NAME" "$PACKAGE_NAME" "$APP_NAME" "$TEAM_ID" "$APPLE_ID" "$TEMPLATES_DIR"; then
+        if create_all_templates "$TARGET_DIR" "$PROJECT_NAME" "$PACKAGE_NAME" "$APP_NAME" "$TEAM_ID" "$TEMPLATES_DIR"; then
             print_success "All configuration files created using templates"
         else
             print_warning "Some template files failed to create, falling back to inline creation"
@@ -1610,39 +1610,6 @@ auto_sync_project_config() {
         print_success "project.config loaded successfully"
         
         # Show current config values for key iOS fields
-
-        # Load .env and map APP_STORE_* or FASTLANE_* vars
-        if [ -f "$TARGET_DIR/.env" ]; then
-            set -a
-            source "$TARGET_DIR/.env" 2>/dev/null || true
-            set +a
-        fi
-        # Infer KEY_ID from existing AuthKey_*.p8 in ios/fastlane or env
-        if [[ -z "$KEY_ID" || "$KEY_ID" == "YOUR_KEY_ID" || "$KEY_ID" == "KEY_ID" ]]; then
-            if compgen -G "/ios/fastlane/AuthKey_*.p8" > /dev/null; then
-                auth_key_file=20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400ls "/ios/fastlane/AuthKey_"*.p8 | head -1)
-                inferred_key_id=20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400basename "")
-                inferred_key_id=${inferred_key_id#AuthKey_}
-                inferred_key_id=${inferred_key_id%.p8}
-                if [[ -n "$inferred_key_id" ]]; then
-                    KEY_ID="$inferred_key_id"
-                fi
-            elif [[ -n "${APP_STORE_KEY_ID:-}" ]]; then
-                KEY_ID="$APP_STORE_KEY_ID"
-            elif [[ -n "${FASTLANE_APP_STORE_KEY_ID:-}" ]]; then
-                KEY_ID="$FASTLANE_APP_STORE_KEY_ID"
-            fi
-        fi
-        # Map ISSUER_ID from env if placeholder
-        if [[ -z "$ISSUER_ID" || "$ISSUER_ID" == "YOUR_ISSUER_ID" || "$ISSUER_ID" == "ISSUER_ID" ]]; then
-            if [[ -n "${APP_STORE_ISSUER_ID:-}" ]]; then
-                ISSUER_ID="$APP_STORE_ISSUER_ID"
-            elif [[ -n "${FASTLANE_APP_STORE_ISSUER_ID:-}" ]]; then
-                ISSUER_ID="$FASTLANE_APP_STORE_ISSUER_ID"
-            fi
-        fi
-
-        # Show current config values for key iOS fields
         echo ""
         print_info "Current iOS configuration:"
         echo "   Team ID: ${TEAM_ID:-'not set'}"
@@ -1715,32 +1682,6 @@ sync_appfile() {
     # Load current project config
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
-    # Load .env if present and map APP_STORE_* to local vars
-    if [ -f "$TARGET_DIR/.env" ]; then
-        set -a
-        source "$TARGET_DIR/.env" 2>/dev/null || true
-        set +a
-    fi
-    if [[ -z "$KEY_ID" || "$KEY_ID" == "YOUR_KEY_ID" || "$KEY_ID" == "KEY_ID" ]]; then
-        if [[ -n "${APP_STORE_KEY_ID:-}" ]]; then KEY_ID="$APP_STORE_KEY_ID"; fi
-    fi
-    if [[ -z "$ISSUER_ID" || "$ISSUER_ID" == "YOUR_ISSUER_ID" || "$ISSUER_ID" == "ISSUER_ID" ]]; then
-        if [[ -n "${APP_STORE_ISSUER_ID:-}" ]]; then ISSUER_ID="$APP_STORE_ISSUER_ID"; fi
-    fi
-
-            # Infer KEY_ID from existing AuthKey_*.p8 if still placeholder
-        if [[ -z "" || "" == "YOUR_KEY_ID" || "" == "KEY_ID" ]]; then
-            if compgen -G "/ios/fastlane/AuthKey_*.p8" > /dev/null; then
-                auth_key_file=20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400ls "/ios/fastlane/AuthKey_"*.p8 | head -1)
-                inferred_key_id=20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400basename "")
-                inferred_key_id=${inferred_key_id#AuthKey_}
-                inferred_key_id=${inferred_key_id%.p8}
-                if [[ -n "" ]]; then
-                    KEY_ID=""
-                fi
-            fi
-        fi
-
     else
         print_warning "project.config not found, skipping Appfile sync"
         return 0
@@ -1810,19 +1751,6 @@ sync_fastfile() {
     # Load current project config
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
-    # Load .env if present and map APP_STORE_* to local vars
-    if [ -f "$TARGET_DIR/.env" ]; then
-        set -a
-        source "$TARGET_DIR/.env" 2>/dev/null || true
-        set +a
-    fi
-    if [[ -z "$KEY_ID" || "$KEY_ID" == "YOUR_KEY_ID" || "$KEY_ID" == "KEY_ID" ]]; then
-        if [[ -n "${APP_STORE_KEY_ID:-}" ]]; then KEY_ID="$APP_STORE_KEY_ID"; fi
-    fi
-    if [[ -z "$ISSUER_ID" || "$ISSUER_ID" == "YOUR_ISSUER_ID" || "$ISSUER_ID" == "ISSUER_ID" ]]; then
-        if [[ -n "${APP_STORE_ISSUER_ID:-}" ]]; then ISSUER_ID="$APP_STORE_ISSUER_ID"; fi
-    fi
-
     else
         print_warning "project.config not found, skipping Fastfile sync"
         return 0
@@ -1848,13 +1776,6 @@ sync_fastfile() {
     if [[ -n "$ISSUER_ID" && "$ISSUER_ID" != "YOUR_ISSUER_ID" ]]; then
         sed -i.bak "s/ISSUER_ID = \"YOUR_ISSUER_ID\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
         sed -i.bak "s/^ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
-    fi
-
-    # Update BUNDLE_ID if present in project.config
-    if [[ -n "$BUNDLE_ID" ]]; then
-        # Replace placeholder or any existing value
-        sed -i.bak "s/BUNDLE_ID = \"{{BUNDLE_ID}}\"/BUNDLE_ID = \"$BUNDLE_ID\"/g" "$temp_fastfile"
-        sed -i.bak "s/^BUNDLE_ID = \"[^\"]*\"/BUNDLE_ID = \"$BUNDLE_ID\"/g" "$temp_fastfile"
     fi
     
     # Clean up backup files
@@ -1901,19 +1822,6 @@ sync_export_options() {
     # Load project.config values
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
-    # Load .env if present and map APP_STORE_* to local vars
-    if [ -f "$TARGET_DIR/.env" ]; then
-        set -a
-        source "$TARGET_DIR/.env" 2>/dev/null || true
-        set +a
-    fi
-    if [[ -z "$KEY_ID" || "$KEY_ID" == "YOUR_KEY_ID" || "$KEY_ID" == "KEY_ID" ]]; then
-        if [[ -n "${APP_STORE_KEY_ID:-}" ]]; then KEY_ID="$APP_STORE_KEY_ID"; fi
-    fi
-    if [[ -z "$ISSUER_ID" || "$ISSUER_ID" == "YOUR_ISSUER_ID" || "$ISSUER_ID" == "ISSUER_ID" ]]; then
-        if [[ -n "${APP_STORE_ISSUER_ID:-}" ]]; then ISSUER_ID="$APP_STORE_ISSUER_ID"; fi
-    fi
-
     else
         print_warning "project.config not found, skipping ExportOptions.plist sync"
         return 0
@@ -2189,19 +2097,6 @@ collect_ios_credentials() {
     # Load existing config if available
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
-    # Load .env if present and map APP_STORE_* to local vars
-    if [ -f "$TARGET_DIR/.env" ]; then
-        set -a
-        source "$TARGET_DIR/.env" 2>/dev/null || true
-        set +a
-    fi
-    if [[ -z "$KEY_ID" || "$KEY_ID" == "YOUR_KEY_ID" || "$KEY_ID" == "KEY_ID" ]]; then
-        if [[ -n "${APP_STORE_KEY_ID:-}" ]]; then KEY_ID="$APP_STORE_KEY_ID"; fi
-    fi
-    if [[ -z "$ISSUER_ID" || "$ISSUER_ID" == "YOUR_ISSUER_ID" || "$ISSUER_ID" == "ISSUER_ID" ]]; then
-        if [[ -n "${APP_STORE_ISSUER_ID:-}" ]]; then ISSUER_ID="$APP_STORE_ISSUER_ID"; fi
-    fi
-
     fi
     
     # Collect Team ID

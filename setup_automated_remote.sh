@@ -1682,6 +1682,19 @@ sync_appfile() {
     # Load current project config
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
+    # Load .env if present and map APP_STORE_* to local vars
+    if [ -f "$TARGET_DIR/.env" ]; then
+        set -a
+        source "$TARGET_DIR/.env" 2>/dev/null || true
+        set +a
+    fi
+    if [[ -z "$KEY_ID" || "$KEY_ID" == "YOUR_KEY_ID" || "$KEY_ID" == "KEY_ID" ]]; then
+        if [[ -n "${APP_STORE_KEY_ID:-}" ]]; then KEY_ID="$APP_STORE_KEY_ID"; fi
+    fi
+    if [[ -z "$ISSUER_ID" || "$ISSUER_ID" == "YOUR_ISSUER_ID" || "$ISSUER_ID" == "ISSUER_ID" ]]; then
+        if [[ -n "${APP_STORE_ISSUER_ID:-}" ]]; then ISSUER_ID="$APP_STORE_ISSUER_ID"; fi
+    fi
+
     else
         print_warning "project.config not found, skipping Appfile sync"
         return 0
@@ -1751,6 +1764,19 @@ sync_fastfile() {
     # Load current project config
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
+    # Load .env if present and map APP_STORE_* to local vars
+    if [ -f "$TARGET_DIR/.env" ]; then
+        set -a
+        source "$TARGET_DIR/.env" 2>/dev/null || true
+        set +a
+    fi
+    if [[ -z "$KEY_ID" || "$KEY_ID" == "YOUR_KEY_ID" || "$KEY_ID" == "KEY_ID" ]]; then
+        if [[ -n "${APP_STORE_KEY_ID:-}" ]]; then KEY_ID="$APP_STORE_KEY_ID"; fi
+    fi
+    if [[ -z "$ISSUER_ID" || "$ISSUER_ID" == "YOUR_ISSUER_ID" || "$ISSUER_ID" == "ISSUER_ID" ]]; then
+        if [[ -n "${APP_STORE_ISSUER_ID:-}" ]]; then ISSUER_ID="$APP_STORE_ISSUER_ID"; fi
+    fi
+
     else
         print_warning "project.config not found, skipping Fastfile sync"
         return 0
@@ -1829,6 +1855,19 @@ sync_export_options() {
     # Load project.config values
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
+    # Load .env if present and map APP_STORE_* to local vars
+    if [ -f "$TARGET_DIR/.env" ]; then
+        set -a
+        source "$TARGET_DIR/.env" 2>/dev/null || true
+        set +a
+    fi
+    if [[ -z "$KEY_ID" || "$KEY_ID" == "YOUR_KEY_ID" || "$KEY_ID" == "KEY_ID" ]]; then
+        if [[ -n "${APP_STORE_KEY_ID:-}" ]]; then KEY_ID="$APP_STORE_KEY_ID"; fi
+    fi
+    if [[ -z "$ISSUER_ID" || "$ISSUER_ID" == "YOUR_ISSUER_ID" || "$ISSUER_ID" == "ISSUER_ID" ]]; then
+        if [[ -n "${APP_STORE_ISSUER_ID:-}" ]]; then ISSUER_ID="$APP_STORE_ISSUER_ID"; fi
+    fi
+
     else
         print_warning "project.config not found, skipping ExportOptions.plist sync"
         return 0
@@ -2104,6 +2143,19 @@ collect_ios_credentials() {
     # Load existing config if available
     if [ -f "$TARGET_DIR/project.config" ]; then
         source "$TARGET_DIR/project.config" 2>/dev/null || true
+    # Load .env if present and map APP_STORE_* to local vars
+    if [ -f "$TARGET_DIR/.env" ]; then
+        set -a
+        source "$TARGET_DIR/.env" 2>/dev/null || true
+        set +a
+    fi
+    if [[ -z "$KEY_ID" || "$KEY_ID" == "YOUR_KEY_ID" || "$KEY_ID" == "KEY_ID" ]]; then
+        if [[ -n "${APP_STORE_KEY_ID:-}" ]]; then KEY_ID="$APP_STORE_KEY_ID"; fi
+    fi
+    if [[ -z "$ISSUER_ID" || "$ISSUER_ID" == "YOUR_ISSUER_ID" || "$ISSUER_ID" == "ISSUER_ID" ]]; then
+        if [[ -n "${APP_STORE_ISSUER_ID:-}" ]]; then ISSUER_ID="$APP_STORE_ISSUER_ID"; fi
+    fi
+
     fi
     
     # Collect Team ID

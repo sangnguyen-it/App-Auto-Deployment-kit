@@ -207,7 +207,14 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
 	@if command -v dart >/dev/null 2>&1; then \
-		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
+		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Preparing version selection context..."; \
+		if [ -n "$(ANDROID_VERSION_NAME)" ] && [ -n "$(ANDROID_VERSION_CODE)" ] && [ -n "$(IOS_VERSION_NAME)" ] && [ -n "$(IOS_VERSION_CODE)" ]; then \
+			printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual versions detected: ANDROID=$(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE), iOS=$(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)"; \
+			VERSION_MODE=manual ANDROID_VERSION_NAME="$(ANDROID_VERSION_NAME)" ANDROID_VERSION_CODE="$(ANDROID_VERSION_CODE)" IOS_VERSION_NAME="$(IOS_VERSION_NAME)" IOS_VERSION_CODE="$(IOS_VERSION_CODE)" dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; \
+		else \
+			dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; \
+		fi; \
+		if [ $$? -eq 0 ]; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
 		else \
 			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \

@@ -153,13 +153,19 @@ Future<void> interactiveMode() async {
   print('⚙️  VERSION MODE SELECTION:');
   print('   1. Auto - Keep current versions for both platforms');
   print('   2. Manual - Enter custom versions for each platform');
+  print('   (Env overrides supported: VERSION_MODE=manual + ANDROID_VERSION_NAME/ANDROID_VERSION_CODE/IOS_VERSION_NAME/IOS_VERSION_CODE)');
   print('');
   stdout.write('Select mode (1=Auto, 2=Manual) [default: 1]: ');
-  
+
   String? modeInput;
   try {
     // Check if stdin is available and not piped
-    if (stdin.hasTerminal) {
+    final envMode = Platform.environment['VERSION_MODE'];
+    if (envMode != null && envMode.isNotEmpty) {
+      // Force mode via environment variable
+      modeInput = (envMode.toLowerCase() == 'manual' || envMode == '2') ? '2' : '1';
+      print('$modeInput (env-selected)');
+    } else if (stdin.hasTerminal) {
       modeInput = stdin.readLineSync()?.trim();
     } else {
       // Auto-select mode 1 when stdin is not available (piped input)
@@ -193,69 +199,90 @@ Future<void> interactiveMode() async {
     print('✏️  MANUAL MODE - Enter custom versions:');
     print('');
     
-    print('📱 ANDROID VERSION:');
-    stdout.write('Enter Android version name [current: ${getVersionName()}]: ');
-    String? androidVersionNameInput;
-    try {
-      if (stdin.hasTerminal) {
-        androidVersionNameInput = stdin.readLineSync()?.trim();
-      } else {
+    // Env overrides if provided
+    final envAndroidName = Platform.environment['ANDROID_VERSION_NAME'];
+    final envAndroidCode = Platform.environment['ANDROID_VERSION_CODE'];
+    final envIosName = Platform.environment['IOS_VERSION_NAME'];
+    final envIosCode = Platform.environment['IOS_VERSION_CODE'];
+
+    final hasEnvManual = (envAndroidName != null && envAndroidName.isNotEmpty) &&
+                         (envAndroidCode != null && envAndroidCode.isNotEmpty) &&
+                         (envIosName != null && envIosName.isNotEmpty) &&
+                         (envIosCode != null && envIosCode.isNotEmpty);
+
+    if (hasEnvManual) {
+      androidVersionName = envAndroidName!;
+      androidVersionCode = envAndroidCode!;
+      iosVersionName = envIosName!;
+      iosVersionCode = envIosCode!;
+      print('📦 Using manual versions from environment variables');
+      print('   ANDROID: $androidVersionName+$androidVersionCode');
+      print('   iOS: $iosVersionName+$iosVersionCode');
+    } else {
+      print('📱 ANDROID VERSION:');
+      stdout.write('Enter Android version name [current: ${getVersionName()}]: ');
+      String? androidVersionNameInput;
+      try {
+        if (stdin.hasTerminal) {
+          androidVersionNameInput = stdin.readLineSync()?.trim();
+        } else {
+          androidVersionNameInput = '';
+          print('${getVersionName()} (auto-selected)');
+        }
+      } catch (e) {
         androidVersionNameInput = '';
         print('${getVersionName()} (auto-selected)');
       }
-    } catch (e) {
-      androidVersionNameInput = '';
-      print('${getVersionName()} (auto-selected)');
-    }
-    androidVersionName = (androidVersionNameInput?.isEmpty ?? true) ? getVersionName() : androidVersionNameInput!;
-    
-    stdout.write('Enter Android version code [current: ${getVersionCode()}]: ');
-    String? androidVersionCodeInput;
-    try {
-      if (stdin.hasTerminal) {
-        androidVersionCodeInput = stdin.readLineSync()?.trim();
-      } else {
+      androidVersionName = (androidVersionNameInput?.isEmpty ?? true) ? getVersionName() : androidVersionNameInput!;
+
+      stdout.write('Enter Android version code [current: ${getVersionCode()}]: ');
+      String? androidVersionCodeInput;
+      try {
+        if (stdin.hasTerminal) {
+          androidVersionCodeInput = stdin.readLineSync()?.trim();
+        } else {
+          androidVersionCodeInput = '';
+          print('${getVersionCode()} (auto-selected)');
+        }
+      } catch (e) {
         androidVersionCodeInput = '';
         print('${getVersionCode()} (auto-selected)');
       }
-    } catch (e) {
-      androidVersionCodeInput = '';
-      print('${getVersionCode()} (auto-selected)');
-    }
-    androidVersionCode = (androidVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : androidVersionCodeInput!;
-    
-    print('');
-    print('🍎 iOS VERSION:');
-    stdout.write('Enter iOS version name [current: ${getVersionName()}]: ');
-    String? iosVersionNameInput;
-    try {
-      if (stdin.hasTerminal) {
-        iosVersionNameInput = stdin.readLineSync()?.trim();
-      } else {
+      androidVersionCode = (androidVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : androidVersionCodeInput!;
+
+      print('');
+      print('🍎 iOS VERSION:');
+      stdout.write('Enter iOS version name [current: ${getVersionName()}]: ');
+      String? iosVersionNameInput;
+      try {
+        if (stdin.hasTerminal) {
+          iosVersionNameInput = stdin.readLineSync()?.trim();
+        } else {
+          iosVersionNameInput = '';
+          print('${getVersionName()} (auto-selected)');
+        }
+      } catch (e) {
         iosVersionNameInput = '';
         print('${getVersionName()} (auto-selected)');
       }
-    } catch (e) {
-      iosVersionNameInput = '';
-      print('${getVersionName()} (auto-selected)');
-    }
-    iosVersionName = (iosVersionNameInput?.isEmpty ?? true) ? getVersionName() : iosVersionNameInput!;
-    
-    stdout.write('Enter iOS version code [current: ${getVersionCode()}]: ');
-    String? iosVersionCodeInput;
-    try {
-      if (stdin.hasTerminal) {
-        iosVersionCodeInput = stdin.readLineSync()?.trim();
-      } else {
+      iosVersionName = (iosVersionNameInput?.isEmpty ?? true) ? getVersionName() : iosVersionNameInput!;
+
+      stdout.write('Enter iOS version code [current: ${getVersionCode()}]: ');
+      String? iosVersionCodeInput;
+      try {
+        if (stdin.hasTerminal) {
+          iosVersionCodeInput = stdin.readLineSync()?.trim();
+        } else {
+          iosVersionCodeInput = '';
+          print('${getVersionCode()} (auto-selected)');
+        }
+      } catch (e) {
         iosVersionCodeInput = '';
         print('${getVersionCode()} (auto-selected)');
       }
-    } catch (e) {
-      iosVersionCodeInput = '';
-      print('${getVersionCode()} (auto-selected)');
+      iosVersionCode = (iosVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : iosVersionCodeInput!;
     }
-    iosVersionCode = (iosVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : iosVersionCodeInput!;
-    
+
     print('');
     print('📝 Summary:');
     print('   Android: $androidVersionName+$androidVersionCode');

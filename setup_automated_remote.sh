@@ -721,7 +721,7 @@ create_configuration_files() {
     # Check if template processor is available
     if command -v create_all_templates >/dev/null 2>&1; then
         # Use template processor
-        if create_all_templates "$TARGET_DIR" "$PROJECT_NAME" "$PACKAGE_NAME" "$APP_NAME" "$TEAM_ID" "$TEMPLATES_DIR"; then
+        if create_all_templates "$TARGET_DIR" "$PROJECT_NAME" "$PACKAGE_NAME" "$APP_NAME" "$TEAM_ID" "$APPLE_ID" "$TEMPLATES_DIR"; then
             print_success "All configuration files created using templates"
         else
             print_warning "Some template files failed to create, falling back to inline creation"

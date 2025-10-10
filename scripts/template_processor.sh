@@ -40,7 +40,9 @@ process_template() {
     local app_name="${5:-}"
     local team_id="${6:-YOUR_TEAM_ID}"
     local apple_id="${7:-your-apple-id@email.com}"
-    local target_dir="${8:-$(dirname "$output_file")}"
+    local target_dir="${8:-$(dirname "$output_file")}" 
+    # Optional: bundle_id; defaults to package_name if not provided
+    local bundle_id="${9:-$package_name}"
     
     if [ ! -f "$template_file" ]; then
         echo "Error: Template file not found: $template_file" >&2
@@ -73,6 +75,7 @@ process_template() {
     temp_content="${temp_content//\{\{APP_NAME\}\}/$app_name}"
     temp_content="${temp_content//\{\{TEAM_ID\}\}/$team_id}"
     temp_content="${temp_content//\{\{APPLE_ID\}\}/$apple_id}"
+    temp_content="${temp_content//\{\{BUNDLE_ID\}\}/$bundle_id}"
     temp_content="${temp_content//\{\{GENERATION_DATE\}\}/$(date)}"
     temp_content="${temp_content//\{\{VERSION_FULL\}\}/$version_full}"
     temp_content="${temp_content//\{\{VERSION_NAME\}\}/$version_name}"
@@ -115,12 +118,15 @@ create_ios_fastfile_from_template() {
     local target_dir="$1"
     local project_name="$2"
     local package_name="$3"
-    local template_dir="${4:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
+    local team_id="${4:-YOUR_TEAM_ID}"
+    local apple_id="${5:-your-apple-id@email.com}"
+    local template_dir="${6:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
     
     local template_file="$template_dir/ios_fastfile.template"
     local output_file="$target_dir/ios/fastlane/Fastfile"
     
-    if process_template "$template_file" "$output_file" "$project_name" "$package_name"; then
+    # Pass target_dir for version discovery and bundle_id defaulting to package_name
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name" "$project_name" "$team_id" "$apple_id" "$target_dir" "$package_name"; then
         echo "✅ iOS Fastfile created from template"
         return 0
     else
@@ -284,7 +290,7 @@ create_all_templates() {
         success=false
     fi
     
-    if ! create_ios_fastfile_from_template "$target_dir" "$project_name" "$package_name" "$template_dir"; then
+    if ! create_ios_fastfile_from_template "$target_dir" "$project_name" "$package_name" "$team_id" "$apple_id" "$template_dir"; then
         success=false
     fi
     

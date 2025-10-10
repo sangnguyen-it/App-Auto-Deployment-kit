@@ -1,7 +1,7 @@
 # Appfile for {{PROJECT_NAME}} iOS
 # Configuration for App Store Connect and Apple Developer
 
-app_identifier("{{BUNDLE_ID}}") # Your bundle identifier
+app_identifier("{{PACKAGE_NAME}}") # Your bundle identifier
 apple_id("{{APPLE_ID}}") # Replace with your Apple ID
 team_id("{{TEAM_ID}}") # Replace with your Apple Developer Team ID
 

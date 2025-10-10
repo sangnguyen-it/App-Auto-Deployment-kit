@@ -342,21 +342,15 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 				cd ios; \
 				if fastlane build_archive_beta 2>/dev/null; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive and IPA created successfully"; \
-                    cd ..; \
-                    IPA_FILE=$$(find build/ios/ipa -name "*.ipa" 2>/dev/null | head -1); \
-                    if [ -z "$$IPA_FILE" ]; then \
-                        IPA_FILE=$$(find ios/fastlane/builds -name "*.ipa" 2>/dev/null | head -1); \
-                    fi; \
-                    if [ -z "$$IPA_FILE" ]; then \
-                        IPA_FILE=$$(find . -type f -name "*.ipa" \( -path "*/build/*" -o -path "*/fastlane/*" \) 2>/dev/null | head -1); \
-                    fi; \
-                    if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
-                        printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA exported successfully"; \
-                        cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_NAME)"; \
-                        printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
-                        printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to TestFlight..."; \
-                        cd ios; \
-                        if fastlane ios beta 2>/dev/null; then \
+					cd ..; \
+					IPA_FILE=$$(find build/ios/ipa -name "*.ipa" | head -1); \
+					if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA exported successfully"; \
+						cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_NAME)"; \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
+						printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to TestFlight..."; \
+						cd ios; \
+						if fastlane ios beta 2>/dev/null; then \
 							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to TestFlight"; \
 						else \
 							printf "$(YELLOW)$(WARNING) %s$(NC)\n" "TestFlight upload failed - check fastlane configuration"; \
@@ -756,20 +750,14 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 					printf "$(RED)$(CROSS) %s$(NC)\n" "Fastlane production build failed"; \
 					exit 1; \
 				fi; \
-                cd ..; \
-                IPA_FILE=$$(find build/ios/ipa -name "*.ipa" 2>/dev/null | head -1); \
-                if [ -z "$$IPA_FILE" ]; then \
-                    IPA_FILE=$$(find ios/fastlane/builds -name "*.ipa" 2>/dev/null | head -1); \
-                fi; \
-                if [ -z "$$IPA_FILE" ]; then \
-                    IPA_FILE=$$(find . -type f -name "*.ipa" \( -path "*/build/*" -o -path "*/fastlane/*" \) 2>/dev/null | head -1); \
-                fi; \
-                if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
-                    printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
-                    cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
-                    printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
-                    printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
-                    cd ios; \
+				cd ..; \
+				IPA_FILE=$$(find build/ios/ipa -name "*.ipa" | head -1); \
+				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
+					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
+					cd ios; \
 					if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
 						if bundle exec fastlane ios release 2>/dev/null; then \
 							printf "$(GREEN)$(CHECK) %s$(NC)\n" "Successfully uploaded to App Store via bundle"; \

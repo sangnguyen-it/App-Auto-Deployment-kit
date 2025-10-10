@@ -152,6 +152,9 @@ validate_github_secrets() {
     # Required secrets list
     local required_secrets=(
         "ANDROID_KEYSTORE_BASE64"
+        "KEYSTORE_PASSWORD"
+        "KEY_ALIAS"
+        "KEY_PASSWORD"
         "PLAY_STORE_JSON_BASE64"
         "APP_STORE_KEY_CONTENT"
         "APP_STORE_KEY_ID"
@@ -160,11 +163,8 @@ validate_github_secrets() {
     
     # Optional secrets (for additional features)
     local optional_secrets=(
-        "KEYSTORE_PASSWORD"
-        "KEY_ALIAS"
-        "KEY_PASSWORD"
-        "SLACK_WEBHOOK_URL"
-        "DISCORD_WEBHOOK_URL"
+        # "SLACK_WEBHOOK_URL"
+        # "DISCORD_WEBHOOK_URL"
     )
     
     print_status "$CYAN" "$INFO" "Checking required secrets..."

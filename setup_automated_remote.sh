@@ -1777,6 +1777,13 @@ sync_fastfile() {
         sed -i.bak "s/ISSUER_ID = \"YOUR_ISSUER_ID\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
         sed -i.bak "s/^ISSUER_ID = \"[^\"]*\"/ISSUER_ID = \"$ISSUER_ID\"/g" "$temp_fastfile"
     fi
+
+    # Update BUNDLE_ID if present in project.config
+    if [[ -n "$BUNDLE_ID" ]]; then
+        # Replace placeholder or any existing value
+        sed -i.bak "s/BUNDLE_ID = \"{{BUNDLE_ID}}\"/BUNDLE_ID = \"$BUNDLE_ID\"/g" "$temp_fastfile"
+        sed -i.bak "s/^BUNDLE_ID = \"[^\"]*\"/BUNDLE_ID = \"$BUNDLE_ID\"/g" "$temp_fastfile"
+    fi
     
     # Clean up backup files
     rm -f "$temp_fastfile.bak"

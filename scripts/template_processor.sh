@@ -126,7 +126,9 @@ create_ios_fastfile_from_template() {
     local output_file="$target_dir/ios/fastlane/Fastfile"
     
     # Pass target_dir for version discovery and bundle_id defaulting to package_name
-    if process_template "$template_file" "$output_file" "$project_name" "$package_name" "$project_name" "$team_id" "$apple_id" "$target_dir" "$package_name"; then
+    # Prefer BUNDLE_ID from environment if provided; fallback to package_name
+    local effective_bundle_id="${BUNDLE_ID:-$package_name}"
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name" "$project_name" "$team_id" "$apple_id" "$target_dir" "$effective_bundle_id"; then
         echo "✅ iOS Fastfile created from template"
         return 0
     else

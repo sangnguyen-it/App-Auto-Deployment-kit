@@ -2,6 +2,13 @@
 # Template Processing Functions for AppAutoDeploy
 # This script provides functions to process templates with variable substitution
 
+# Source common functions if available
+COMMON_FUNCS_DIR="$(dirname "${BASH_SOURCE[0]}")"
+if [ -f "$COMMON_FUNCS_DIR/common_functions.sh" ]; then
+    # shellcheck source=/dev/null
+    source "$COMMON_FUNCS_DIR/common_functions.sh"
+fi
+
 # Function to get version information from dynamic_version_manager
 get_version_info() {
     local target_dir="$1"
@@ -63,6 +70,13 @@ process_template() {
         flutter_version=$(flutter --version | head -1 | sed 's/Flutter \([0-9.]*\).*/\1/' || echo "3.24.3")
     fi
     
+    # Derive optional values from environment or fallbacks
+    local bundle_id="${BUNDLE_ID:-$package_name}"
+    local team_id_local="${TEAM_ID:-$team_id}"
+    local apple_id_local="${APPLE_ID:-$apple_id}"
+    local key_id_local="${KEY_ID:-YOUR_KEY_ID}"
+    local issuer_id_local="${ISSUER_ID:-YOUR_ISSUER_ID}"
+
     # Process template with variable substitution
     local temp_content
     temp_content=$(cat "$template_file")
@@ -70,9 +84,12 @@ process_template() {
     # Replace template variables
     temp_content="${temp_content//\{\{PROJECT_NAME\}\}/$project_name}"
     temp_content="${temp_content//\{\{PACKAGE_NAME\}\}/$package_name}"
+    temp_content="${temp_content//\{\{BUNDLE_ID\}\}/$bundle_id}"
     temp_content="${temp_content//\{\{APP_NAME\}\}/$app_name}"
-    temp_content="${temp_content//\{\{TEAM_ID\}\}/$team_id}"
-    temp_content="${temp_content//\{\{APPLE_ID\}\}/$apple_id}"
+    temp_content="${temp_content//\{\{TEAM_ID\}\}/$team_id_local}"
+    temp_content="${temp_content//\{\{APPLE_ID\}\}/$apple_id_local}"
+    temp_content="${temp_content//\{\{KEY_ID\}\}/$key_id_local}"
+    temp_content="${temp_content//\{\{ISSUER_ID\}\}/$issuer_id_local}"
     temp_content="${temp_content//\{\{GENERATION_DATE\}\}/$(date)}"
     temp_content="${temp_content//\{\{VERSION_FULL\}\}/$version_full}"
     temp_content="${temp_content//\{\{VERSION_NAME\}\}/$version_name}"
@@ -141,7 +158,7 @@ create_ios_appfile_from_template() {
     local template_file="$template_dir/ios_appfile.template"
     local output_file="$target_dir/ios/fastlane/Appfile"
     
-    if process_template "$template_file" "$output_file" "$project_name" "$package_name" "$project_name" "$team_id" "$apple_id"; then
+    if process_template "$template_file" "$output_file" "$project_name" "$package_name" "$project_name" "$team_id" "$apple_id" "$target_dir"; then
         echo "✅ iOS Appfile created from template"
         return 0
     else
@@ -267,6 +284,26 @@ create_all_templates() {
     local apple_id="${6:-your-apple-id@email.com}"
     local template_dir="${7:-${TEMPLATES_DIR:-$(dirname "${BASH_SOURCE[0]}")/../templates}}"
 
+    # Try to source project.config from target_dir or its parents to load env vars
+    local config_path=""
+    for try_dir in "$target_dir" "$(dirname "$target_dir")" "$(dirname "$(dirname "$target_dir")")"; do
+        if [ -f "$try_dir/project.config" ]; then
+            config_path="$try_dir/project.config"
+            break
+        fi
+    done
+    if [ -n "$config_path" ]; then
+        # shellcheck source=/dev/null
+        source "$config_path"
+        # Override from config if set
+        project_name="${PROJECT_NAME:-$project_name}"
+        package_name="${PACKAGE_NAME:-$package_name}"
+        team_id="${TEAM_ID:-$team_id}"
+        apple_id="${APPLE_ID:-$apple_id}"
+        export BUNDLE_ID="${BUNDLE_ID:-$package_name}"
+        export KEY_ID="${KEY_ID:-$KEY_ID}"
+        export ISSUER_ID="${ISSUER_ID:-$ISSUER_ID}"
+    fi
     
     # Create directory structure
     mkdir -p "$target_dir/android/fastlane"
@@ -308,6 +345,11 @@ create_all_templates() {
         success=false
     fi
     
+    # Auto-sync fastlane files with project.config if available
+    if type auto_sync_project_config >/dev/null 2>&1; then
+        auto_sync_project_config "$target_dir" || true
+    fi
+
     if [ "$success" = true ]; then
         echo "✅ All templates created successfully!"
         return 0

@@ -34,9 +34,9 @@ end
 # Project Configuration
 PROJECT_NAME = "{{PROJECT_NAME}}"
 BUNDLE_ID = "{{BUNDLE_ID}}"
-TEAM_ID = "YOUR_TEAM_ID"
-KEY_ID = "YOUR_KEY_ID"
-ISSUER_ID = "YOUR_ISSUER_ID"
+TEAM_ID = "{{TEAM_ID}}"
+KEY_ID = "{{KEY_ID}}"
+ISSUER_ID = "{{ISSUER_ID}}"
 TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Testers"]
 
 # File paths (relative to fastlane directory)

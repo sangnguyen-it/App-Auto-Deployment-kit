@@ -1728,6 +1728,19 @@ sync_appfile() {
         if [[ -n "${APP_STORE_ISSUER_ID:-}" ]]; then ISSUER_ID="$APP_STORE_ISSUER_ID"; fi
     fi
 
+            # Infer KEY_ID from existing AuthKey_*.p8 if still placeholder
+        if [[ -z "" || "" == "YOUR_KEY_ID" || "" == "KEY_ID" ]]; then
+            if compgen -G "/ios/fastlane/AuthKey_*.p8" > /dev/null; then
+                auth_key_file=20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400ls "/ios/fastlane/AuthKey_"*.p8 | head -1)
+                inferred_key_id=20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400basename "")
+                inferred_key_id=${inferred_key_id#AuthKey_}
+                inferred_key_id=${inferred_key_id%.p8}
+                if [[ -n "" ]]; then
+                    KEY_ID=""
+                fi
+            fi
+        fi
+
     else
         print_warning "project.config not found, skipping Appfile sync"
         return 0

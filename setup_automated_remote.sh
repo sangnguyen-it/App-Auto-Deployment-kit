@@ -1308,10 +1308,34 @@ copy_automation_files() {
 
 # Create project configuration
 create_project_config() {
-    local target_dir="$1"
+    local target_dir="${1:-}"
     local project_name="$2"
     local bundle_id="$3"
     local package_name="$4"
+    
+    # Resolve target_dir to a writable location
+    if [ -z "$target_dir" ] || [ "$target_dir" = "/" ]; then
+        target_dir="$(pwd)"
+    fi
+    
+    # If current dir is root or not writable, fallback to repo root (parent of scripts) or $HOME
+    if [ "$target_dir" = "/" ] || [ ! -w "$target_dir" ]; then
+        local caller_path
+        caller_path="${BASH_SOURCE[0]:-$0}"
+        local script_dir
+        script_dir="$(cd "$(dirname "$caller_path")" && pwd)"
+        local repo_root
+        repo_root="$(cd "$script_dir/.." && pwd)"
+        if [ -w "$repo_root" ]; then
+            target_dir="$repo_root"
+        else
+            target_dir="$HOME"
+        fi
+        print_warning "Resolved target_dir to '$target_dir' for writable project.config"
+    fi
+    
+    # Ensure target directory exists
+    mkdir -p "$target_dir"
     
     cat > "$target_dir/project.config" << EOF
 # Project Configuration
@@ -1536,6 +1560,30 @@ create_new_project_config() {
     KEY_ID="YOUR_KEY_ID"
     ISSUER_ID="YOUR_ISSUER_ID"
     APPLE_ID="your-apple-id@email.com"
+    
+    # Ensure TARGET_DIR is writable and not root
+    if [ -z "$TARGET_DIR" ] || [ "$TARGET_DIR" = "/" ] || [ ! -w "$TARGET_DIR" ]; then
+        local caller_path
+        caller_path="${BASH_SOURCE[0]:-$0}"
+        local script_dir
+        script_dir="$(cd "$(dirname "$caller_path")" && pwd)"
+        # Prefer current working dir; fallback to repo root or HOME
+        local fallback_dir
+        fallback_dir="$(pwd)"
+        if [ "$fallback_dir" = "/" ] || [ ! -w "$fallback_dir" ]; then
+            local repo_root
+            repo_root="$(cd "$script_dir/.." && pwd)"
+            if [ -w "$repo_root" ]; then
+                TARGET_DIR="$repo_root"
+            else
+                TARGET_DIR="$HOME"
+            fi
+        else
+            TARGET_DIR="$fallback_dir"
+        fi
+        print_warning "Resolved TARGET_DIR to '$TARGET_DIR' for writable project.config"
+    fi
+    mkdir -p "$TARGET_DIR"
     
     cat > "$TARGET_DIR/project.config" << EOF
 # Flutter CI/CD Project Configuration
@@ -2052,6 +2100,30 @@ update_project_config() {
     local timestamp=$(date)
     
     # Create updated config file
+    # Ensure TARGET_DIR is writable and not root
+    if [ -z "$TARGET_DIR" ] || [ "$TARGET_DIR" = "/" ] || [ ! -w "$TARGET_DIR" ]; then
+        local caller_path
+        caller_path="${BASH_SOURCE[0]:-$0}"
+        local script_dir
+        script_dir="$(cd "$(dirname "$caller_path")" && pwd)"
+        # Prefer current working dir; fallback to repo root or HOME
+        local fallback_dir
+        fallback_dir="$(pwd)"
+        if [ "$fallback_dir" = "/" ] || [ ! -w "$fallback_dir" ]; then
+            local repo_root
+            repo_root="$(cd "$script_dir/.." && pwd)"
+            if [ -w "$repo_root" ]; then
+                TARGET_DIR="$repo_root"
+            else
+                TARGET_DIR="$HOME"
+            fi
+        else
+            TARGET_DIR="$fallback_dir"
+        fi
+        print_warning "Resolved TARGET_DIR to '$TARGET_DIR' for writable project.config"
+    fi
+    mkdir -p "$TARGET_DIR"
+    
     cat > "$TARGET_DIR/project.config" << EOF
 # Flutter CI/CD Project Configuration
 # Auto-generated for project: $PROJECT_NAME

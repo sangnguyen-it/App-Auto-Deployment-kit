@@ -139,10 +139,35 @@ check_dependencies() {
 
 # Create project configuration
 create_project_config() {
-    local target_dir="$1"
+    local target_dir="${1:-}"
     local project_name="$2"
     local bundle_id="$3"
     local package_name="$4"
+    
+    # Resolve target_dir to a writable location
+    if [ -z "$target_dir" ] || [ "$target_dir" = "/" ]; then
+        target_dir="$(pwd)"
+    fi
+    
+    # If current dir is root or not writable, fallback to repo root (parent of scripts)
+    if [ "$target_dir" = "/" ] || [ ! -w "$target_dir" ]; then
+        local caller_path
+        caller_path="${BASH_SOURCE[0]:-$0}"
+        local script_dir
+        script_dir="$(cd "$(dirname "$caller_path")" && pwd)"
+        local repo_root
+        repo_root="$(cd "$script_dir/.." && pwd)"
+        if [ -w "$repo_root" ]; then
+            target_dir="$repo_root"
+        else
+            # Last resort: use user's home directory
+            target_dir="$HOME"
+        fi
+        print_warning "Resolved target_dir to '$target_dir' for writable project.config"
+    fi
+    
+    # Ensure target directory exists
+    mkdir -p "$target_dir"
     
     cat > "$target_dir/project.config" << EOF
 # Project Configuration

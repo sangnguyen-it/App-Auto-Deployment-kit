@@ -110,7 +110,8 @@ platform :ios do
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
-      xcargs: "-allowProvisioningUpdates"
+      xcargs: "-allowProvisioningUpdates",
+      export_options: "fastlane/ExportOptions.plist"
     )
   end
   

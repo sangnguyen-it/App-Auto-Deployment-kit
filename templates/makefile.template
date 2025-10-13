@@ -29,48 +29,42 @@ IPA_PROD_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.ipa
 ARCHIVE_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.xcarchive
 ARCHIVE_PROD_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.xcarchive
 
-# AppAutoDeploy Scripts Configuration
-# Set APPAUTODEPLOY_DIR to your AppAutoDeploy installation directory
-# Default: ~/AppAutoDeploy (can be overridden by environment variable)
-APPAUTODEPLOY_DIR ?= $(HOME)/AppAutoDeploy
-SCRIPTS_DIR := $(APPAUTODEPLOY_DIR)/scripts
-
 # Function to get current version (will be called during build)
 define get_current_version
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
+$(shell dart scripts/dynamic_version_manager.dart get-android-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
 endef
 
 define get_current_version_name
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "$(VERSION_NAME_FALLBACK)")
+$(shell dart scripts/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "$(VERSION_NAME_FALLBACK)")
 endef
 
 define get_current_version_code
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
+$(shell dart scripts/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
 endef
 
 # Functions to get platform-specific versions
 define get_android_version
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
+$(shell dart scripts/dynamic_version_manager.dart get-android-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
 endef
 
 define get_android_version_name
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "$(VERSION_NAME_FALLBACK)")
+$(shell dart scripts/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "$(VERSION_NAME_FALLBACK)")
 endef
 
 define get_android_version_code
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
+$(shell dart scripts/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
 endef
 
 define get_ios_version
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-ios-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
+$(shell dart scripts/dynamic_version_manager.dart get-ios-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
 endef
 
 define get_ios_version_name
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-ios-version-name 2>/dev/null || echo "$(VERSION_NAME_FALLBACK)")
+$(shell dart scripts/dynamic_version_manager.dart get-ios-version-name 2>/dev/null || echo "$(VERSION_NAME_FALLBACK)")
 endef
 
 define get_ios_version_code
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-ios-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
+$(shell dart scripts/dynamic_version_manager.dart get-ios-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
 endef
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -216,15 +210,15 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 		printf "$(CYAN)$(GEAR) %s$(NC)\n" "Preparing version selection context..."; \
 		if [ -n "$(ANDROID_VERSION_NAME)" ] && [ -n "$(ANDROID_VERSION_CODE)" ] && [ -n "$(IOS_VERSION_NAME)" ] && [ -n "$(IOS_VERSION_CODE)" ]; then \
 			printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual versions detected: ANDROID=$(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE), iOS=$(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)"; \
-			VERSION_MODE=manual ANDROID_VERSION_NAME="$(ANDROID_VERSION_NAME)" ANDROID_VERSION_CODE="$(ANDROID_VERSION_CODE)" IOS_VERSION_NAME="$(IOS_VERSION_NAME)" IOS_VERSION_CODE="$(IOS_VERSION_CODE)" dart $(SCRIPTS_DIR)/dynamic_version_manager.dart interactive 2>/dev/null; \
+			VERSION_MODE=manual ANDROID_VERSION_NAME="$(ANDROID_VERSION_NAME)" ANDROID_VERSION_CODE="$(ANDROID_VERSION_CODE)" IOS_VERSION_NAME="$(IOS_VERSION_NAME)" IOS_VERSION_CODE="$(IOS_VERSION_CODE)" dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; \
 		else \
-			dart $(SCRIPTS_DIR)/dynamic_version_manager.dart interactive 2>/dev/null; \
+			dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; \
 		fi; \
 		if [ $$? -eq 0 ]; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
 		else \
 			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
-			if dart $(SCRIPTS_DIR)/dynamic_version_manager.dart set-strategy fallback_only && dart $(SCRIPTS_DIR)/dynamic_version_manager.dart apply; then \
+			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
 			else \
 				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
@@ -241,17 +235,17 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
 	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
 	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
-	@ANDROID_VERSION_NAME=$$(dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "1.0.0"); \
-	ANDROID_VERSION_CODE=$$(dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "1"); \
-	IOS_VERSION_NAME=$$(dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-ios-version-name 2>/dev/null || echo "1.0.0"); \
-	IOS_VERSION_CODE=$$(dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-ios-version-code 2>/dev/null || echo "1"); \
+	@ANDROID_VERSION_NAME=$$(dart scripts/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "1.0.0"); \
+	ANDROID_VERSION_CODE=$$(dart scripts/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "1"); \
+	IOS_VERSION_NAME=$$(dart scripts/dynamic_version_manager.dart get-ios-version-name 2>/dev/null || echo "1.0.0"); \
+	IOS_VERSION_CODE=$$(dart scripts/dynamic_version_manager.dart get-ios-version-code 2>/dev/null || echo "1"); \
 	printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"; \
 	printf "$(CYAN)   📱 Android: $$ANDROID_VERSION_NAME+$$ANDROID_VERSION_CODE$(NC)\n"; \
 	printf "$(CYAN)   🍎 iOS: $$IOS_VERSION_NAME+$$IOS_VERSION_CODE$(NC)\n"
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
 	@if command -v dart >/dev/null 2>&1; then \
-		if dart $(SCRIPTS_DIR)/build_info_generator.dart 2>/dev/null; then \
+		if dart scripts/build_info_generator.dart 2>/dev/null; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Build information generated"; \
 		else \
 			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Build info generation failed - continuing"; \
@@ -397,11 +391,11 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
 	@if command -v dart >/dev/null 2>&1; then \
-		if dart $(SCRIPTS_DIR)/dynamic_version_manager.dart interactive 2>/dev/null; then \
+		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
 		else \
 			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
-			if dart $(SCRIPTS_DIR)/dynamic_version_manager.dart set-strategy fallback_only && dart $(SCRIPTS_DIR)/dynamic_version_manager.dart apply; then \
+			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
 			else \
 				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
@@ -417,7 +411,7 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
 	@if command -v dart >/dev/null 2>&1; then \
-		if dart $(SCRIPTS_DIR)/build_info_generator.dart 2>/dev/null; then \
+		if dart scripts/build_info_generator.dart 2>/dev/null; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Build information generated"; \
 		else \
 			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Build info generation failed - continuing"; \
@@ -588,11 +582,11 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
 	@if command -v dart >/dev/null 2>&1; then \
-		if dart $(SCRIPTS_DIR)/dynamic_version_manager.dart interactive 2>/dev/null; then \
+		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
 		else \
 			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
-			if dart $(SCRIPTS_DIR)/dynamic_version_manager.dart set-strategy fallback_only && dart $(SCRIPTS_DIR)/dynamic_version_manager.dart apply; then \
+			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
 			else \
 				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
@@ -608,7 +602,7 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
 	@if command -v dart >/dev/null 2>&1; then \
-		if dart $(SCRIPTS_DIR)/build_info_generator.dart 2>/dev/null; then \
+		if dart scripts/build_info_generator.dart 2>/dev/null; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Build information generated"; \
 		else \
 			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Build info generation failed - continuing"; \
@@ -805,11 +799,11 @@ live-github: ## ☁️ Automated Live Production Pipeline (GitHub Actions Build 
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Interactive version selection..."
 	@if command -v dart >/dev/null 2>&1; then \
-		if dart $(SCRIPTS_DIR)/dynamic_version_manager.dart interactive 2>/dev/null; then \
+		if dart scripts/dynamic_version_manager.dart interactive 2>/dev/null; then \
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version applied successfully"; \
 		else \
 			printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Interactive version failed - using fallback"; \
-			if dart $(SCRIPTS_DIR)/dynamic_version_manager.dart set-strategy fallback_only && dart $(SCRIPTS_DIR)/dynamic_version_manager.dart apply; then \
+			if dart scripts/dynamic_version_manager.dart set-strategy fallback_only && dart scripts/dynamic_version_manager.dart apply; then \
 				printf "$(GREEN)$(CHECK) %s$(NC)\n" "Fallback version applied"; \
 			else \
 				printf "$(RED)$(CROSS) %s$(NC)\n" "Version management failed"; \
@@ -822,10 +816,10 @@ live-github: ## ☁️ Automated Live Production Pipeline (GitHub Actions Build 
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Refreshing version information after interactive selection..."
 	
 	@# Read versions directly from files created by interactive mode
-	@ANDROID_VERSION_NAME=$$(dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "1.0.0"); \
-	ANDROID_VERSION_CODE=$$(dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "1"); \
-	IOS_VERSION_NAME=$$(dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-ios-version-name 2>/dev/null || echo "1.0.0"); \
-	IOS_VERSION_CODE=$$(dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-ios-version-code 2>/dev/null || echo "1"); \
+	@ANDROID_VERSION_NAME=$$(dart scripts/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "1.0.0"); \
+	ANDROID_VERSION_CODE=$$(dart scripts/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "1"); \
+	IOS_VERSION_NAME=$$(dart scripts/dynamic_version_manager.dart get-ios-version-name 2>/dev/null || echo "1.0.0"); \
+	IOS_VERSION_CODE=$$(dart scripts/dynamic_version_manager.dart get-ios-version-code 2>/dev/null || echo "1"); \
 	printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"; \
 	printf "$(CYAN)   📱 Android: $$ANDROID_VERSION_NAME+$$ANDROID_VERSION_CODE$(NC)\n"; \
 	printf "$(CYAN)   🍎 iOS: $$IOS_VERSION_NAME+$$IOS_VERSION_CODE$(NC)\n"; \

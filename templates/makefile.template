@@ -149,11 +149,12 @@ menu: ## 🎯 Interactive Menu - Choose Your Build Pipeline
 	@printf "\n"
 	@printf "$(CYAN)  5)$(NC) $(WHITE)⚙️  Manual Operations$(NC)       $(GRAY)# Advanced tools & configurations$(NC)\n"
 	@printf "$(CYAN)  6)$(NC) $(WHITE)🔍 System Check$(NC)            $(GRAY)# Verify environment setup$(NC)\n"
-	@printf "$(CYAN)  7)$(NC) $(WHITE)📋 Help & Commands$(NC)         $(GRAY)# Show all available commands$(NC)\n"
-	@printf "$(CYAN)  8)$(NC) $(WHITE)🚪 Exit$(NC)                   $(GRAY)# Close this menu$(NC)\n"
+	@printf "$(CYAN)  7)$(NC) $(WHITE)🔧 Config$(NC)                  $(GRAY)# Update project configuration$(NC)\n"
+	@printf "$(CYAN)  8)$(NC) $(WHITE)📋 Help & Commands$(NC)         $(GRAY)# Show all available commands$(NC)\n"
+	@printf "$(CYAN)  9)$(NC) $(WHITE)🚪 Exit$(NC)                   $(GRAY)# Close this menu$(NC)\n"
 	@printf "\n"
 	@printf "$(GRAY)─────────────────────────────────────────────────────────────────$(NC)\n"
-	@printf "$(WHITE)Enter your choice [1-8]:$(NC) "
+	@printf "$(WHITE)Enter your choice [1-9]:$(NC) "
 	@read -p "" CHOICE; \
 	case $$CHOICE in \
 		1) $(MAKE) auto-build-tester ;; \
@@ -162,9 +163,10 @@ menu: ## 🎯 Interactive Menu - Choose Your Build Pipeline
 		4) $(MAKE) live ;; \
 		5) $(MAKE) manual-operations ;; \
 		6) $(MAKE) system-check ;; \
-		7) $(MAKE) help ;; \
-		8) printf "$(GREEN)$(CHECK) %s$(NC)\n" "Goodbye! 👋" ;; \
-		*) printf "$(RED)Invalid choice. Please select 1-8.$(NC)\n" && $(MAKE) menu ;; \
+		7) $(MAKE) config ;; \
+		8) $(MAKE) help ;; \
+		9) printf "$(GREEN)$(CHECK) %s$(NC)\n" "Goodbye! 👋" ;; \
+		*) printf "$(RED)Invalid choice. Please select 1-9.$(NC)\n" && $(MAKE) menu ;; \
 	esac
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -994,3 +996,43 @@ build: ## 🔨 Building
 test: ## 🧪 Running tests
 	@echo "🧪 Running tests..."
 	flutter test
+
+config: ## 🔧 Update project configuration
+	@printf "\n"
+	@printf "$(CYAN)🔧 Updating project configuration...$(NC)\n"
+	@printf "\n"
+	@if [ ! -f "$(APPAUTODEPLOY_SCRIPT)" ]; then \
+		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "AppAutoDeploy script not found. Downloading..."; \
+		curl -fsSL "$(APPAUTODEPLOY_URL)" -o "$(APPAUTODEPLOY_SCRIPT)"; \
+		chmod +x "$(APPAUTODEPLOY_SCRIPT)"; \
+		printf "$(GREEN)$(CHECK) %s$(NC)\n" "AppAutoDeploy script downloaded successfully"; \
+	fi
+	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Running configuration update..."
+	@bash "$(APPAUTODEPLOY_SCRIPT)" --config
+	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Configuration updated successfully"
+
+help: ## 📋 Show all available commands
+	@printf "\n"
+	@printf "$(PURPLE)$(BOLD)📋 Available Make Commands$(NC)\n"
+	@printf "$(GRAY)═══════════════════════════════════════════════════════════════════$(NC)\n"
+	@printf "\n"
+	@printf "$(PURPLE)$(BOLD)🚀 Build Pipelines:$(NC)\n"
+	@printf "$(CYAN)  make tester$(NC)              $(GRAY)# 🧪 Build APK + TestFlight for testing$(NC)\n"
+	@printf "$(CYAN)  make live-local$(NC)          $(GRAY)# 🚀 Build AAB + App Store (local upload)$(NC)\n"
+	@printf "$(CYAN)  make live-github$(NC)         $(GRAY)# ☁️  Deploy via GitHub Actions$(NC)\n"
+	@printf "$(CYAN)  make live$(NC)                $(GRAY)# 🔄 Hybrid: local build + GitHub upload$(NC)\n"
+	@printf "\n"
+	@printf "$(PURPLE)$(BOLD)⚙️ System & Configuration:$(NC)\n"
+	@printf "$(CYAN)  make system-check$(NC)        $(GRAY)# 🔍 Verify environment setup$(NC)\n"
+	@printf "$(CYAN)  make config$(NC)              $(GRAY)# 🔧 Update project configuration$(NC)\n"
+	@printf "$(CYAN)  make manual-operations$(NC)   $(GRAY)# ⚙️  Advanced tools & configurations$(NC)\n"
+	@printf "\n"
+	@printf "$(PURPLE)$(BOLD)🛠️ Development Tools:$(NC)\n"
+	@printf "$(CYAN)  make clean$(NC)               $(GRAY)# 🧹 Clean build artifacts$(NC)\n"
+	@printf "$(CYAN)  make build$(NC)               $(GRAY)# 🔨 Build APK and AAB$(NC)\n"
+	@printf "$(CYAN)  make test$(NC)                $(GRAY)# 🧪 Run Flutter tests$(NC)\n"
+	@printf "\n"
+	@printf "$(PURPLE)$(BOLD)ℹ️ Information:$(NC)\n"
+	@printf "$(CYAN)  make menu$(NC)                $(GRAY)# 📋 Show interactive menu$(NC)\n"
+	@printf "$(CYAN)  make help$(NC)                $(GRAY)# 📋 Show this help message$(NC)\n"
+	@printf "\n"

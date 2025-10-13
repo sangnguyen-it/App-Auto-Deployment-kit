@@ -1935,6 +1935,7 @@ main() {
         echo "  --help, -h            Show this help message"
         echo "  --local               Force local deployment mode (skip deployment mode selection)"
         echo "  --github              Force GitHub Actions deployment mode"
+        echo "  --config              Update script to latest version and restart"
         echo ""
         echo "Description:"
         echo "  This script automatically sets up a complete CI/CD pipeline for Flutter projects."
@@ -1966,6 +1967,23 @@ main() {
             --github)
                 FORCE_DEPLOYMENT_MODE="github"
                 shift
+                ;;
+            --config)
+                echo "🔧 Update configuration mode enabled"
+                # Re-download and update the script itself
+                SCRIPT_URL="https://raw.githubusercontent.com/sunny-THS/AppAutoDeploy/main/setup_automated_remote.sh"
+                TEMP_SCRIPT="/tmp/setup_automated_remote_new.sh"
+                
+                echo "📥 Downloading latest configuration..."
+                if curl -fsSL "$SCRIPT_URL" -o "$TEMP_SCRIPT"; then
+                    chmod +x "$TEMP_SCRIPT"
+                    echo "✅ Configuration updated successfully"
+                    echo "🔄 Restarting with new configuration..."
+                    exec "$TEMP_SCRIPT" "${@:2}"  # Execute new script with remaining args
+                else
+                    echo "❌ Failed to download configuration update"
+                    exit 1
+                fi
                 ;;
             --help|-h)
                 # Already handled above

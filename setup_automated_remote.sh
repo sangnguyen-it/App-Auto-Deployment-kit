@@ -1971,7 +1971,7 @@ main() {
             --config)
                 echo "🔧 Update configuration mode enabled"
                 # Re-download and update the script itself
-                SCRIPT_URL="https://raw.githubusercontent.com/sunny-THS/AppAutoDeploy/main/setup_automated_remote.sh"
+                SCRIPT_URL="https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/setup_automated_remote.sh"
                 TEMP_SCRIPT="/tmp/setup_automated_remote_new.sh"
                 
                 echo "📥 Downloading latest configuration..."

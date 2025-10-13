@@ -2026,7 +2026,7 @@ main() {
         fi
     fi
     
-    # Source template processor after scripts are downloaded/copied
+    # Source template processor BEFORE creating configuration files
     if [ "$REMOTE_EXECUTION" = "true" ]; then
         # In remote mode, use template processor from cache directory
         if [ -f "$SCRIPTS_DIR/template_processor.sh" ]; then

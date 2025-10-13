@@ -506,25 +506,14 @@ detect_project_info() {
 
 # Function to create directory structure
 create_directory_structure() {
-    # Skip creating scripts directory in remote mode - use cache directory instead
-    if [ "$REMOTE_EXECUTION" = "true" ]; then
-        print_info "🔄 Running in remote mode - creating minimal directory structure"
-        local directories=(
-            "android/fastlane"
-            "ios/fastlane"
-            ".github/workflows"
-            "builder"
-        )
-    else
-        print_header "Creating Directory Structure"
-        local directories=(
-            "android/fastlane"
-            "ios/fastlane"
-            ".github/workflows"
-            "scripts"
-            "builder"
-        )
-    fi
+    # Never create scripts directory in project - always use cache directory
+    print_header "Creating Directory Structure"
+    local directories=(
+        "android/fastlane"
+        "ios/fastlane"
+        ".github/workflows"
+        "builder"
+    )
     
     for dir in "${directories[@]}"; do
         if [ ! -d "$TARGET_DIR/$dir" ]; then

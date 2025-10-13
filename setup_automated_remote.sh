@@ -57,23 +57,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATES_DIR="$SCRIPT_DIR/templates"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 
-# Create temporary directory for downloads if running remotely
+# Create persistent cache directory for downloads if running remotely
 if [ "$REMOTE_EXECUTION" = "true" ]; then
-    TMP_DOWNLOAD_DIR="/tmp/flutter_cicd_setup_$$"
-    mkdir -p "$TMP_DOWNLOAD_DIR"
-    echo "📁 Created temporary directory: $TMP_DOWNLOAD_DIR"
+    # Use persistent cache directory instead of temporary
+    APPAUTODEPLOY_CACHE_DIR="$HOME/.appautodeploy"
+    mkdir -p "$APPAUTODEPLOY_CACHE_DIR"
+    echo "📁 Using AppAutoDeploy cache directory: $APPAUTODEPLOY_CACHE_DIR"
     
-    # Override script directories to use temp directory
-    SCRIPT_DIR="$TMP_DOWNLOAD_DIR"
-    TEMPLATES_DIR="$TMP_DOWNLOAD_DIR/templates"
-    SCRIPTS_DIR="$TMP_DOWNLOAD_DIR/scripts"
+    # Override script directories to use cache directory
+    SCRIPT_DIR="$APPAUTODEPLOY_CACHE_DIR"
+    TEMPLATES_DIR="$APPAUTODEPLOY_CACHE_DIR/templates"
+    SCRIPTS_DIR="$APPAUTODEPLOY_CACHE_DIR/scripts"
     
-    # Create subdirectories in temp
+    # Create subdirectories in cache
     mkdir -p "$TEMPLATES_DIR"
     mkdir -p "$SCRIPTS_DIR"
     
-    # Set cleanup trap
-    trap 'rm -rf "$TMP_DOWNLOAD_DIR" 2>/dev/null || true' EXIT
+    # No cleanup trap - keep files for Makefile to use
+    echo "📁 Scripts and templates will be cached in: $APPAUTODEPLOY_CACHE_DIR"
 fi
 
 # Source common functions (template processor will be sourced later after download)
@@ -739,8 +740,8 @@ create_configuration_files_inline() {
     
     # Ensure TEMPLATES_DIR is properly set
     if [ -z "$TEMPLATES_DIR" ] || [ "$TEMPLATES_DIR" = "/" ]; then
-        if [ "$REMOTE_EXECUTION" = "true" ] && [ -n "$TMP_DOWNLOAD_DIR" ]; then
-            TEMPLATES_DIR="$TMP_DOWNLOAD_DIR/templates"
+        if [ "$REMOTE_EXECUTION" = "true" ] && [ -n "$APPAUTODEPLOY_CACHE_DIR" ]; then
+            TEMPLATES_DIR="$APPAUTODEPLOY_CACHE_DIR/templates"
         else
             TEMPLATES_DIR="$SCRIPT_DIR/templates"
         fi

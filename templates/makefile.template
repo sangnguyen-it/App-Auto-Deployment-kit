@@ -1005,14 +1005,8 @@ config: ## 🔧 Update project configuration
 	@printf "\n"
 	@printf "$(CYAN)🔧 Updating project configuration...$(NC)\n"
 	@printf "\n"
-	@if [ ! -f "$(APPAUTODEPLOY_SCRIPT)" ]; then \
-		printf "$(YELLOW)$(WARNING) %s$(NC)\n" "AppAutoDeploy script not found. Downloading..."; \
-		curl -fsSL "$(APPAUTODEPLOY_URL)" -o "$(APPAUTODEPLOY_SCRIPT)"; \
-		chmod +x "$(APPAUTODEPLOY_SCRIPT)"; \
-		printf "$(GREEN)$(CHECK) %s$(NC)\n" "AppAutoDeploy script downloaded successfully"; \
-	fi
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Running configuration update..."
-	@bash "$(APPAUTODEPLOY_SCRIPT)" --config
+	@curl -fsSL "$(APPAUTODEPLOY_URL)" | bash
 	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Configuration updated successfully"
 
 help: ## 📋 Show all available commands

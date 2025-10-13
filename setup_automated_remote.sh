@@ -641,77 +641,9 @@ download_templates_from_github() {
 
 # Function to copy scripts or create them inline
 copy_scripts() {
-    # Skip copying scripts when running in remote mode - use cache directory instead
-    if [ "$REMOTE_EXECUTION" = "true" ]; then
-        print_info "🔄 Running in remote mode - using scripts from cache directory ~/.appautodeploy"
-        return 0
-    fi
-    
-    # Only copy scripts when running locally (not remote execution)
-    print_header "Copying Scripts"
-    
-    local script_files=(
-        "version_manager.dart"
-        "version_sync.dart"
-        "build_info_generator.dart"
-        "tag_generator.dart"
-        "common_functions.sh"
-        "dynamic_version_manager.dart"
-        "store_version_checker.rb"
-        "google_play_version_checker.rb"
-        "template_processor.sh"
-    )
-    
-    local scripts_copied=0
-    local scripts_created_inline=0
-    
-    for script in "${script_files[@]}"; do
-        if [ -f "$SCRIPTS_DIR/$script" ]; then
-            # Only copy if source and target are different
-            if [ "$SCRIPTS_DIR/$script" != "$TARGET_DIR/scripts/$script" ]; then
-                cp "$SCRIPTS_DIR/$script" "$TARGET_DIR/scripts/"
-                chmod +x "$TARGET_DIR/scripts/$script" 2>/dev/null || true
-                ((scripts_copied++))
-                # print_success "Copied: $script"
-            else
-                # File already exists in target location
-                chmod +x "$TARGET_DIR/scripts/$script" 2>/dev/null || true
-                ((scripts_copied++))
-                # print_success "Already exists: $script"
-            fi
-        else
-            # Create essential scripts inline if not found
-            case "$script" in
-                "version_manager.dart")
-                    create_version_manager_inline
-                    ((scripts_created_inline++))
-                    ;;
-                "build_info_generator.dart")
-                    create_build_info_generator_inline
-                    ((scripts_created_inline++))
-                    ;;
-                "dynamic_version_manager.dart")
-                    create_dynamic_version_manager_inline
-                    ((scripts_created_inline++))
-                    ;;
-                "common_functions.sh")
-                    create_common_functions_inline
-                    ((scripts_created_inline++))
-                    ;;
-                *)
-                    print_warning "Script not found: $script"
-                    ;;
-            esac
-        fi
-    done
-    
-    if [ $scripts_copied -gt 0 ]; then
-        print_success "Copied $scripts_copied scripts from source"
-    fi
-    
-    if [ $scripts_created_inline -gt 0 ]; then
-        print_success "Created $scripts_created_inline scripts inline"
-    fi
+    # Always skip copying scripts to project directory - use cache directory instead
+    print_info "🔄 Using scripts from cache directory ~/.appautodeploy (no local scripts directory created)"
+    return 0
 }
 
 # Function to create all configuration files using templates

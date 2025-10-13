@@ -235,9 +235,13 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 	$(eval IPA_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).ipa)
 	$(eval ARCHIVE_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
 	$(eval ARCHIVE_PROD_NAME := $(PROJECT_NAME)-$(IOS_VERSION_NAME)-$(IOS_VERSION_CODE).xcarchive)
-	@printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"
-	@printf "$(CYAN)   📱 Android: $(ANDROID_VERSION_NAME)+$(ANDROID_VERSION_CODE)$(NC)\n"
-	@printf "$(CYAN)   🍎 iOS: $(IOS_VERSION_NAME)+$(IOS_VERSION_CODE)$(NC)\n"
+	@ANDROID_VERSION_NAME=$$(dart scripts/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "1.0.0"); \
+	ANDROID_VERSION_CODE=$$(dart scripts/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "1"); \
+	IOS_VERSION_NAME=$$(dart scripts/dynamic_version_manager.dart get-ios-version-name 2>/dev/null || echo "1.0.0"); \
+	IOS_VERSION_CODE=$$(dart scripts/dynamic_version_manager.dart get-ios-version-code 2>/dev/null || echo "1"); \
+	printf "$(GREEN)$(CHECK) %s$(NC)\n" "Version refreshed:"; \
+	printf "$(CYAN)   📱 Android: $$ANDROID_VERSION_NAME+$$ANDROID_VERSION_CODE$(NC)\n"; \
+	printf "$(CYAN)   🍎 iOS: $$IOS_VERSION_NAME+$$IOS_VERSION_CODE$(NC)\n"
 	
 	@printf "$(CYAN)$(GEAR) %s$(NC)\n" "Generating build information..."
 	@if command -v dart >/dev/null 2>&1; then \

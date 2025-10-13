@@ -506,21 +506,25 @@ detect_project_info() {
 
 # Function to create directory structure
 create_directory_structure() {
-    # Always create directories in project (both local and remote)
-    # if [ "$REMOTE_EXECUTION" = "true" ]; then
-    #     print_info "🔄 Running in remote mode - skipping directory creation in project"
-    #     return 0
-    # fi
-    
-    # print_header "Creating Directory Structure"
-    
-    local directories=(
-        "android/fastlane"
-        "ios/fastlane"
-        ".github/workflows"
-        "scripts"
-        "builder"
-    )
+    # Skip creating scripts directory in remote mode - use cache directory instead
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        print_info "🔄 Running in remote mode - creating minimal directory structure"
+        local directories=(
+            "android/fastlane"
+            "ios/fastlane"
+            ".github/workflows"
+            "builder"
+        )
+    else
+        print_header "Creating Directory Structure"
+        local directories=(
+            "android/fastlane"
+            "ios/fastlane"
+            ".github/workflows"
+            "scripts"
+            "builder"
+        )
+    fi
     
     for dir in "${directories[@]}"; do
         if [ ! -d "$TARGET_DIR/$dir" ]; then
@@ -2023,14 +2027,28 @@ main() {
     fi
     
     # Source template processor after scripts are downloaded/copied
-    if [ -f "$TARGET_DIR/scripts/template_processor.sh" ]; then
-        # Store TEMPLATES_DIR before sourcing
-        SAVED_TEMPLATES_DIR="$TEMPLATES_DIR"
-        source "$TARGET_DIR/scripts/template_processor.sh"
-        # Restore TEMPLATES_DIR after sourcing
-        TEMPLATES_DIR="$SAVED_TEMPLATES_DIR"
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        # In remote mode, use template processor from cache directory
+        if [ -f "$SCRIPTS_DIR/template_processor.sh" ]; then
+            # Store TEMPLATES_DIR before sourcing
+            SAVED_TEMPLATES_DIR="$TEMPLATES_DIR"
+            source "$SCRIPTS_DIR/template_processor.sh"
+            # Restore TEMPLATES_DIR after sourcing
+            TEMPLATES_DIR="$SAVED_TEMPLATES_DIR"
+        else
+            echo "Warning: template_processor.sh not found in $SCRIPTS_DIR, using inline template processing"
+        fi
     else
-        echo "Warning: template_processor.sh not found in $TARGET_DIR/scripts, using inline template processing"
+        # In local mode, use template processor from project directory
+        if [ -f "$TARGET_DIR/scripts/template_processor.sh" ]; then
+            # Store TEMPLATES_DIR before sourcing
+            SAVED_TEMPLATES_DIR="$TEMPLATES_DIR"
+            source "$TARGET_DIR/scripts/template_processor.sh"
+            # Restore TEMPLATES_DIR after sourcing
+            TEMPLATES_DIR="$SAVED_TEMPLATES_DIR"
+        else
+            echo "Warning: template_processor.sh not found in $TARGET_DIR/scripts, using inline template processing"
+        fi
     fi
     
     create_configuration_files

@@ -130,6 +130,28 @@ check_dependencies() {
 # Note: copy_automation_files function removed as we no longer copy files to project
 # Scripts and templates are used directly from AppAutoDeploy directory
 
+# Function to create configuration files using templates
+create_configuration_files() {
+    print_step "Creating configuration files from templates..."
+    
+    # Get project information
+    local project_name=$(get_project_name)
+    local package_name=$(get_android_package)
+    local bundle_id=$(get_ios_bundle_id)
+    local app_name="$project_name"
+    
+    # Use create_all_templates if available, otherwise create minimal config
+    if command -v create_all_templates >/dev/null 2>&1; then
+        create_all_templates "$TARGET_DIR" "$project_name" "$package_name" "$app_name" "YOUR_TEAM_ID" "your-apple-id@email.com" "$TEMPLATES_DIR"
+    else
+        print_warning "create_all_templates not available, creating minimal configuration"
+        # Create basic Makefile if template processor is not available
+        if [ -f "$TEMPLATES_DIR/makefile.template" ]; then
+            create_makefile_from_template "$TARGET_DIR" "$project_name" "$package_name" "$app_name" "$TEMPLATES_DIR"
+        fi
+    fi
+}
+
 # Create project configuration
 create_project_config() {
     local target_dir="$1"
@@ -752,6 +774,11 @@ main() {
     else
         TARGET_DIR="$(pwd)"
     fi
+    
+    # Set AppAutoDeploy directory paths
+    APPAUTODEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    SCRIPTS_DIR="$APPAUTODEPLOY_DIR/scripts"
+    TEMPLATES_DIR="$APPAUTODEPLOY_DIR/templates"
     
     # Validate Flutter project
     if [ ! -f "$TARGET_DIR/pubspec.yaml" ]; then

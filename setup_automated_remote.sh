@@ -950,6 +950,11 @@ create_gemfile_inline() {
 
 # Inline creation function for version_manager.dart
 create_version_manager_inline() {
+    # Skip creating scripts in remote mode - use cache directory instead
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        return 0
+    fi
+    
     cat > "$TARGET_DIR/scripts/version_manager.dart" << 'EOF'
 #!/usr/bin/env dart
 // Version Manager - Simplified inline version
@@ -1029,6 +1034,11 @@ EOF
 
 # Inline creation function for build_info_generator.dart
 create_build_info_generator_inline() {
+    # Skip creating scripts in remote mode - use cache directory instead
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        return 0
+    fi
+    
     cat > "$TARGET_DIR/scripts/build_info_generator.dart" << 'EOF'
 #!/usr/bin/env dart
 import 'dart:io';
@@ -1095,6 +1105,11 @@ EOF
 
 # Inline creation function for dynamic_version_manager.dart
 create_dynamic_version_manager_inline() {
+    # Skip creating scripts in remote mode - use cache directory instead
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        return 0
+    fi
+    
     cat > "$TARGET_DIR/scripts/dynamic_version_manager.dart" << 'EOF'
 #!/usr/bin/env dart
 // Dynamic Version Manager - Simplified inline version
@@ -1181,6 +1196,11 @@ EOF
 
 # Inline creation function for common_functions.sh
 create_common_functions_inline() {
+    # Skip creating scripts in remote mode - use cache directory instead
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        return 0
+    fi
+    
     cat > "$TARGET_DIR/scripts/common_functions.sh" << 'EOF'
 #!/bin/bash
 # Common Functions Library - Simplified inline version
@@ -1346,6 +1366,11 @@ EOF
 
 # Function to create common_functions.sh inline (optimized)
 create_common_functions_inline() {
+    # Skip creating scripts in remote mode - use cache directory instead
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        return 0
+    fi
+    
     print_step "Creating common_functions.sh (inline, optimized)..."
     
     cat > "$TARGET_DIR/scripts/common_functions.sh" << 'EOF'

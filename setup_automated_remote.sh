@@ -637,13 +637,14 @@ download_templates_from_github() {
 
 # Function to copy scripts or create them inline
 copy_scripts() {
-    # Always copy scripts to project directory (both local and remote)
-    # if [ "$REMOTE_EXECUTION" = "true" ]; then
-    #     print_info "🔄 Running in remote mode - scripts will be created inline as needed"
-    #     return 0
-    # fi
+    # Skip copying scripts when running in remote mode - use cache directory instead
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        print_info "🔄 Running in remote mode - using scripts from cache directory ~/.appautodeploy"
+        return 0
+    fi
     
-    # print_header "Copying Scripts"
+    # Only copy scripts when running locally (not remote execution)
+    print_header "Copying Scripts"
     
     local script_files=(
         "version_manager.dart"
@@ -2003,16 +2004,21 @@ main() {
     
     copy_scripts
     
-    # Copy templates to target directory if running remotely
-    if [ "$REMOTE_EXECUTION" = "true" ] && [ -d "$TEMPLATES_DIR" ]; then
-        echo "🔄 Copying templates to target directory..."
-        mkdir -p "$TARGET_DIR/templates"
-        if cp -r "$TEMPLATES_DIR"/* "$TARGET_DIR/templates/" 2>/dev/null; then
-            # Update TEMPLATES_DIR to point to copied location
-            TEMPLATES_DIR="$TARGET_DIR/templates"
-            echo "✅ Templates copied to $TEMPLATES_DIR"
-        else
-            echo "⚠️ Warning: Failed to copy templates, will use original location"
+    # Skip copying templates when running in remote mode - use cache directory instead
+    if [ "$REMOTE_EXECUTION" = "true" ]; then
+        echo "🔄 Running in remote mode - using templates from cache directory ~/.appautodeploy"
+    else
+        # Copy templates to target directory only when running locally
+        if [ -d "$TEMPLATES_DIR" ]; then
+            echo "🔄 Copying templates to target directory..."
+            mkdir -p "$TARGET_DIR/templates"
+            if cp -r "$TEMPLATES_DIR"/* "$TARGET_DIR/templates/" 2>/dev/null; then
+                # Update TEMPLATES_DIR to point to copied location
+                TEMPLATES_DIR="$TARGET_DIR/templates"
+                echo "✅ Templates copied to $TEMPLATES_DIR"
+            else
+                echo "⚠️ Warning: Failed to copy templates, will use original location"
+            fi
         fi
     fi
     

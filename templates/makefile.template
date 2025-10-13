@@ -35,6 +35,10 @@ ARCHIVE_PROD_NAME := {{PROJECT_NAME}}-{{VERSION_NAME}}-{{VERSION_CODE}}.xcarchiv
 APPAUTODEPLOY_DIR ?= $(HOME)/.appautodeploy
 SCRIPTS_DIR := $(APPAUTODEPLOY_DIR)/scripts
 
+# AppAutoDeploy Update Configuration
+APPAUTODEPLOY_URL := https://raw.githubusercontent.com/sangnguyen-it/App-Auto-Deployment-kit/main/setup_automated_remote.sh
+APPAUTODEPLOY_SCRIPT := $(APPAUTODEPLOY_DIR)/setup_automated_remote.sh
+
 # Function to get current version (will be called during build)
 define get_current_version
 $(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")

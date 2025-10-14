@@ -40,16 +40,17 @@ APPAUTODEPLOY_URL := https://raw.githubusercontent.com/sangnguyen-it/App-Auto-De
 APPAUTODEPLOY_SCRIPT := $(APPAUTODEPLOY_DIR)/setup_automated_remote.sh
 
 # Function to get current version (will be called during build)
+# Default to pubspec.yaml version for general use
 define get_current_version
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
+$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-version 2>/dev/null || echo "$(VERSION_FULL_FALLBACK)")
 endef
 
 define get_current_version_name
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version-name 2>/dev/null || echo "$(VERSION_NAME_FALLBACK)")
+$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-version-name 2>/dev/null || echo "$(VERSION_NAME_FALLBACK)")
 endef
 
 define get_current_version_code
-$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-android-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
+$(shell dart $(SCRIPTS_DIR)/dynamic_version_manager.dart get-version-code 2>/dev/null || echo "$(VERSION_CODE_FALLBACK)")
 endef
 
 # Functions to get platform-specific versions
@@ -289,6 +290,9 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
 			mkdir -p build/ios/archive build/ios/ipa; \
 			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building and exporting IPA using Fastlane..."; \
+			IOS_VERSION_NAME=$$(call get_ios_version_name); \
+			IOS_VERSION_CODE=$$(call get_ios_version_code); \
+			IOS_IPA_NAME="$(PROJECT_NAME)-$$IOS_VERSION_NAME-$$IOS_VERSION_CODE.ipa"; \
 			if command -v fastlane >/dev/null 2>&1 && [ -f "ios/fastlane/Fastfile" ]; then \
 				cd ios; \
 				if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
@@ -316,8 +320,8 @@ auto-build-tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight)
 				fi; \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA exported successfully: $$IPA_FILE"; \
-					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_NAME)"; \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA copied to $(OUTPUT_DIR)/$(IPA_NAME)"; \
+					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$$IOS_IPA_NAME"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "TestFlight IPA copied to $(OUTPUT_DIR)/$$IOS_IPA_NAME"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to TestFlight..."; \
 					cd ios; \
 					if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
@@ -455,6 +459,10 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
 			mkdir -p build/ios/archive build/ios/ipa; \
 			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building and exporting Production IPA using Fastlane..."; \
+			IOS_VERSION_NAME=$$(call get_ios_version_name); \
+			IOS_VERSION_CODE=$$(call get_ios_version_code); \
+			IOS_IPA_PROD_NAME="$(PROJECT_NAME)-$$IOS_VERSION_NAME-$$IOS_VERSION_CODE.ipa"; \
+			IOS_ARCHIVE_PROD_NAME="$(PROJECT_NAME)-$$IOS_VERSION_NAME-$$IOS_VERSION_CODE.xcarchive"; \
 			if command -v fastlane >/dev/null 2>&1 && [ -f "ios/fastlane/Fastfile" ]; then \
 				cd ios; \
 				if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
@@ -482,8 +490,8 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 				fi; \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully: $$IPA_FILE"; \
-					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
 					cd ios; \
 					if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
@@ -511,8 +519,8 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 				cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
 				if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
-					cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
+					cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$$IOS_ARCHIVE_PROD_NAME"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$$IOS_ARCHIVE_PROD_NAME"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting Production IPA from Archive..."; \
 					if [ -f "fastlane/ExportOptions.plist" ]; then \
 						xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
@@ -525,10 +533,10 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 					IPA_FILE=$$(find ../build/ios/ipa -name "*.ipa" | head -1); \
 					if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 						printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
-						cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
-						printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+						cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME"; \
+						printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME"; \
 						printf "$(CYAN)$(INFO) %s$(NC)\n" "Manual App Store upload required"; \
-						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME"; \
 					else \
 						printf "$(RED)$(CROSS) %s$(NC)\n" "Production IPA export failed"; \
 					fi; \
@@ -545,9 +553,12 @@ live: ## 🔄 Automated Live Production Pipeline (Hybrid)
 	@printf "$(WHITE)📁 Builder Directory:$(NC) $(OUTPUT_DIR)/\n"
 	@printf "$(WHITE)📦 Android AAB:$(NC) $(OUTPUT_DIR)/$(AAB_NAME)\n"
 	@printf "$(WHITE)📦 Android AAB (builder/):$(NC) builder/$(AAB_NAME)\n"
-	@if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$(IPA_PROD_NAME)" ]; then \
-		printf "$(WHITE)🍎 iOS Production IPA:$(NC) $(OUTPUT_DIR)/$(IPA_PROD_NAME)\n"; \
-		printf "$(WHITE)🍎 iOS Production IPA (builder/):$(NC) builder/$(IPA_PROD_NAME)\n"; \
+	@IOS_VERSION_NAME=$$(call get_ios_version_name); \
+	IOS_VERSION_CODE=$$(call get_ios_version_code); \
+	IOS_IPA_PROD_NAME="$(PROJECT_NAME)-$$IOS_VERSION_NAME-$$IOS_VERSION_CODE.ipa"; \
+	if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME" ]; then \
+		printf "$(WHITE)🍎 iOS Production IPA:$(NC) $(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME\n"; \
+		printf "$(WHITE)🍎 iOS Production IPA (builder/):$(NC) builder/$$IOS_IPA_PROD_NAME\n"; \
 	fi
 	
 	@printf "\n"
@@ -672,6 +683,10 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 			printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS build completed"; \
 			mkdir -p build/ios/archive build/ios/ipa; \
 			printf "$(CYAN)$(GEAR) %s$(NC)\n" "Building and exporting Production IPA using Fastlane..."; \
+			IOS_VERSION_NAME=$$(call get_ios_version_name); \
+			IOS_VERSION_CODE=$$(call get_ios_version_code); \
+			IOS_IPA_PROD_NAME="$(PROJECT_NAME)-$$IOS_VERSION_NAME-$$IOS_VERSION_CODE.ipa"; \
+			IOS_ARCHIVE_PROD_NAME="$(PROJECT_NAME)-$$IOS_VERSION_NAME-$$IOS_VERSION_CODE.xcarchive"; \
 			if command -v fastlane >/dev/null 2>&1 && [ -f "ios/fastlane/Fastfile" ]; then \
 				cd ios; \
 				if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
@@ -693,8 +708,8 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 				IPA_FILE=$$(find build/ios/ipa -name "*.ipa" | head -1); \
 				if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully"; \
-					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					cp "$$IPA_FILE" "$(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
 					cd ios; \
 					if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
@@ -721,8 +736,8 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 				cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "generic/platform=iOS" -archivePath ../build/ios/archive/Runner.xcarchive archive; \
 				if [ $$? -eq 0 ] && [ -d "../build/ios/archive/Runner.xcarchive" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "iOS Archive created successfully"; \
-					cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$(ARCHIVE_PROD_NAME)"; \
+					cp -r "../build/ios/archive/Runner.xcarchive" "../$(OUTPUT_DIR)/$$IOS_ARCHIVE_PROD_NAME"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Archive copied to $(OUTPUT_DIR)/$$IOS_ARCHIVE_PROD_NAME"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Exporting Production IPA from Archive..."; \
 					if [ -f "fastlane/ExportOptions.plist" ]; then \
 						xcodebuild -exportArchive -archivePath ../build/ios/archive/Runner.xcarchive -exportPath ../build/ios/ipa -exportOptionsPlist fastlane/ExportOptions.plist; \
@@ -741,8 +756,8 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 					fi; \
 					if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA exported successfully: $$IPA_FILE"; \
-					cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
-					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+					cp "$$IPA_FILE" "../$(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME"; \
+					printf "$(GREEN)$(CHECK) %s$(NC)\n" "Production IPA copied to $(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME"; \
 					printf "$(CYAN)$(GEAR) %s$(NC)\n" "Uploading to App Store..."; \
 					if command -v fastlane >/dev/null 2>&1 && [ -f "fastlane/Fastfile" ]; then \
 						if command -v bundle >/dev/null 2>&1 && [ -f "../Gemfile" ]; then \
@@ -763,7 +778,7 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 					else \
 						printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Fastlane not available - manual App Store upload required"; \
 						printf "$(CYAN)$(INFO) %s$(NC)\n" "Upload manually: Use Xcode Organizer or Transporter app"; \
-						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$(IPA_PROD_NAME)"; \
+						printf "$(CYAN)$(INFO) %s$(NC)\n" "IPA location: $(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME"; \
 					fi; \
 				else \
 					printf "$(YELLOW)$(WARNING) %s$(NC)\n" "Production IPA not found in expected locations - build may have succeeded but IPA location differs"; \
@@ -780,9 +795,12 @@ live-local: ## 🚀 Automated Live Production Pipeline (Local Only)
 	@printf "$(WHITE)📁 Builder Directory:$(NC) $(OUTPUT_DIR)/\n"
 	@printf "$(WHITE)📦 Android AAB:$(NC) $(OUTPUT_DIR)/$(AAB_NAME)\n"
 	@printf "$(WHITE)📦 Android AAB (builder/):$(NC) builder/$(AAB_NAME)\n"
-	@if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$(IPA_PROD_NAME)" ]; then \
-		printf "$(WHITE)🍎 iOS Production IPA:$(NC) $(OUTPUT_DIR)/$(IPA_PROD_NAME)\n"; \
-		printf "$(WHITE)🍎 iOS Production IPA (builder/):$(NC) builder/$(IPA_PROD_NAME)\n"; \
+	@IOS_VERSION_NAME=$$(call get_ios_version_name); \
+	IOS_VERSION_CODE=$$(call get_ios_version_code); \
+	IOS_IPA_PROD_NAME="$(PROJECT_NAME)-$$IOS_VERSION_NAME-$$IOS_VERSION_CODE.ipa"; \
+	if [ "$$(uname)" = "Darwin" ] && [ -f "$(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME" ]; then \
+		printf "$(WHITE)🍎 iOS Production IPA:$(NC) $(OUTPUT_DIR)/$$IOS_IPA_PROD_NAME\n"; \
+		printf "$(WHITE)🍎 iOS Production IPA (builder/):$(NC) builder/$$IOS_IPA_PROD_NAME\n"; \
 	fi
 	
 	@printf "\n"

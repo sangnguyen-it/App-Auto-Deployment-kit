@@ -45,10 +45,42 @@ KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)
 CHANGELOG_PATH = "../../CHANGELOG.md"
 IPA_OUTPUT_DIR = "../../build/ios/ipa"
 PUBSPEC_PATH = "../../pubspec.yaml"
+IOS_VERSION_PATH = "../../.ios_version"
 # Project-specific paths
 PROJECT_KEYSTORE_PATH = "../../app/#{PROJECT_NAME.downcase.gsub(/[^a-z0-9]/, '_')}-release.keystore"
 
-# Function to read version from pubspec.yaml
+# Function to read iOS version from .ios_version file or fallback to pubspec.yaml
+def read_ios_version
+  begin
+    # First try to read from .ios_version file
+    if File.exist?(IOS_VERSION_PATH)
+      ios_version_content = File.read(IOS_VERSION_PATH).strip
+      UI.message("📱 Reading iOS version from .ios_version file: #{ios_version_content}")
+      
+      # Parse version string like "1.0.0+1"
+      if ios_version_content.include?('+')
+        version_parts = ios_version_content.split('+')
+        version_name = version_parts[0]
+        version_code = version_parts[1]
+      else
+        version_name = ios_version_content
+        version_code = "1"
+      end
+      
+      UI.message("📱 Parsed iOS version: #{version_name} (#{version_code})")
+      return { version_name: version_name, version_code: version_code }
+    else
+      UI.message("📱 .ios_version file not found, falling back to pubspec.yaml")
+      return read_pubspec_version
+    end
+  rescue => e
+    UI.error("❌ Error reading iOS version: #{e.message}")
+    UI.message("📱 Falling back to pubspec.yaml")
+    return read_pubspec_version
+  end
+end
+
+# Function to read version from pubspec.yaml (fallback)
 def read_pubspec_version
   begin
     pubspec_content = File.read(PUBSPEC_PATH)
@@ -92,9 +124,9 @@ platform :ios do
   
   desc "Build iOS archive for TestFlight (Beta)"
   lane :build_archive_beta do
-    # Read version from pubspec.yaml
-    version_info = read_pubspec_version
-    UI.message("🔄 Using version: #{version_info[:version_name]} (#{version_info[:version_code]})")
+    # Read version from iOS-specific version file or fallback to pubspec.yaml
+    version_info = read_ios_version
+    UI.message("🔄 Using iOS version: #{version_info[:version_name]} (#{version_info[:version_code]})")
     
     # Update version number and build number
     increment_version_number(
@@ -117,9 +149,9 @@ platform :ios do
   
   desc "Build iOS archive for App Store (Production)"
   lane :build_archive_production do
-    # Read version from pubspec.yaml
-    version_info = read_pubspec_version
-    UI.message("🔄 Using version: #{version_info[:version_name]} (#{version_info[:version_code]})")
+    # Read version from iOS-specific version file or fallback to pubspec.yaml
+    version_info = read_ios_version
+    UI.message("🔄 Using iOS version: #{version_info[:version_name]} (#{version_info[:version_code]})")
     
     # Update version number and build number
     increment_version_number(

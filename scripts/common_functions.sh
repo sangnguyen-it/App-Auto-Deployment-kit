@@ -86,12 +86,13 @@ get_android_package() {
     local target_dir="$1"
     local gradle_file="$target_dir/android/app/build.gradle.kts"
     if [ -f "$gradle_file" ]; then
-        grep "applicationId" "$gradle_file" | cut -d'"' -f2 | head -1
+        # Use improved regex to extract only the main applicationId, avoiding debug suffix
+        grep "applicationId" "$gradle_file" | grep -v "applicationIdSuffix" | sed 's/.*applicationId.*= *"//' | sed 's/".*//' | head -1
     else
         # Fallback to old gradle format
         gradle_file="$target_dir/android/app/build.gradle"
         if [ -f "$gradle_file" ]; then
-            grep "applicationId" "$gradle_file" | cut -d'"' -f2 | head -1
+            grep "applicationId" "$gradle_file" | grep -v "applicationIdSuffix" | sed 's/.*applicationId *"//' | sed 's/".*//' | head -1
         fi
     fi
 }

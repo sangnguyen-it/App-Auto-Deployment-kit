@@ -1183,10 +1183,11 @@ get_android_package() {
     local gradle_file="$target_dir/android/app/build.gradle.kts"
     
     if [ -f "$gradle_file" ]; then
-        grep 'applicationId' "$gradle_file" | sed 's/.*applicationId = "\([^"]*\)".*/\1/' | head -1
+        # Use improved regex to extract only the main applicationId, avoiding debug suffix
+        grep 'applicationId' "$gradle_file" | grep -v "applicationIdSuffix" | sed 's/.*applicationId.*= *"//' | sed 's/".*//' | head -1
     else
         gradle_file="$target_dir/android/app/build.gradle"
-        grep 'applicationId' "$gradle_file" | sed 's/.*applicationId "\([^"]*\)".*/\1/' | head -1
+        grep 'applicationId' "$gradle_file" | grep -v "applicationIdSuffix" | sed 's/.*applicationId *"//' | sed 's/".*//' | head -1
     fi
 }
 
@@ -1358,9 +1359,10 @@ get_project_name() {
 
 get_android_package() {
     if [ -f "android/app/build.gradle" ]; then
-        grep "applicationId" android/app/build.gradle | sed 's/.*applicationId *"//' | sed 's/".*//'
+        # Use improved regex to extract only the main applicationId, avoiding debug suffix
+        grep "applicationId" android/app/build.gradle | grep -v "applicationIdSuffix" | sed 's/.*applicationId *"//' | sed 's/".*//' | head -1
     elif [ -f "android/app/build.gradle.kts" ]; then
-        grep "applicationId" android/app/build.gradle.kts | sed 's/.*applicationId.*= *"//' | sed 's/".*//'
+        grep "applicationId" android/app/build.gradle.kts | grep -v "applicationIdSuffix" | sed 's/.*applicationId.*= *"//' | sed 's/".*//' | head -1
     else
         echo "com.example.$(get_project_name)"
     fi

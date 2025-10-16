@@ -142,6 +142,7 @@ platform :ios do
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
+      output_name: "Runner",
       xcargs: "-allowProvisioningUpdates",
       export_options: "fastlane/ExportOptions.plist"
     )
@@ -167,9 +168,9 @@ platform :ios do
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
+      output_name: "Runner",
       xcargs: "-allowProvisioningUpdates",
       export_options: "fastlane/ExportOptions.plist"
-
     )
   end
   

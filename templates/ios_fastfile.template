@@ -43,7 +43,7 @@ TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Teste
 # Use File.expand_path to ensure absolute path resolution for AuthKey file
 KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)
 CHANGELOG_PATH = "../../CHANGELOG.md"
-IPA_OUTPUT_DIR = File.expand_path("../../build/ios/ipa", __dir__)
+IPA_OUTPUT_DIR = "../../build/ios/ipa"
 PUBSPEC_PATH = "../../pubspec.yaml"
 IOS_VERSION_PATH = "../../.ios_version"
 # Project-specific paths
@@ -142,7 +142,6 @@ platform :ios do
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
-      output_name: "Runner",
       xcargs: "-allowProvisioningUpdates",
       export_options: "fastlane/ExportOptions.plist"
     )
@@ -168,9 +167,9 @@ platform :ios do
       scheme: "Runner",
       export_method: "app-store",
       output_directory: IPA_OUTPUT_DIR,
-      output_name: "Runner",
       xcargs: "-allowProvisioningUpdates",
       export_options: "fastlane/ExportOptions.plist"
+
     )
   end
   

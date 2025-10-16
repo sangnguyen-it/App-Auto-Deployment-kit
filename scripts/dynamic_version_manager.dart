@@ -21,6 +21,21 @@ void main(List<String> args) async {
     case 'get-android-version':
       print(getAndroidVersion());
       break;
+    case 'get-android-version-name':
+      print(getAndroidVersionName());
+      break;
+    case 'get-android-version-code':
+      print(getAndroidVersionCode());
+      break;
+    case 'get-ios-version':
+      print(getIosVersion());
+      break;
+    case 'get-ios-version-name':
+      print(getIosVersionName());
+      break;
+    case 'get-ios-version-code':
+      print(getIosVersionCode());
+      break;
 
     case 'interactive':
       await interactiveMode();
@@ -57,6 +72,18 @@ void main(List<String> args) async {
     case 'set-strategy':
       print('✅ Strategy set successfully');
       break;
+    case 'bump-android':
+      await bumpAndroidVersionCode();
+      break;
+    case 'bump-ios':
+      await bumpIosVersionCode();
+      break;
+    case 'bump-both':
+      await bumpBothVersionCodes();
+      break;
+    case 'init':
+      await initializeVersionFiles();
+      break;
     default:
       showUsage();
   }
@@ -69,6 +96,7 @@ void showUsage() {
   print('  dart scripts/dynamic_version_manager.dart get-version-code # Get version code');
   print('  dart scripts/dynamic_version_manager.dart interactive      # Interactive mode');
   print('  dart scripts/dynamic_version_manager.dart apply           # Apply version');
+  print('  dart scripts/dynamic_version_manager.dart init             # Initialize version files');
   print('');
   print('🤖 Platform-specific commands:');
   print('  dart scripts/dynamic_version_manager.dart interactive-android  # Interactive mode for Android');
@@ -77,6 +105,11 @@ void showUsage() {
   print('  dart scripts/dynamic_version_manager.dart apply-ios            # Apply iOS version changes');
   print('  dart scripts/dynamic_version_manager.dart set-android-version <version> # Set Android version');
   print('  dart scripts/dynamic_version_manager.dart set-ios-version <version>     # Set iOS version');
+  print('');
+  print('🚀 Version bumping commands (post-build):');
+  print('  dart scripts/dynamic_version_manager.dart bump-android         # Bump Android version code');
+  print('  dart scripts/dynamic_version_manager.dart bump-ios             # Bump iOS version code');
+  print('  dart scripts/dynamic_version_manager.dart bump-both            # Bump both platform version codes');
 }
 
 String getFullVersion() {
@@ -174,7 +207,6 @@ Future<void> interactiveMode() async {
     print('⚙️  VERSION MODE SELECTION:');
     print('   1. Auto - Keep current versions for both platforms');
     print('   2. Manual - Enter custom versions for each platform');
-    print('   (Env overrides supported: VERSION_MODE=manual + ANDROID_VERSION_NAME/ANDROID_VERSION_CODE/IOS_VERSION_NAME/IOS_VERSION_CODE)');
     print('');
     stdout.write('Select mode (1=Auto, 2=Manual) [default: 1]: ');
 
@@ -204,16 +236,18 @@ Future<void> interactiveMode() async {
     String iosVersionName, iosVersionCode;
     
     if (mode == '1') {
-      // Auto mode - use current versions
-      androidVersionName = getVersionName();
-      androidVersionCode = getVersionCode();
-      iosVersionName = getVersionName();
-      iosVersionCode = getVersionCode();
+      // Auto mode - use separate platform versions
+      await initializeVersionFiles(); // Ensure version files exist
+      
+      androidVersionName = getAndroidVersionName();
+      androidVersionCode = getAndroidVersionCode();
+      iosVersionName = getIosVersionName();
+      iosVersionCode = getIosVersionCode();
       
       print('');
-      print('🤖 AUTO MODE - Using current versions:');
-      print('   Android: $androidVersionName+$androidVersionCode');
-      print('   iOS: $iosVersionName+$iosVersionCode');
+      print('🤖 AUTO MODE - Using separate platform versions:');
+      print('   Android: $androidVersionName+$androidVersionCode (from .android_version)');
+      print('   iOS: $iosVersionName+$iosVersionCode (from .ios_version)');
     } else {
       // Manual mode - ask for custom versions
       print('');
@@ -474,6 +508,26 @@ Future<void> _createVersionInfoFiles(String androidVersionName, String androidVe
   }
 }
 
+// Initialize version files if they don't exist
+Future<void> initializeVersionFiles() async {
+  final androidVersionFile = File('.android_version');
+  final iosVersionFile = File('.ios_version');
+  
+  final currentVersionName = getVersionName();
+  final currentVersionCode = getVersionCode();
+  final defaultVersion = '$currentVersionName+$currentVersionCode';
+  
+  if (!androidVersionFile.existsSync()) {
+    await androidVersionFile.writeAsString(defaultVersion);
+    print('📝 Created .android_version with default: $defaultVersion');
+  }
+  
+  if (!iosVersionFile.existsSync()) {
+    await iosVersionFile.writeAsString(defaultVersion);
+    print('📝 Created .ios_version with default: $defaultVersion');
+  }
+}
+
 // Platform-specific interactive modes
 Future<void> interactiveAndroidMode() async {
   print('🤖 Android Version Manager');
@@ -669,4 +723,72 @@ Future<void> applyIosVersionChanges() async {
   
   await _updateIosVersion(parts[0], parts[1]);
   print('✅ iOS version changes applied');
+}
+
+// Version bumping functions for post-build
+Future<void> bumpAndroidVersionCode() async {
+  print('🤖 Bumping Android version code...');
+  
+  final androidVersionFile = File('.android_version');
+  String currentVersion;
+  
+  if (androidVersionFile.existsSync()) {
+    currentVersion = androidVersionFile.readAsStringSync().trim();
+  } else {
+    // Fallback to pubspec.yaml
+    currentVersion = '${getVersionName()}+${getVersionCode()}';
+  }
+  
+  final parts = currentVersion.split('+');
+  if (parts.length != 2) {
+    print('❌ Invalid Android version format');
+    return;
+  }
+  
+  final versionName = parts[0];
+  final currentCode = int.parse(parts[1]);
+  final newCode = currentCode + 1;
+  final newVersion = '$versionName+$newCode';
+  
+  // Update Android version file
+  await androidVersionFile.writeAsString(newVersion);
+  
+  print('✅ Android version bumped: $currentVersion → $newVersion');
+}
+
+Future<void> bumpIosVersionCode() async {
+  print('🍎 Bumping iOS version code...');
+  
+  final iosVersionFile = File('.ios_version');
+  String currentVersion;
+  
+  if (iosVersionFile.existsSync()) {
+    currentVersion = iosVersionFile.readAsStringSync().trim();
+  } else {
+    // Fallback to pubspec.yaml
+    currentVersion = '${getVersionName()}+${getVersionCode()}';
+  }
+  
+  final parts = currentVersion.split('+');
+  if (parts.length != 2) {
+    print('❌ Invalid iOS version format');
+    return;
+  }
+  
+  final versionName = parts[0];
+  final currentCode = int.parse(parts[1]);
+  final newCode = currentCode + 1;
+  final newVersion = '$versionName+$newCode';
+  
+  // Update iOS version file
+  await iosVersionFile.writeAsString(newVersion);
+  
+  print('✅ iOS version bumped: $currentVersion → $newVersion');
+}
+
+Future<void> bumpBothVersionCodes() async {
+  print('🚀 Bumping both Android and iOS version codes...');
+  await bumpAndroidVersionCode();
+  await bumpIosVersionCode();
+  print('✅ Both platform version codes bumped successfully');
 }

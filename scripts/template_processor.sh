@@ -85,8 +85,8 @@ process_template() {
     temp_content="${temp_content//\{\{IOS_VERSION_NAME\}\}/$version_name}"
     temp_content="${temp_content//\{\{IOS_VERSION_CODE\}\}/$version_code}"
     
-    # Write processed content to output file
-    echo "$temp_content" > "$output_file"
+    # Write processed content to output file (preserve newlines)
+    printf "%s" "$temp_content" > "$output_file"
     
     return 0
 }

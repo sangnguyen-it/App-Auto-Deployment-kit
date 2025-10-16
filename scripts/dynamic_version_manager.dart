@@ -21,26 +21,38 @@ void main(List<String> args) async {
     case 'get-android-version':
       print(getAndroidVersion());
       break;
-    case 'get-android-version-name':
-      print(getAndroidVersionName());
-      break;
-    case 'get-android-version-code':
-      print(getAndroidVersionCode());
-      break;
-    case 'get-ios-version':
-      print(getIosVersion());
-      break;
-    case 'get-ios-version-name':
-      print(getIosVersionName());
-      break;
-    case 'get-ios-version-code':
-      print(getIosVersionCode());
-      break;
+
     case 'interactive':
       await interactiveMode();
       break;
+    case 'interactive-android':
+      await interactiveAndroidMode();
+      break;
+    case 'interactive-ios':
+      await interactiveIosMode();
+      break;
     case 'apply':
       print('✅ Version applied successfully');
+      break;
+    case 'apply-android':
+      await applyAndroidVersionChanges();
+      break;
+    case 'apply-ios':
+      await applyIosVersionChanges();
+      break;
+    case 'set-android-version':
+      if (args.length < 2) {
+        print('Error: Version required. Format: name+code (e.g., 1.0.0+1)');
+        exit(1);
+      }
+      await setAndroidVersion(args[1]);
+      break;
+    case 'set-ios-version':
+      if (args.length < 2) {
+        print('Error: Version required. Format: name+code (e.g., 1.0.0+1)');
+        exit(1);
+      }
+      await setIosVersion(args[1]);
       break;
     case 'set-strategy':
       print('✅ Strategy set successfully');
@@ -57,6 +69,14 @@ void showUsage() {
   print('  dart scripts/dynamic_version_manager.dart get-version-code # Get version code');
   print('  dart scripts/dynamic_version_manager.dart interactive      # Interactive mode');
   print('  dart scripts/dynamic_version_manager.dart apply           # Apply version');
+  print('');
+  print('🤖 Platform-specific commands:');
+  print('  dart scripts/dynamic_version_manager.dart interactive-android  # Interactive mode for Android');
+  print('  dart scripts/dynamic_version_manager.dart interactive-ios      # Interactive mode for iOS');
+  print('  dart scripts/dynamic_version_manager.dart apply-android        # Apply Android version changes');
+  print('  dart scripts/dynamic_version_manager.dart apply-ios            # Apply iOS version changes');
+  print('  dart scripts/dynamic_version_manager.dart set-android-version <version> # Set Android version');
+  print('  dart scripts/dynamic_version_manager.dart set-ios-version <version>     # Set iOS version');
 }
 
 String getFullVersion() {
@@ -452,4 +472,201 @@ Future<void> _createVersionInfoFiles(String androidVersionName, String androidVe
   } catch (e) {
     print('❌ Error creating version info files: $e');
   }
+}
+
+// Platform-specific interactive modes
+Future<void> interactiveAndroidMode() async {
+  print('🤖 Android Version Manager');
+  print('═══════════════════════════');
+  
+  final currentVersion = getAndroidVersionName();
+  final currentCode = getAndroidVersionCode();
+  
+  print('📱 Current Android Version: $currentVersion+$currentCode');
+  print('');
+  
+  // Check for environment variable override
+  final envVersion = Platform.environment['ANDROID_VERSION_OVERRIDE'];
+  if (envVersion != null && envVersion.isNotEmpty) {
+    print('🔧 Using environment override: $envVersion');
+    await setAndroidVersion(envVersion);
+    return;
+  }
+  
+  print('Choose version strategy:');
+  print('1. 🔄 Use current version ($currentVersion+$currentCode)');
+  print('2. ✏️  Enter custom version');
+  print('');
+  
+  stdout.write('Enter your choice (1-2): ');
+  final choice = stdin.readLineSync() ?? '1';
+  
+  switch (choice) {
+    case '1':
+      print('✅ Using current Android version: $currentVersion+$currentCode');
+      break;
+    case '2':
+      await _promptAndroidCustomVersion();
+      break;
+    default:
+      print('⚠️ Invalid choice, using current version');
+      break;
+  }
+}
+
+Future<void> interactiveIosMode() async {
+  print('🍎 iOS Version Manager');
+  print('═══════════════════════');
+  
+  final currentVersion = getIosVersionName();
+  final currentCode = getIosVersionCode();
+  
+  print('📱 Current iOS Version: $currentVersion+$currentCode');
+  print('');
+  
+  // Check for environment variable override
+  final envVersion = Platform.environment['IOS_VERSION_OVERRIDE'];
+  if (envVersion != null && envVersion.isNotEmpty) {
+    print('🔧 Using environment override: $envVersion');
+    await setIosVersion(envVersion);
+    return;
+  }
+  
+  print('Choose version strategy:');
+  print('1. 🔄 Use current version ($currentVersion+$currentCode)');
+  print('2. ✏️  Enter custom version');
+  print('');
+  
+  stdout.write('Enter your choice (1-2): ');
+  final choice = stdin.readLineSync() ?? '1';
+  
+  switch (choice) {
+    case '1':
+      print('✅ Using current iOS version: $currentVersion+$currentCode');
+      break;
+    case '2':
+      await _promptIosCustomVersion();
+      break;
+    default:
+      print('⚠️ Invalid choice, using current version');
+      break;
+  }
+}
+
+Future<void> _promptAndroidCustomVersion() async {
+  final currentVersion = getAndroidVersionName();
+  final currentCode = getAndroidVersionCode();
+  
+  stdout.write('Enter Android version name [$currentVersion]: ');
+  final versionName = stdin.readLineSync();
+  final finalVersionName = (versionName?.isEmpty ?? true) ? currentVersion : versionName!;
+  
+  stdout.write('Enter Android version code [$currentCode]: ');
+  final versionCode = stdin.readLineSync();
+  final finalVersionCode = (versionCode?.isEmpty ?? true) ? currentCode : versionCode!;
+  
+  final finalVersion = '$finalVersionName+$finalVersionCode';
+  await setAndroidVersion(finalVersion);
+}
+
+Future<void> _promptIosCustomVersion() async {
+  final currentVersion = getIosVersionName();
+  final currentCode = getIosVersionCode();
+  
+  stdout.write('Enter iOS version name [$currentVersion]: ');
+  final versionName = stdin.readLineSync();
+  final finalVersionName = (versionName?.isEmpty ?? true) ? currentVersion : versionName!;
+  
+  stdout.write('Enter iOS version code [$currentCode]: ');
+  final versionCode = stdin.readLineSync();
+  final finalVersionCode = (versionCode?.isEmpty ?? true) ? currentCode : versionCode!;
+  
+  final finalVersion = '$finalVersionName+$finalVersionCode';
+  await setIosVersion(finalVersion);
+}
+
+// Platform-specific version setters
+Future<void> setAndroidVersion(String version) async {
+  final parts = version.split('+');
+  if (parts.length != 2) {
+    print('❌ Invalid version format. Use: name+code (e.g., 1.0.0+1)');
+    exit(1);
+  }
+  
+  final versionName = parts[0];
+  final versionCode = parts[1];
+  
+  print('🤖 Setting Android version to: $versionName+$versionCode');
+  
+  // Update pubspec.yaml with Android version
+  await _updatePubspecVersion('$versionName+$versionCode');
+  
+  // Create Android version file
+  final androidVersionFile = File('.android_version');
+  await androidVersionFile.writeAsString(version);
+  
+  print('✅ Android version updated successfully');
+}
+
+Future<void> setIosVersion(String version) async {
+  final parts = version.split('+');
+  if (parts.length != 2) {
+    print('❌ Invalid version format. Use: name+code (e.g., 1.0.0+1)');
+    exit(1);
+  }
+  
+  final versionName = parts[0];
+  final versionCode = parts[1];
+  
+  print('🍎 Setting iOS version to: $versionName+$versionCode');
+  
+  // Update iOS files
+  await _updateIosVersion(versionName, versionCode);
+  
+  // Create iOS version file
+  final iosVersionFile = File('.ios_version');
+  await iosVersionFile.writeAsString(version);
+  
+  print('✅ iOS version updated successfully');
+}
+
+// Platform-specific apply functions
+Future<void> applyAndroidVersionChanges() async {
+  print('🤖 Applying Android version changes...');
+  
+  final androidVersionFile = File('.android_version');
+  if (!androidVersionFile.existsSync()) {
+    print('⚠️ No Android version file found, using current version');
+    return;
+  }
+  
+  final version = androidVersionFile.readAsStringSync().trim();
+  final parts = version.split('+');
+  if (parts.length != 2) {
+    print('❌ Invalid Android version format in .android_version');
+    return;
+  }
+  
+  await _updatePubspecVersion('${parts[0]}+${parts[1]}');
+  print('✅ Android version changes applied');
+}
+
+Future<void> applyIosVersionChanges() async {
+  print('🍎 Applying iOS version changes...');
+  
+  final iosVersionFile = File('.ios_version');
+  if (!iosVersionFile.existsSync()) {
+    print('⚠️ No iOS version file found, using current version');
+    return;
+  }
+  
+  final version = iosVersionFile.readAsStringSync().trim();
+  final parts = version.split('+');
+  if (parts.length != 2) {
+    print('❌ Invalid iOS version format in .ios_version');
+    return;
+  }
+  
+  await _updateIosVersion(parts[0], parts[1]);
+  print('✅ iOS version changes applied');
 }

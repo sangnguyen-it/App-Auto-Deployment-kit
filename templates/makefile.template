@@ -59,29 +59,31 @@ ROBOT := 🤖
 # ═══════════════════════════════════════════════════════════════════════════════
 
 define print_header
-	@printf "\n$(BLUE)╔═══════════════════════════════════════════════════════════════╗$(NC)\n"
-	@printf "$(BLUE)║$(NC) $(WHITE)$(1)$(NC) $(BLUE)║$(NC)\n"
-	@printf "$(BLUE)╚═══════════════════════════════════════════════════════════════╝$(NC)\n\n"
+	@echo ""
+	@echo "$(BLUE)╔═══════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║$(NC) $(WHITE)$(1)$(NC) $(BLUE)║$(NC)"
+	@echo "$(BLUE)╚═══════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
 endef
 
 define print_step
-	@printf "$(YELLOW)$(GEAR) $(1)$(NC)\n"
+	@echo "$(YELLOW)$(GEAR) $(1)$(NC)"
 endef
 
 define print_success
-	@printf "$(GREEN)$(CHECK) $(1)$(NC)\n"
+	@echo "$(GREEN)$(CHECK) $(1)$(NC)"
 endef
 
 define print_error
-	@printf "$(RED)$(CROSS) $(1)$(NC)\n"
+	@echo "$(RED)$(CROSS) $(1)$(NC)"
 endef
 
 define print_warning
-	@printf "$(YELLOW)$(WARNING) $(1)$(NC)\n"
+	@echo "$(YELLOW)$(WARNING) $(1)$(NC)"
 endef
 
 define print_info
-	@printf "$(CYAN)$(INFO) $(1)$(NC)\n"
+	@echo "$(CYAN)$(INFO) $(1)$(NC)"
 endef
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -106,19 +108,23 @@ BUILD_IOS := $(if $(filter --ios,$(MAKECMDGOALS)),true,$(if $(PLATFORM_ARG),,tru
 .PHONY: menu
 menu: ## 📱 Interactive build menu
 	$(call print_header,🚀 AppAutoDeploy Build Menu)
-	@printf "$(CYAN)Choose your build pipeline:$(NC)\n\n"
-	@printf "$(YELLOW)1.$(NC) $(MOBILE) Tester Pipeline (APK + TestFlight)\n"
-	@printf "$(YELLOW)2.$(NC) $(ROCKET) Live Local Pipeline (AAB + App Store)\n"
-	@printf "$(YELLOW)3.$(NC) $(ROBOT) Live GitHub Pipeline (Trigger CI/CD)\n"
-	@printf "$(YELLOW)4.$(NC) $(GEAR) Live Hybrid Pipeline (Local + GitHub)\n\n"
-	@printf "$(CYAN)Advanced Options:$(NC)\n"
-	@printf "$(YELLOW)5.$(NC) $(GEAR) System Check\n"
-	@printf "$(YELLOW)6.$(NC) $(FOLDER) Clean Build\n"
-	@printf "$(YELLOW)7.$(NC) $(INFO) Help\n\n"
-	@printf "$(CYAN)Platform-specific builds:$(NC)\n"
-	@printf "$(YELLOW)•$(NC) Add --android for Android only\n"
-	@printf "$(YELLOW)•$(NC) Add --ios for iOS only\n"
-	@printf "$(YELLOW)•$(NC) Examples: make tester --android, make live --ios\n\n"
+	@echo "$(CYAN)Choose your build pipeline:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)1.$(NC) $(MOBILE) Tester Pipeline (APK + TestFlight)"
+	@echo "$(YELLOW)2.$(NC) $(ROCKET) Live Local Pipeline (AAB + App Store)"
+	@echo "$(YELLOW)3.$(NC) $(ROBOT) Live GitHub Pipeline (Trigger CI/CD)"
+	@echo "$(YELLOW)4.$(NC) $(GEAR) Live Hybrid Pipeline (Local + GitHub)"
+	@echo ""
+	@echo "$(CYAN)Advanced Options:$(NC)"
+	@echo "$(YELLOW)5.$(NC) $(GEAR) System Check"
+	@echo "$(YELLOW)6.$(NC) $(FOLDER) Clean Build"
+	@echo "$(YELLOW)7.$(NC) $(INFO) Help"
+	@echo ""
+	@echo "$(CYAN)Platform-specific builds:$(NC)"
+	@echo "$(YELLOW)•$(NC) Add --android for Android only"
+	@echo "$(YELLOW)•$(NC) Add --ios for iOS only"
+	@echo "$(YELLOW)•$(NC) Examples: make tester --android, make live --ios"
+	@echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🔍 DEPENDENCY CHECKS
@@ -310,9 +316,10 @@ upload-ios-appstore: ## 🍎 Upload iOS to App Store
 .PHONY: tester
 tester: ## 🧪 Automated Tester Pipeline (APK + TestFlight) - Use --android or --ios for platform-specific builds
 	$(call print_header,🧪 Building for Testing)
-	@printf "$(CYAN)Platform Configuration:$(NC)\n"
-	@printf "$(YELLOW)• Android: $(if $(filter true,$(BUILD_ANDROID)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)\n"
-	@printf "$(YELLOW)• iOS: $(if $(filter true,$(BUILD_IOS)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)\n\n"
+	@echo "$(CYAN)Platform Configuration:$(NC)"
+	@echo "$(YELLOW)• Android: $(if $(filter true,$(BUILD_ANDROID)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)"
+	@echo "$(YELLOW)• iOS: $(if $(filter true,$(BUILD_IOS)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)"
+	@echo ""
 	
 	@$(MAKE) check-deps
 	@$(MAKE) version-interactive
@@ -328,14 +335,14 @@ ifeq ($(BUILD_IOS),true)
 endif
 
 	$(call print_header,🎉 Tester Build Complete!)
-	@printf "$(GREEN)Build artifacts available in: $(BUILD_DIR)/$(NC)\n"
-ifeq ($(BUILD_ANDROID),true)
-	@printf "$(YELLOW)📱 Android APK: $(BUILD_DIR)/$(APK_NAME)$(NC)\n"
-endif
-ifeq ($(BUILD_IOS),true)
-	@printf "$(YELLOW)🍎 iOS IPA: $(BUILD_DIR)/$(IPA_NAME)$(NC)\n"
-	@printf "$(YELLOW)🍎 TestFlight: Upload completed$(NC)\n"
-endif
+	@echo "$(GREEN)Build artifacts available in: $(BUILD_DIR)/$(NC)"
+	ifeq ($(BUILD_ANDROID),true)
+		@echo "$(YELLOW)📱 Android APK: $(BUILD_DIR)/$(APK_NAME)$(NC)"
+	endif
+	ifeq ($(BUILD_IOS),true)
+		@echo "$(YELLOW)🍎 iOS IPA: $(BUILD_DIR)/$(IPA_NAME)$(NC)"
+		@echo "$(YELLOW)🍎 TestFlight: Upload completed$(NC)"
+	endif
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🚀 LIVE PIPELINE
@@ -344,9 +351,10 @@ endif
 .PHONY: live
 live: ## 🚀 Automated Live Pipeline (AAB + App Store) - Use --android or --ios for platform-specific builds
 	$(call print_header,🚀 Building for Production)
-	@printf "$(CYAN)Platform Configuration:$(NC)\n"
-	@printf "$(YELLOW)• Android: $(if $(filter true,$(BUILD_ANDROID)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)\n"
-	@printf "$(YELLOW)• iOS: $(if $(filter true,$(BUILD_IOS)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)\n\n"
+	@echo "$(CYAN)Platform Configuration:$(NC)"
+	@echo "$(YELLOW)• Android: $(if $(filter true,$(BUILD_ANDROID)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)"
+	@echo "$(YELLOW)• iOS: $(if $(filter true,$(BUILD_IOS)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)"
+	@echo ""
 	
 	@$(MAKE) check-deps
 	@$(MAKE) version-interactive
@@ -362,14 +370,14 @@ ifeq ($(BUILD_IOS),true)
 endif
 
 	$(call print_header,🎉 Live Build Complete!)
-	@printf "$(GREEN)Build artifacts available in: $(BUILD_DIR)/$(NC)\n"
-ifeq ($(BUILD_ANDROID),true)
-	@printf "$(YELLOW)📱 Android AAB: $(BUILD_DIR)/$(AAB_NAME)$(NC)\n"
-endif
-ifeq ($(BUILD_IOS),true)
-	@printf "$(YELLOW)🍎 iOS IPA: $(BUILD_DIR)/$(IPA_NAME)$(NC)\n"
-	@printf "$(YELLOW)🍎 App Store: Upload completed$(NC)\n"
-endif
+	@echo "$(GREEN)Build artifacts available in: $(BUILD_DIR)/$(NC)"
+	ifeq ($(BUILD_ANDROID),true)
+		@echo "$(YELLOW)📱 Android AAB: $(BUILD_DIR)/$(AAB_NAME)$(NC)"
+	endif
+	ifeq ($(BUILD_IOS),true)
+		@echo "$(YELLOW)🍎 iOS IPA: $(BUILD_DIR)/$(IPA_NAME)$(NC)"
+		@echo "$(YELLOW)🍎 App Store: Upload completed$(NC)"
+	endif
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🤖 GITHUB PIPELINE
@@ -378,17 +386,18 @@ endif
 .PHONY: live-github
 live-github: ## 🤖 Automated GitHub Pipeline (Trigger CI/CD) - Use --android or --ios for platform-specific builds
 	$(call print_header,🤖 Triggering GitHub Actions)
-	@printf "$(CYAN)Platform Configuration:$(NC)\n"
-	@printf "$(YELLOW)• Android: $(if $(filter true,$(BUILD_ANDROID)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)\n"
-	@printf "$(YELLOW)• iOS: $(if $(filter true,$(BUILD_IOS)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)\n\n"
+	@echo "$(CYAN)Platform Configuration:$(NC)"
+	@echo "$(YELLOW)• Android: $(if $(filter true,$(BUILD_ANDROID)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)"
+	@echo "$(YELLOW)• iOS: $(if $(filter true,$(BUILD_IOS)),$(GREEN)Enabled$(NC),$(RED)Disabled$(NC))$(NC)"
+	@echo ""
 	
 	@$(MAKE) check-deps
 	@$(MAKE) version-interactive
 	@$(MAKE) create-git-tag
 	
 	$(call print_header,🎉 GitHub Actions Triggered!)
-	@printf "$(GREEN)GitHub Actions will handle the build process$(NC)\n"
-	@printf "$(YELLOW)Check your repository's Actions tab for build progress$(NC)\n"
+	@echo "$(GREEN)GitHub Actions will handle the build process$(NC)"
+	@echo "$(YELLOW)Check your repository's Actions tab for build progress$(NC)"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🛠️ UTILITY COMMANDS
@@ -417,15 +426,19 @@ doctor: ## 🩺 Run Flutter doctor
 
 .PHONY: help
 help: ## 📖 Show this help message
-	@printf "$(CYAN)AppAutoDeploy Makefile Commands:$(NC)\n\n"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
-	@printf "\n$(CYAN)Platform-specific builds:$(NC)\n"
-	@printf "$(YELLOW)• --android$(NC)  Build only for Android\n"
-	@printf "$(YELLOW)• --ios$(NC)      Build only for iOS\n"
-	@printf "$(YELLOW)• (no flag)$(NC)  Build for both platforms\n\n"
-	@printf "$(CYAN)Examples:$(NC)\n"
-	@printf "$(YELLOW)make tester --android$(NC)     # Build APK and skip iOS\n"
-	@printf "$(YELLOW)make live --ios$(NC)           # Build iOS only for production\n"
-	@printf "$(YELLOW)make live-github --android$(NC) # Trigger GitHub Actions for Android\n\n"
+	@echo "$(CYAN)AppAutoDeploy Makefile Commands:$(NC)"
+	@echo ""
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "$(YELLOW)%-20s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "$(CYAN)Platform-specific builds:$(NC)"
+	@echo "$(YELLOW)• --android$(NC)  Build only for Android"
+	@echo "$(YELLOW)• --ios$(NC)      Build only for iOS"
+	@echo "$(YELLOW)• (no flag)$(NC)  Build for both platforms"
+	@echo ""
+	@echo "$(CYAN)Examples:$(NC)"
+	@echo "$(YELLOW)make tester --android$(NC)     # Build APK and skip iOS"
+	@echo "$(YELLOW)make live --ios$(NC)           # Build iOS only for production"
+	@echo "$(YELLOW)make live-github --android$(NC) # Trigger GitHub Actions for Android"
+	@echo ""
 
 .DEFAULT_GOAL := menu

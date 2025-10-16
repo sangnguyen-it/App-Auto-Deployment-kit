@@ -79,14 +79,24 @@ process_template() {
     temp_content="${temp_content//\{\{VERSION_CODE\}\}/$version_code}"
     temp_content="${temp_content//\{\{FLUTTER_VERSION\}\}/$flutter_version}"
     
+    # Replace APPAUTODEPLOY_SCRIPTS_DIR with the actual scripts directory path
+    # Use cache directory if running in remote mode, otherwise use project directory
+    local appautodeploy_scripts_dir
+    if [ "${REMOTE_EXECUTION:-false}" = "true" ] && [ -d "$HOME/.appautodeploy/scripts" ]; then
+        appautodeploy_scripts_dir="$HOME/.appautodeploy/scripts"
+    else
+        appautodeploy_scripts_dir="$target_dir/scripts"
+    fi
+    temp_content="${temp_content//\{\{APPAUTODEPLOY_SCRIPTS_DIR\}\}/$appautodeploy_scripts_dir}"
+    
     # Replace Android and iOS specific version variables
     temp_content="${temp_content//\{\{ANDROID_VERSION_NAME\}\}/$version_name}"
     temp_content="${temp_content//\{\{ANDROID_VERSION_CODE\}\}/$version_code}"
     temp_content="${temp_content//\{\{IOS_VERSION_NAME\}\}/$version_name}"
     temp_content="${temp_content//\{\{IOS_VERSION_CODE\}\}/$version_code}"
     
-    # Write processed content to output file (preserve newlines)
-    printf "%s" "$temp_content" > "$output_file"
+    # Write processed content to output file
+    echo "$temp_content" > "$output_file"
     
     return 0
 }

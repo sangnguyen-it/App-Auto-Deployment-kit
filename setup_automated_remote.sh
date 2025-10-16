@@ -1993,6 +1993,9 @@ main() {
     fi
     
     # Source template processor BEFORE creating configuration files
+    # Export REMOTE_EXECUTION to ensure it's available in template processor
+    export REMOTE_EXECUTION
+    
     if [ "$REMOTE_EXECUTION" = "true" ]; then
         # In remote mode, use template processor from cache directory
         if [ -f "$SCRIPTS_DIR/template_processor.sh" ]; then

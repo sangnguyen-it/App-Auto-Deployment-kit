@@ -43,7 +43,7 @@ TESTER_GROUPS = ["#{PROJECT_NAME} Internal Testers", "#{PROJECT_NAME} Beta Teste
 # Use File.expand_path to ensure absolute path resolution for AuthKey file
 KEY_PATH = File.expand_path("./AuthKey_#{KEY_ID}.p8", __dir__)
 CHANGELOG_PATH = "../../CHANGELOG.md"
-IPA_OUTPUT_DIR = "../../build/ios/ipa"
+IPA_OUTPUT_DIR = File.expand_path("../../build/ios/ipa", __dir__)
 PUBSPEC_PATH = "../../pubspec.yaml"
 IOS_VERSION_PATH = "../../.ios_version"
 # Project-specific paths

@@ -269,10 +269,24 @@ build-ios-ipa: ## 🍎 Build iOS IPA
 		$(call print_step,Creating IPA with Fastlane...); \
 		if command -v fastlane >/dev/null 2>&1 && [ -f "ios/fastlane/Fastfile" ]; then \
 			cd ios && fastlane build_archive_beta && cd ..; \
-			IPA_FILE=$$(find build/ios/ipa -name "*.ipa" -type f 2>/dev/null | head -1); \
-			if [ -z "$$IPA_FILE" ]; then \
-				IPA_FILE=$$(find . -name "*.ipa" -path "*/build/ios/ipa/*" -type f 2>/dev/null | head -1); \
-			fi; \
+			$(call print_step,Searching for IPA file...); \
+			IPA_FILE=""; \
+			for search_path in \
+				"build/ios/ipa" \
+				"build/ios" \
+				"ios/build" \
+				"ios/build/Runner" \
+				"." \
+			; do \
+				if [ -z "$$IPA_FILE" ]; then \
+					FOUND_IPA=$$(find "$$search_path" -name "*.ipa" -type f 2>/dev/null | head -1); \
+					if [ -n "$$FOUND_IPA" ] && [ -f "$$FOUND_IPA" ]; then \
+						IPA_FILE="$$FOUND_IPA"; \
+						$(call print_info,Found IPA at: $$IPA_FILE); \
+						break; \
+					fi; \
+				fi; \
+			done; \
 			if [ -n "$$IPA_FILE" ] && [ -f "$$IPA_FILE" ]; then \
 				cp "$$IPA_FILE" "$(BUILD_DIR)/$(IPA_NAME)"; \
 				IPA_SIZE=$$(du -h "$(BUILD_DIR)/$(IPA_NAME)" | awk '{print $$1}'); \
@@ -281,9 +295,14 @@ build-ios-ipa: ## 🍎 Build iOS IPA
 				$(call print_error,IPA file not found after Fastlane build); \
 				$(call print_error,Searched locations:); \
 				echo "  - build/ios/ipa/"; \
-				echo "  - */build/ios/ipa/*"; \
+				echo "  - build/ios/"; \
+				echo "  - ios/build/"; \
+				echo "  - ios/build/Runner/"; \
+				echo "  - . (current directory)"; \
 				$(call print_error,Available .ipa files:); \
-				find . -name "*.ipa" -type f 2>/dev/null || echo "No .ipa files found"; \
+				find . -name "*.ipa" -type f 2>/dev/null | head -10 || echo "No .ipa files found"; \
+				$(call print_error,Directory contents of build/ios/:); \
+				ls -la build/ios/ 2>/dev/null || echo "build/ios/ not found"; \
 				exit 1; \
 			fi; \
 		else \

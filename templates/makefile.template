@@ -67,23 +67,23 @@ define print_header
 endef
 
 define print_step
-	@echo "$(YELLOW)$(GEAR) $(1)$(NC)"
+	echo "$(YELLOW)$(GEAR) $(1)$(NC)"
 endef
 
 define print_success
-	@echo "$(GREEN)$(CHECK) $(1)$(NC)"
+	echo "$(GREEN)$(CHECK) $(1)$(NC)"
 endef
 
 define print_error
-	@echo "$(RED)$(CROSS) $(1)$(NC)"
+	echo "$(RED)$(CROSS) $(1)$(NC)"
 endef
 
 define print_warning
-	@echo "$(YELLOW)$(WARNING) $(1)$(NC)"
+	echo "$(YELLOW)$(WARNING) $(1)$(NC)"
 endef
 
 define print_info
-	@echo "$(CYAN)$(INFO) $(1)$(NC)"
+	echo "$(CYAN)$(INFO) $(1)$(NC)"
 endef
 
 # ═══════════════════════════════════════════════════════════════════════════════

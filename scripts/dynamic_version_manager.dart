@@ -2,13 +2,27 @@
 // Dynamic Version Manager - Simplified inline version
 import 'dart:io';
 
-void main(List<String> args) async {
-  if (args.isEmpty) {
-    showUsage();
+void main(List<String> arguments) async {
+  if (arguments.isEmpty) {
+    print('Usage: dart dynamic_version_manager.dart <command> [options]');
+    print('Commands:');
+    print('  interactive                    - Interactive version management');
+    print('  interactive-android           - Interactive Android-only version management');
+    print('  interactive-ios               - Interactive iOS-only version management');
+    print('  apply-android                 - Apply Android version to project');
+    print('  apply-ios                     - Apply iOS version to project');
+    print('  set-android-version <version> - Set Android version (format: 1.0.0+1)');
+    print('  set-ios-version <version>     - Set iOS version (format: 1.0.0+1)');
+    print('  bump-android                  - Bump Android version');
+    print('  bump-ios                      - Bump iOS version');
+    print('  bump-both                     - Bump both Android and iOS versions');
+    print('  init                          - Initialize version files');
     return;
   }
 
-  switch (args[0]) {
+  final command = arguments[0];
+
+  switch (command) {
     case 'get-version':
       print(getFullVersion());
       break;
@@ -56,18 +70,18 @@ void main(List<String> args) async {
       await applyIosVersionChanges();
       break;
     case 'set-android-version':
-      if (args.length < 2) {
+      if (arguments.length < 2) {
         print('Error: Version required. Format: name+code (e.g., 1.0.0+1)');
         exit(1);
       }
-      await setAndroidVersion(args[1]);
+      await setAndroidVersion(arguments[1]);
       break;
     case 'set-ios-version':
-      if (args.length < 2) {
+      if (arguments.length < 2) {
         print('Error: Version required. Format: name+code (e.g., 1.0.0+1)');
         exit(1);
       }
-      await setIosVersion(args[1]);
+      await setIosVersion(arguments[1]);
       break;
     case 'set-strategy':
       print('✅ Strategy set successfully');
@@ -193,8 +207,13 @@ Future<void> interactiveMode() async {
   while (true) {
     print('🔧 Interactive Version Selection');
     print('   Current pubspec.yaml: ${getFullVersion()}');
-    print('   Version Name: ${getVersionName()}');
-    print('   Version Code: ${getVersionCode()}');
+    
+    // Initialize version files to ensure they exist
+    await initializeVersionFiles();
+    
+    // Display current versions from platform-specific files
+    print('   Android (.android_version): ${getAndroidVersion()}');
+    print('   iOS (.ios_version): ${getIosVersion()}');
     
     // Check iOS Info.plist current version
     final iosCurrentVersion = _getIosCurrentVersion();
@@ -275,67 +294,67 @@ Future<void> interactiveMode() async {
         print('   iOS: $iosVersionName+$iosVersionCode');
       } else {
         print('📱 ANDROID VERSION:');
-        stdout.write('Enter Android version name [current: ${getVersionName()}]: ');
+        stdout.write('Enter Android version name [current: ${getAndroidVersionName()}]: ');
         String? androidVersionNameInput;
         try {
           if (stdin.hasTerminal) {
             androidVersionNameInput = stdin.readLineSync()?.trim();
           } else {
             androidVersionNameInput = '';
-            print('${getVersionName()} (auto-selected)');
+            print('${getAndroidVersionName()} (auto-selected)');
           }
         } catch (e) {
           androidVersionNameInput = '';
-          print('${getVersionName()} (auto-selected)');
+          print('${getAndroidVersionName()} (auto-selected)');
         }
-        androidVersionName = (androidVersionNameInput?.isEmpty ?? true) ? getVersionName() : androidVersionNameInput!;
+        androidVersionName = (androidVersionNameInput?.isEmpty ?? true) ? getAndroidVersionName() : androidVersionNameInput!;
 
-        stdout.write('Enter Android version code [current: ${getVersionCode()}]: ');
+        stdout.write('Enter Android version code [current: ${getAndroidVersionCode()}]: ');
         String? androidVersionCodeInput;
         try {
           if (stdin.hasTerminal) {
             androidVersionCodeInput = stdin.readLineSync()?.trim();
           } else {
             androidVersionCodeInput = '';
-            print('${getVersionCode()} (auto-selected)');
+            print('${getAndroidVersionCode()} (auto-selected)');
           }
         } catch (e) {
           androidVersionCodeInput = '';
-          print('${getVersionCode()} (auto-selected)');
+          print('${getAndroidVersionCode()} (auto-selected)');
         }
-        androidVersionCode = (androidVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : androidVersionCodeInput!;
+        androidVersionCode = (androidVersionCodeInput?.isEmpty ?? true) ? getAndroidVersionCode() : androidVersionCodeInput!;
 
         print('');
         print('🍎 iOS VERSION:');
-        stdout.write('Enter iOS version name [current: ${getVersionName()}]: ');
+        stdout.write('Enter iOS version name [current: ${getIosVersionName()}]: ');
         String? iosVersionNameInput;
         try {
           if (stdin.hasTerminal) {
             iosVersionNameInput = stdin.readLineSync()?.trim();
           } else {
             iosVersionNameInput = '';
-            print('${getVersionName()} (auto-selected)');
+            print('${getIosVersionName()} (auto-selected)');
           }
         } catch (e) {
           iosVersionNameInput = '';
-          print('${getVersionName()} (auto-selected)');
+          print('${getIosVersionName()} (auto-selected)');
         }
-        iosVersionName = (iosVersionNameInput?.isEmpty ?? true) ? getVersionName() : iosVersionNameInput!;
+        iosVersionName = (iosVersionNameInput?.isEmpty ?? true) ? getIosVersionName() : iosVersionNameInput!;
 
-        stdout.write('Enter iOS version code [current: ${getVersionCode()}]: ');
+        stdout.write('Enter iOS version code [current: ${getIosVersionCode()}]: ');
         String? iosVersionCodeInput;
         try {
           if (stdin.hasTerminal) {
             iosVersionCodeInput = stdin.readLineSync()?.trim();
           } else {
             iosVersionCodeInput = '';
-            print('${getVersionCode()} (auto-selected)');
+            print('${getIosVersionCode()} (auto-selected)');
           }
         } catch (e) {
           iosVersionCodeInput = '';
-          print('${getVersionCode()} (auto-selected)');
+          print('${getIosVersionCode()} (auto-selected)');
         }
-        iosVersionCode = (iosVersionCodeInput?.isEmpty ?? true) ? getVersionCode() : iosVersionCodeInput!;
+        iosVersionCode = (iosVersionCodeInput?.isEmpty ?? true) ? getIosVersionCode() : iosVersionCodeInput!;
       }
 
       print('');

@@ -823,11 +823,22 @@ create_makefile_inline() {
         # Fallback: Copy template and process placeholders with sed
         cp "$template_file" "$output_file"
         
+        # Determine APPAUTODEPLOY_SCRIPTS_DIR based on execution mode
+        local appautodeploy_scripts_dir
+        if [ "$REMOTE_EXECUTION" = "true" ] || [ -d "$HOME/.appautodeploy/scripts" ]; then
+            # Remote execution mode - use cache directory
+            appautodeploy_scripts_dir="$HOME/.appautodeploy/scripts"
+        else
+            # Local execution mode - use project scripts directory
+            appautodeploy_scripts_dir="$TARGET_DIR/scripts"
+        fi
+        
         # Replace placeholders in Makefile
         sed -i.bak "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$output_file"
         sed -i.bak "s/{{PACKAGE_NAME}}/$PACKAGE_NAME/g" "$output_file"
         sed -i.bak "s/{{APP_NAME}}/$APP_NAME/g" "$output_file"
         sed -i.bak "s/{{TARGET_DIR}}/./g" "$output_file"
+        sed -i.bak "s|{{APPAUTODEPLOY_SCRIPTS_DIR}}|$appautodeploy_scripts_dir|g" "$output_file"
         
         # Clean up backup files
         rm -f "$output_file.bak"

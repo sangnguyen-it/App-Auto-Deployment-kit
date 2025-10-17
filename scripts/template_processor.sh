@@ -67,6 +67,16 @@ process_template() {
     local temp_content
     temp_content=$(cat "$template_file")
     
+    # Determine APPAUTODEPLOY_SCRIPTS_DIR based on execution mode
+    local appautodeploy_scripts_dir
+    if [ "$REMOTE_EXECUTION" = "true" ] || [ -d "$HOME/.appautodeploy/scripts" ]; then
+        # Remote execution mode - use cache directory
+        appautodeploy_scripts_dir="$HOME/.appautodeploy/scripts"
+    else
+        # Local execution mode - use project scripts directory
+        appautodeploy_scripts_dir="$target_dir/scripts"
+    fi
+    
     # Replace template variables
     temp_content="${temp_content//\{\{PROJECT_NAME\}\}/$project_name}"
     temp_content="${temp_content//\{\{PACKAGE_NAME\}\}/$package_name}"
@@ -78,6 +88,7 @@ process_template() {
     temp_content="${temp_content//\{\{VERSION_NAME\}\}/$version_name}"
     temp_content="${temp_content//\{\{VERSION_CODE\}\}/$version_code}"
     temp_content="${temp_content//\{\{FLUTTER_VERSION\}\}/$flutter_version}"
+    temp_content="${temp_content//\{\{APPAUTODEPLOY_SCRIPTS_DIR\}\}/$appautodeploy_scripts_dir}"
     
     # Replace Android and iOS specific version variables
     temp_content="${temp_content//\{\{ANDROID_VERSION_NAME\}\}/$version_name}"
